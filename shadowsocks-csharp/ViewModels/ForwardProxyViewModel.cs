@@ -1,5 +1,4 @@
 ﻿using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
 using ReactiveUI.Validation.Extensions;
 using ReactiveUI.Validation.Helpers;
 using Shadowsocks.Controller;
@@ -33,8 +32,8 @@ namespace Shadowsocks.ViewModels
             Username = _config.proxy.authUser;
             Password = _config.proxy.authPwd;
 
-            this.WhenAnyValue(x => x.NoProxy, x => !x)
-                .ToPropertyEx(this, x => x.CanModifyDetails);
+            _canModifyDetails = this.WhenAnyValue(x => x.NoProxy, x => !x)
+                .ToProperty(this, x => x.CanModifyDetails);
 
             AddressRule = this.ValidationRule(
                 viewModel => viewModel.Address,
@@ -76,32 +75,64 @@ namespace Shadowsocks.ViewModels
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<Unit, Unit> Cancel { get; }
 
-        [ObservableAsProperty]
-        public bool CanModifyDetails { get; }
+        private readonly ObservableAsPropertyHelper<bool> _canModifyDetails;
+        public bool CanModifyDetails => _canModifyDetails.Value;
 
-        [Reactive]
-        public bool NoProxy { get; set; }
+        private bool _noProxy;
+        public bool NoProxy
+        {
+            get => _noProxy;
+            set => this.RaiseAndSetIfChanged(ref _noProxy, value);
+        }
 
-        [Reactive]
-        public bool UseSocks5Proxy { get; set; }
+        private bool _useSocks5Proxy;
+        public bool UseSocks5Proxy
+        {
+            get => _useSocks5Proxy;
+            set => this.RaiseAndSetIfChanged(ref _useSocks5Proxy, value);
+        }
 
-        [Reactive]
-        public bool UseHttpProxy { get; set; }
+        private bool _useHttpProxy;
+        public bool UseHttpProxy
+        {
+            get => _useHttpProxy;
+            set => this.RaiseAndSetIfChanged(ref _useHttpProxy, value);
+        }
 
-        [Reactive]
-        public string Address { get; set; }
+        private string _address;
+        public string Address
+        {
+            get => _address;
+            set => this.RaiseAndSetIfChanged(ref _address, value);
+        }
 
-        [Reactive]
-        public int Port { get; set; }
+        private int _port;
+        public int Port
+        {
+            get => _port;
+            set => this.RaiseAndSetIfChanged(ref _port, value);
+        }
 
-        [Reactive]
-        public int Timeout { get; set; }
+        private int _timeout;
+        public int Timeout
+        {
+            get => _timeout;
+            set => this.RaiseAndSetIfChanged(ref _timeout, value);
+        }
 
-        [Reactive]
-        public string Username { get; set; }
+        private string _username;
+        public string Username
+        {
+            get => _username;
+            set => this.RaiseAndSetIfChanged(ref _username, value);
+        }
 
-        [Reactive]
-        public string Password { get; set; }
+        private string _password;
+        public string Password
+        {
+            get => _password;
+            set => this.RaiseAndSetIfChanged(ref _password, value);
+        }
 
         private ForwardProxyConfig GetForwardProxyConfig()
         {

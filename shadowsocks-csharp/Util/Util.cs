@@ -12,6 +12,7 @@ using System.Drawing;
 using ZXing;
 using ZXing.QrCode;
 using ZXing.Common;
+using ZXing.Windows.Compatibility;
 
 namespace Shadowsocks.Util
 {
@@ -50,7 +51,7 @@ namespace Shadowsocks.Util
                     }
                     else
                     {
-                        _tempPath = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), @"Shadowsocks\ss_win_temp_" + Program.ExecutablePath.GetHashCode())).FullName;
+                        _tempPath = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), @"Shadowsocks\ss_win_temp_" + GetDeterministicHashCode(Program.ExecutablePath))).FullName;
                     }
                 }
                 catch (Exception e)
@@ -60,6 +61,37 @@ namespace Shadowsocks.Util
                 }
             }
             return _tempPath;
+        }
+
+        // .NET Framework String.GetHashCode() was stable between processes. Modern .NET
+        // randomizes string hashes, so process-wide identifiers must not use string.GetHashCode().
+        // This reproduces the legacy algorithm used by the original application.
+        public static int GetDeterministicHashCode(string value)
+        {
+            if (value == null) throw new ArgumentNullException(nameof(value));
+
+            unchecked
+            {
+                int hash1 = (5381 << 16) + 5381;
+                int hash2 = hash1;
+                int i = 0;
+
+                while (i < value.Length)
+                {
+                    int block = value[i];
+                    if (i + 1 < value.Length) block |= value[i + 1] << 16;
+                    hash1 = ((hash1 << 5) + hash1 + (hash1 >> 27)) ^ block;
+                    i += 2;
+                    if (i >= value.Length) break;
+
+                    block = value[i];
+                    if (i + 1 < value.Length) block |= value[i + 1] << 16;
+                    hash2 = ((hash2 << 5) + hash2 + (hash2 >> 27)) ^ block;
+                    i += 2;
+                }
+
+                return hash1 + hash2 * 1566083941;
+            }
         }
 
         public enum WindowsThemeMode { Dark, Light }

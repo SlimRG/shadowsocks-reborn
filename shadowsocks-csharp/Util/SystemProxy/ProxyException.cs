@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -33,9 +32,6 @@ namespace Shadowsocks.Util.SystemProxy
         {
         }
 
-        protected ProxyException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
         public ProxyException(ProxyExceptionType type)
         {
             this.Type = type;
@@ -51,9 +47,5 @@ namespace Shadowsocks.Util.SystemProxy
             this.Type = type;
         }
 
-        protected ProxyException(ProxyExceptionType type, SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-            this.Type = type;
-        }
     }
 }

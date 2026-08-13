@@ -61,7 +61,7 @@ namespace Shadowsocks.Controller
             catch (Exception ex)
             {
                 logger.Error(ex);
-                throw ex;
+                throw;
             }
         }
     }

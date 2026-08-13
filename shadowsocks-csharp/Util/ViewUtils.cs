@@ -5,7 +5,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Linq;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace Shadowsocks.Util
@@ -22,28 +21,31 @@ namespace Shadowsocks.Util
             return children.SelectMany(GetChildControls<TControl>).Concat(children);
         }
 
-        public static IEnumerable<MenuItem> GetMenuItems(Menu m)
+        public static IEnumerable<ToolStripMenuItem> GetToolStripMenuItems(MenuStrip menu)
         {
-            if (m?.MenuItems == null || m.MenuItems.Count == 0) return Enumerable.Empty<MenuItem>();
-            var children = new List<MenuItem>();
-            foreach (var item in m.MenuItems)
-            {
-                children.Add((MenuItem)item);
-            }
-            return children.SelectMany(GetMenuItems).Concat(children);
+            if (menu == null) return Enumerable.Empty<ToolStripMenuItem>();
+            return GetToolStripMenuItems(menu.Items);
         }
 
-        // Workaround NotifyIcon's 63 chars limit
-        // https://stackoverflow.com/questions/579665/how-can-i-show-a-systray-tooltip-longer-than-63-chars
+        private static IEnumerable<ToolStripMenuItem> GetToolStripMenuItems(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                if (item is not ToolStripMenuItem menuItem) continue;
+                yield return menuItem;
+                foreach (var child in GetToolStripMenuItems(menuItem.DropDownItems))
+                    yield return child;
+            }
+        }
+
+        // NotifyIcon.Text supports 127 characters on modern WinForms.
         public static void SetNotifyIconText(NotifyIcon ni, string text)
         {
+            if (ni == null) throw new ArgumentNullException(nameof(ni));
+            if (text == null) throw new ArgumentNullException(nameof(text));
             if (text.Length >= 128)
-                throw new ArgumentOutOfRangeException("Text limited to 127 characters");
-            Type t = typeof(NotifyIcon);
-            BindingFlags hidden = BindingFlags.NonPublic | BindingFlags.Instance;
-            t.GetField("text", hidden).SetValue(ni, text);
-            if ((bool)t.GetField("added", hidden).GetValue(ni))
-                t.GetMethod("UpdateIcon", hidden).Invoke(ni, new object[] { true });
+                throw new ArgumentOutOfRangeException(nameof(text), "Text limited to 127 characters");
+            ni.Text = text;
         }
 
         public static Bitmap AddBitmapOverlay(Bitmap original, params Bitmap[] overlays)

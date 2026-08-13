@@ -1,6 +1,12 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+
+// This is a Windows-only desktop application. GenerateAssemblyInfo is disabled,
+// so the SDK cannot emit this platform annotation automatically.
+[assembly: SupportedOSPlatform("windows7.0")]
+
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information

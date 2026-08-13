@@ -5,11 +5,11 @@ namespace Shadowsocks.Encryption
 {
     public static class RNG
     {
-        private static RNGCryptoServiceProvider _rng = null;
+        private static RandomNumberGenerator _rng = null;
 
         public static void Init()
         {
-            _rng = _rng ?? new RNGCryptoServiceProvider();
+            _rng = _rng ?? RandomNumberGenerator.Create();
         }
 
         public static void Close()
@@ -32,17 +32,9 @@ namespace Shadowsocks.Encryption
         public static void GetBytes(byte[] buf, int len)
         {
             if (_rng == null) Init();
-            try
-            {
-                _rng.GetBytes(buf, 0, len);
-            }
-            catch
-            {
-                // the backup way
-                byte[] tmp = new byte[len];
-                _rng.GetBytes(tmp);
-                Buffer.BlockCopy(tmp, 0, buf, 0, len);
-            }
+            if (buf == null) throw new ArgumentNullException(nameof(buf));
+            if ((uint)len > (uint)buf.Length) throw new ArgumentOutOfRangeException(nameof(len));
+            _rng.GetBytes(buf.AsSpan(0, len));
         }
     }
 }

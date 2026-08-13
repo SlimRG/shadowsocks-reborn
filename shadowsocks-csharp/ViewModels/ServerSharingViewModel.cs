@@ -1,5 +1,4 @@
 ﻿using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
 using Shadowsocks.Model;
 using System;
 using System.Collections.Generic;
@@ -33,17 +32,33 @@ namespace Shadowsocks.ViewModels
 
         public ReactiveCommand<Unit, Unit> CopyLink { get; }
 
-        [Reactive]
-        public List<Server> Servers { get; private set; }
+        private List<Server> _servers;
+        public List<Server> Servers
+        {
+            get => _servers;
+            private set => this.RaiseAndSetIfChanged(ref _servers, value);
+        }
 
-        [Reactive]
-        public Server SelectedServer { get; set; }
+        private Server _selectedServer;
+        public Server SelectedServer
+        {
+            get => _selectedServer;
+            set => this.RaiseAndSetIfChanged(ref _selectedServer, value);
+        }
 
-        [Reactive]
-        public string SelectedServerUrl { get; private set; }
+        private string _selectedServerUrl;
+        public string SelectedServerUrl
+        {
+            get => _selectedServerUrl;
+            private set => this.RaiseAndSetIfChanged(ref _selectedServerUrl, value);
+        }
 
-        [Reactive]
-        public BitmapImage SelectedServerUrlImage { get; private set; }
+        private BitmapImage _selectedServerUrlImage;
+        public BitmapImage SelectedServerUrlImage
+        {
+            get => _selectedServerUrlImage;
+            private set => this.RaiseAndSetIfChanged(ref _selectedServerUrlImage, value);
+        }
 
         /// <summary>
         /// Called when SelectedServer changed

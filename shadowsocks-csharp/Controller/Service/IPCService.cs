@@ -2,6 +2,7 @@
 using System.IO.Pipes;
 using System.Net;
 using System.Text;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.Controller
 {
@@ -19,7 +20,7 @@ namespace Shadowsocks.Controller
     {
         private const int INT32_LEN = 4;
         private const int OP_OPEN_URL = 1;
-        private static readonly string PIPE_PATH = $"Shadowsocks\\{Program.ExecutablePath.GetHashCode()}";
+        private static readonly string PIPE_PATH = $"Shadowsocks\\{Utils.GetDeterministicHashCode(Program.ExecutablePath)}";
 
         public event EventHandler<RequestAddUrlEventArgs> OpenUrlRequested;
 
@@ -31,14 +32,19 @@ namespace Shadowsocks.Controller
                 using (NamedPipeServerStream stream = new NamedPipeServerStream(PIPE_PATH))
                 {
                     await stream.WaitForConnectionAsync();
-                    await stream.ReadAsync(buf, 0, INT32_LEN);
+                    await stream.ReadExactlyAsync(buf.AsMemory(0, INT32_LEN));
                     int opcode = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buf, 0));
                     if (opcode == OP_OPEN_URL)
                     {
-                        await stream.ReadAsync(buf, 0, INT32_LEN);
+                        await stream.ReadExactlyAsync(buf.AsMemory(0, INT32_LEN));
                         int strlen = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buf, 0));
+                        if (strlen < 0 || strlen > buf.Length)
+                        {
+                            stream.Close();
+                            continue;
+                        }
 
-                        await stream.ReadAsync(buf, 0, strlen);
+                        await stream.ReadExactlyAsync(buf.AsMemory(0, strlen));
                         string url = Encoding.UTF8.GetString(buf, 0, strlen);
 
                         OpenUrlRequested?.Invoke(this, new RequestAddUrlEventArgs(url));

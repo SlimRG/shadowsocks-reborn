@@ -33,32 +33,32 @@ namespace Shadowsocks.View
         private bool _isStartupCheck;
         private string _urlToOpen;
 
-        private ContextMenu contextMenu1;
-        private MenuItem disableItem;
-        private MenuItem AutoStartupItem;
-        private MenuItem ProtocolHandlerItem;
-        private MenuItem ShareOverLANItem;
-        private MenuItem SeperatorItem;
-        private MenuItem ConfigItem;
-        private MenuItem ServersItem;
-        private MenuItem globalModeItem;
-        private MenuItem PACModeItem;
-        private MenuItem localPACItem;
-        private MenuItem onlinePACItem;
-        private MenuItem editLocalPACItem;
-        private MenuItem updateFromGeositeItem;
-        private MenuItem editGFWUserRuleItem;
-        private MenuItem editOnlinePACItem;
-        private MenuItem secureLocalPacUrlToggleItem;
-        private MenuItem regenerateLocalPacOnUpdateItem;
-        private MenuItem autoCheckUpdatesToggleItem;
-        private MenuItem checkPreReleaseToggleItem;
-        private MenuItem proxyItem;
-        private MenuItem hotKeyItem;
-        private MenuItem VerboseLoggingToggleItem;
-        private MenuItem ShowPluginOutputToggleItem;
-        private MenuItem WriteI18NFileItem;
-        private MenuItem onlineConfigItem;
+        private ContextMenuStrip contextMenu1;
+        private ToolStripMenuItem disableItem;
+        private ToolStripMenuItem AutoStartupItem;
+        private ToolStripMenuItem ProtocolHandlerItem;
+        private ToolStripMenuItem ShareOverLANItem;
+        private ToolStripSeparator SeperatorItem;
+        private ToolStripMenuItem ConfigItem;
+        private ToolStripMenuItem ServersItem;
+        private ToolStripMenuItem globalModeItem;
+        private ToolStripMenuItem PACModeItem;
+        private ToolStripMenuItem localPACItem;
+        private ToolStripMenuItem onlinePACItem;
+        private ToolStripMenuItem editLocalPACItem;
+        private ToolStripMenuItem updateFromGeositeItem;
+        private ToolStripMenuItem editGFWUserRuleItem;
+        private ToolStripMenuItem editOnlinePACItem;
+        private ToolStripMenuItem secureLocalPacUrlToggleItem;
+        private ToolStripMenuItem regenerateLocalPacOnUpdateItem;
+        private ToolStripMenuItem autoCheckUpdatesToggleItem;
+        private ToolStripMenuItem checkPreReleaseToggleItem;
+        private ToolStripMenuItem proxyItem;
+        private ToolStripMenuItem hotKeyItem;
+        private ToolStripMenuItem VerboseLoggingToggleItem;
+        private ToolStripMenuItem ShowPluginOutputToggleItem;
+        private ToolStripMenuItem WriteI18NFileItem;
+        private ToolStripMenuItem onlineConfigItem;
 
         private ConfigForm configForm;
         private LogForm logForm;
@@ -95,7 +95,7 @@ namespace Shadowsocks.View
             _notifyIcon = new NotifyIcon();
             UpdateTrayIconAndNotifyText();
             _notifyIcon.Visible = true;
-            _notifyIcon.ContextMenu = contextMenu1;
+            _notifyIcon.ContextMenuStrip = contextMenu1;
             _notifyIcon.BalloonTipClicked += notifyIcon1_BalloonTipClicked;
             _notifyIcon.MouseClick += notifyIcon1_Click;
             _notifyIcon.MouseDoubleClick += notifyIcon1_DoubleClick;
@@ -244,67 +244,68 @@ namespace Shadowsocks.View
 
         #region MenuItems and MenuGroups
 
-        private MenuItem CreateMenuItem(string text, EventHandler click)
+        private ToolStripMenuItem CreateMenuItem(string text, EventHandler click)
         {
-            return new MenuItem(I18N.GetString(text), click);
+            return new ToolStripMenuItem(I18N.GetString(text), null, click);
         }
 
-        private MenuItem CreateMenuGroup(string text, MenuItem[] items)
+        private ToolStripMenuItem CreateMenuGroup(string text, ToolStripItem[] items)
         {
-            return new MenuItem(I18N.GetString(text), items);
+            return new ToolStripMenuItem(I18N.GetString(text), null, items);
         }
 
         private void LoadMenu()
         {
-            this.contextMenu1 = new ContextMenu(new MenuItem[] {
-                CreateMenuGroup("System Proxy", new MenuItem[] {
-                    this.disableItem = CreateMenuItem("Disable", new EventHandler(this.EnableItem_Click)),
-                    this.PACModeItem = CreateMenuItem("PAC", new EventHandler(this.PACModeItem_Click)),
-                    this.globalModeItem = CreateMenuItem("Global", new EventHandler(this.GlobalModeItem_Click))
+            contextMenu1 = new ContextMenuStrip();
+            contextMenu1.Items.AddRange(new ToolStripItem[] {
+                CreateMenuGroup("System Proxy", new ToolStripItem[] {
+                    disableItem = CreateMenuItem("Disable", EnableItem_Click),
+                    PACModeItem = CreateMenuItem("PAC", PACModeItem_Click),
+                    globalModeItem = CreateMenuItem("Global", GlobalModeItem_Click)
                 }),
-                this.ServersItem = CreateMenuGroup("Servers", new MenuItem[] {
-                    this.SeperatorItem = new MenuItem("-"),
-                    this.ConfigItem = CreateMenuItem("Edit Servers...", new EventHandler(this.Config_Click)),
-                    new MenuItem("-"),
-                    CreateMenuItem("Share Server Config...", new EventHandler(this.QRCodeItem_Click)),
-                    CreateMenuItem("Scan QRCode from Screen...", new EventHandler(this.ScanQRCodeItem_Click)),
-                    CreateMenuItem("Import URL from Clipboard...", new EventHandler(this.ImportURLItem_Click))
+                ServersItem = CreateMenuGroup("Servers", new ToolStripItem[] {
+                    SeperatorItem = new ToolStripSeparator(),
+                    ConfigItem = CreateMenuItem("Edit Servers...", Config_Click),
+                    new ToolStripSeparator(),
+                    CreateMenuItem("Share Server Config...", QRCodeItem_Click),
+                    CreateMenuItem("Scan QRCode from Screen...", ScanQRCodeItem_Click),
+                    CreateMenuItem("Import URL from Clipboard...", ImportURLItem_Click)
                 }),
-                CreateMenuGroup("PAC ", new MenuItem[] {
-                    this.localPACItem = CreateMenuItem("Local PAC", new EventHandler(this.LocalPACItem_Click)),
-                    this.onlinePACItem = CreateMenuItem("Online PAC", new EventHandler(this.OnlinePACItem_Click)),
-                    new MenuItem("-"),
-                    this.editLocalPACItem = CreateMenuItem("Edit Local PAC File...", new EventHandler(this.EditPACFileItem_Click)),
-                    this.updateFromGeositeItem = CreateMenuItem("Update Local PAC from Geosite", new EventHandler(this.UpdatePACFromGeositeItem_Click)),
-                    this.editGFWUserRuleItem = CreateMenuItem("Edit User Rule for Geosite...", new EventHandler(this.EditUserRuleFileForGeositeItem_Click)),
-                    this.secureLocalPacUrlToggleItem = CreateMenuItem("Secure Local PAC", new EventHandler(this.SecureLocalPacUrlToggleItem_Click)),
-                    this.regenerateLocalPacOnUpdateItem = CreateMenuItem("Regenerate local PAC on version update", new EventHandler(this.RegenerateLocalPacOnUpdateItem_Click)),
-                    CreateMenuItem("Copy Local PAC URL", new EventHandler(this.CopyLocalPacUrlItem_Click)),
-                    this.editOnlinePACItem = CreateMenuItem("Edit Online PAC URL...", new EventHandler(this.UpdateOnlinePACURLItem_Click)),
+                CreateMenuGroup("PAC ", new ToolStripItem[] {
+                    localPACItem = CreateMenuItem("Local PAC", LocalPACItem_Click),
+                    onlinePACItem = CreateMenuItem("Online PAC", OnlinePACItem_Click),
+                    new ToolStripSeparator(),
+                    editLocalPACItem = CreateMenuItem("Edit Local PAC File...", EditPACFileItem_Click),
+                    updateFromGeositeItem = CreateMenuItem("Update Local PAC from Geosite", UpdatePACFromGeositeItem_Click),
+                    editGFWUserRuleItem = CreateMenuItem("Edit User Rule for Geosite...", EditUserRuleFileForGeositeItem_Click),
+                    secureLocalPacUrlToggleItem = CreateMenuItem("Secure Local PAC", SecureLocalPacUrlToggleItem_Click),
+                    regenerateLocalPacOnUpdateItem = CreateMenuItem("Regenerate local PAC on version update", RegenerateLocalPacOnUpdateItem_Click),
+                    CreateMenuItem("Copy Local PAC URL", CopyLocalPacUrlItem_Click),
+                    editOnlinePACItem = CreateMenuItem("Edit Online PAC URL...", UpdateOnlinePACURLItem_Click),
                 }),
-                this.proxyItem = CreateMenuItem("Forward Proxy...", new EventHandler(this.proxyItem_Click)),
-                this.onlineConfigItem = CreateMenuItem("Online Config...", new EventHandler(this.OnlineConfig_Click)),
-                new MenuItem("-"),
-                this.AutoStartupItem = CreateMenuItem("Start on Boot", new EventHandler(this.AutoStartupItem_Click)),
-                this.ProtocolHandlerItem = CreateMenuItem("Associate ss:// Links", new EventHandler(this.ProtocolHandlerItem_Click)),
-                this.ShareOverLANItem = CreateMenuItem("Allow other Devices to connect", new EventHandler(this.ShareOverLANItem_Click)),
-                new MenuItem("-"),
-                this.hotKeyItem = CreateMenuItem("Edit Hotkeys...", new EventHandler(this.hotKeyItem_Click)),
-                CreateMenuGroup("Help", new MenuItem[] {
-                    CreateMenuItem("Show Logs...", new EventHandler(this.ShowLogItem_Click)),
-                    this.VerboseLoggingToggleItem = CreateMenuItem( "Verbose Logging", new EventHandler(this.VerboseLoggingToggleItem_Click) ),
-                    this.ShowPluginOutputToggleItem = CreateMenuItem("Show Plugin Output", new EventHandler(this.ShowPluginOutputToggleItem_Click)),
-                    this.WriteI18NFileItem = CreateMenuItem("Write translation template",new EventHandler(WriteI18NFileItem_Click)),
-                    CreateMenuGroup("Updates...", new MenuItem[] {
-                        CreateMenuItem("Check for Updates...", new EventHandler(this.checkUpdatesItem_Click)),
-                        new MenuItem("-"),
-                        this.autoCheckUpdatesToggleItem = CreateMenuItem("Check for Updates at Startup", new EventHandler(this.autoCheckUpdatesToggleItem_Click)),
-                        this.checkPreReleaseToggleItem = CreateMenuItem("Check Pre-release Version", new EventHandler(this.checkPreReleaseToggleItem_Click)),
+                proxyItem = CreateMenuItem("Forward Proxy...", proxyItem_Click),
+                onlineConfigItem = CreateMenuItem("Online Config...", OnlineConfig_Click),
+                new ToolStripSeparator(),
+                AutoStartupItem = CreateMenuItem("Start on Boot", AutoStartupItem_Click),
+                ProtocolHandlerItem = CreateMenuItem("Associate ss:// Links", ProtocolHandlerItem_Click),
+                ShareOverLANItem = CreateMenuItem("Allow other Devices to connect", ShareOverLANItem_Click),
+                new ToolStripSeparator(),
+                hotKeyItem = CreateMenuItem("Edit Hotkeys...", hotKeyItem_Click),
+                CreateMenuGroup("Help", new ToolStripItem[] {
+                    CreateMenuItem("Show Logs...", ShowLogItem_Click),
+                    VerboseLoggingToggleItem = CreateMenuItem("Verbose Logging", VerboseLoggingToggleItem_Click),
+                    ShowPluginOutputToggleItem = CreateMenuItem("Show Plugin Output", ShowPluginOutputToggleItem_Click),
+                    WriteI18NFileItem = CreateMenuItem("Write translation template", WriteI18NFileItem_Click),
+                    CreateMenuGroup("Updates...", new ToolStripItem[] {
+                        CreateMenuItem("Check for Updates...", checkUpdatesItem_Click),
+                        new ToolStripSeparator(),
+                        autoCheckUpdatesToggleItem = CreateMenuItem("Check for Updates at Startup", autoCheckUpdatesToggleItem_Click),
+                        checkPreReleaseToggleItem = CreateMenuItem("Check Pre-release Version", checkPreReleaseToggleItem_Click),
                     }),
-                    CreateMenuItem("About...", new EventHandler(this.AboutItem_Click)),
+                    CreateMenuItem("About...", AboutItem_Click),
                 }),
-                new MenuItem("-"),
-                CreateMenuItem("Quit", new EventHandler(this.Quit_Click))
+                new ToolStripSeparator(),
+                CreateMenuItem("Quit", Quit_Click)
             });
         }
 
@@ -652,7 +653,7 @@ namespace Shadowsocks.View
 
         private void UpdateServersMenu()
         {
-            var items = ServersItem.MenuItems;
+            var items = ServersItem.DropDownItems;
             while (items[0] != SeperatorItem)
             {
                 items.RemoveAt(0);
@@ -660,15 +661,15 @@ namespace Shadowsocks.View
             int strategyCount = 0;
             foreach (var strategy in controller.GetStrategies())
             {
-                MenuItem item = new MenuItem(strategy.Name);
+                ToolStripMenuItem item = new ToolStripMenuItem(strategy.Name);
                 item.Tag = strategy.ID;
                 item.Click += AStrategyItem_Click;
-                items.Add(strategyCount, item);
+                items.Insert(strategyCount, item);
                 strategyCount++;
             }
 
             // user wants a seperator item between strategy and servers menugroup
-            items.Add(strategyCount++, new MenuItem("-"));
+            items.Insert(strategyCount++, new ToolStripSeparator());
 
             int maxCount = 20;
             int serverCount = 0;
@@ -693,16 +694,16 @@ namespace Shadowsocks.View
                     {
                         var server = configuration.configs[i];
                         Configuration.CheckServer(server);
-                        var item = new MenuItem(server.ToString());
+                        var item = new ToolStripMenuItem(server.ToString());
                         item.Tag = i;
                         item.Click += AServerItem_Click;
-                        items.Add(strategyCount + serverCount, item);
+                        items.Insert(strategyCount + serverCount, item);
                         serverCount++;
                     }
                     
                     if (overflow)
                     {
-                        items.Add(strategyCount + serverCount, new MenuItem($"... more than {maxCount} (total {configuration.configs.Count})", Config_Click));
+                        items.Insert(strategyCount + serverCount, new ToolStripMenuItem($"... more than {maxCount} (total {configuration.configs.Count})", null, Config_Click));
                         break;
                     }
 
@@ -713,24 +714,25 @@ namespace Shadowsocks.View
                 }
             }
 
-            foreach (MenuItem item in items)
+            foreach (ToolStripItem stripItem in items)
             {
-                if (item.Tag != null && (item.Tag.ToString() == configuration.index.ToString() || item.Tag.ToString() == configuration.strategy))
-                {
-                    item.Checked = true;
-                }
+                if (stripItem is not ToolStripMenuItem item || item.Tag == null)
+                    continue;
+
+                item.Checked = item.Tag.ToString() == configuration.index.ToString()
+                    || item.Tag.ToString() == configuration.strategy;
             }
         }
 
         private void AServerItem_Click(object sender, EventArgs e)
         {
-            MenuItem item = (MenuItem)sender;
+            ToolStripMenuItem item = (ToolStripMenuItem)sender;
             controller.SelectServerIndex((int)item.Tag);
         }
 
         private void AStrategyItem_Click(object sender, EventArgs e)
         {
-            MenuItem item = (MenuItem)sender;
+            ToolStripMenuItem item = (ToolStripMenuItem)sender;
             controller.SelectStrategy((string)item.Tag);
         }
 
@@ -741,7 +743,7 @@ namespace Shadowsocks.View
 
         void openURLFromQRCode()
         {
-            Process.Start(_urlToOpen);
+            Process.Start(new ProcessStartInfo(_urlToOpen) { UseShellExecute = true });
         }
 
         private void QRCodeItem_Click(object sender, EventArgs e)
@@ -995,7 +997,7 @@ namespace Shadowsocks.View
 
         private void AboutItem_Click(object sender, EventArgs e)
         {
-            Process.Start("https://github.com/shadowsocks/shadowsocks-windows");
+            Process.Start(new ProcessStartInfo("https://github.com/shadowsocks/shadowsocks-windows") { UseShellExecute = true });
         }
 
         #endregion

@@ -1,5 +1,4 @@
 ﻿using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
 using ReactiveUI.Validation.Extensions;
 using ReactiveUI.Validation.Helpers;
 using Shadowsocks.Controller;
@@ -103,13 +102,25 @@ namespace Shadowsocks.ViewModels
         public ReactiveCommand<Unit, Unit> Remove { get; }
         public ReactiveCommand<Unit, Unit> Add { get; }
 
-        [Reactive]
-        public ObservableCollection<string> Sources { get; private set; }
+        private ObservableCollection<string> _sources;
+        public ObservableCollection<string> Sources
+        {
+            get => _sources;
+            private set => this.RaiseAndSetIfChanged(ref _sources, value);
+        }
 
-        [Reactive]
-        public string SelectedSource { get; set; }
+        private string _selectedSource;
+        public string SelectedSource
+        {
+            get => _selectedSource;
+            set => this.RaiseAndSetIfChanged(ref _selectedSource, value);
+        }
 
-        [Reactive]
-        public string Address { get; set; }
+        private string _address;
+        public string Address
+        {
+            get => _address;
+            set => this.RaiseAndSetIfChanged(ref _address, value);
+        }
     }
 }

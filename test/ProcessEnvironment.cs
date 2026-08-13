@@ -44,7 +44,6 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using System.Management;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -265,7 +264,6 @@ namespace Shadowsocks.Test
         static bool _TryReadIntPtr32(IntPtr hProcess, IntPtr ptr, out IntPtr readPtr)
         {
             bool result;
-            RuntimeHelpers.PrepareConstrainedRegions();
             try
             {
             }
@@ -293,7 +291,6 @@ namespace Shadowsocks.Test
         static bool _TryReadIntPtr(IntPtr hProcess, IntPtr ptr, out IntPtr readPtr)
         {
             bool result;
-            RuntimeHelpers.PrepareConstrainedRegions();
             try
             {
             }
@@ -321,7 +318,6 @@ namespace Shadowsocks.Test
         static bool _TryReadIntPtrWow64(IntPtr hProcess, long ptr, out long readPtr)
         {
             bool result;
-            RuntimeHelpers.PrepareConstrainedRegions();
             try
             {
             }

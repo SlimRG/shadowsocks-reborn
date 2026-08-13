@@ -1,5 +1,4 @@
 ﻿using ReactiveUI;
-using ReactiveUI.Fody.Helpers;
 using Shadowsocks.Controller;
 using Shadowsocks.Model;
 using Shadowsocks.View;
@@ -45,44 +44,96 @@ namespace Shadowsocks.ViewModels
         public ReactiveCommand<Unit, Unit> Save { get; }
         public ReactiveCommand<Unit, Unit> Cancel { get; }
 
-        [Reactive]
-        public string HotkeySystemProxy { get; set; }
+        private string _hotkeySystemProxy;
+        public string HotkeySystemProxy
+        {
+            get => _hotkeySystemProxy;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySystemProxy, value);
+        }
 
-        [Reactive]
-        public string HotkeyProxyMode { get; set; }
+        private string _hotkeyProxyMode;
+        public string HotkeyProxyMode
+        {
+            get => _hotkeyProxyMode;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyProxyMode, value);
+        }
 
-        [Reactive]
-        public string HotkeyAllowLan { get; set; }
+        private string _hotkeyAllowLan;
+        public string HotkeyAllowLan
+        {
+            get => _hotkeyAllowLan;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyAllowLan, value);
+        }
 
-        [Reactive]
-        public string HotkeyOpenLogs { get; set; }
+        private string _hotkeyOpenLogs;
+        public string HotkeyOpenLogs
+        {
+            get => _hotkeyOpenLogs;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyOpenLogs, value);
+        }
 
-        [Reactive]
-        public string HotkeySwitchPrev { get; set; }
+        private string _hotkeySwitchPrev;
+        public string HotkeySwitchPrev
+        {
+            get => _hotkeySwitchPrev;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySwitchPrev, value);
+        }
 
-        [Reactive]
-        public string HotkeySwitchNext { get; set; }
+        private string _hotkeySwitchNext;
+        public string HotkeySwitchNext
+        {
+            get => _hotkeySwitchNext;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySwitchNext, value);
+        }
 
-        [Reactive]
-        public bool RegisterAtStartup { get; set; }
+        private bool _registerAtStartup;
+        public bool RegisterAtStartup
+        {
+            get => _registerAtStartup;
+            set => this.RaiseAndSetIfChanged(ref _registerAtStartup, value);
+        }
 
-        [Reactive]
-        public string HotkeySystemProxyStatus { get; set; }
+        private string _hotkeySystemProxyStatus;
+        public string HotkeySystemProxyStatus
+        {
+            get => _hotkeySystemProxyStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySystemProxyStatus, value);
+        }
 
-        [Reactive]
-        public string HotkeyProxyModeStatus { get; set; }
+        private string _hotkeyProxyModeStatus;
+        public string HotkeyProxyModeStatus
+        {
+            get => _hotkeyProxyModeStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyProxyModeStatus, value);
+        }
 
-        [Reactive]
-        public string HotkeyAllowLanStatus { get; set; }
+        private string _hotkeyAllowLanStatus;
+        public string HotkeyAllowLanStatus
+        {
+            get => _hotkeyAllowLanStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyAllowLanStatus, value);
+        }
 
-        [Reactive]
-        public string HotkeyOpenLogsStatus { get; set; }
+        private string _hotkeyOpenLogsStatus;
+        public string HotkeyOpenLogsStatus
+        {
+            get => _hotkeyOpenLogsStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeyOpenLogsStatus, value);
+        }
 
-        [Reactive]
-        public string HotkeySwitchPrevStatus { get; set; }
+        private string _hotkeySwitchPrevStatus;
+        public string HotkeySwitchPrevStatus
+        {
+            get => _hotkeySwitchPrevStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySwitchPrevStatus, value);
+        }
 
-        [Reactive]
-        public string HotkeySwitchNextStatus { get; set; }
+        private string _hotkeySwitchNextStatus;
+        public string HotkeySwitchNextStatus
+        {
+            get => _hotkeySwitchNextStatus;
+            set => this.RaiseAndSetIfChanged(ref _hotkeySwitchNextStatus, value);
+        }
 
         public void RecordKeyDown(int hotkeyIndex, KeyEventArgs keyEventArgs)
         {

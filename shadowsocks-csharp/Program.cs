@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
-using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -34,7 +33,7 @@ namespace Shadowsocks
         public static readonly string ExecutablePath = Process.GetCurrentProcess().MainModule?.FileName;
         public static readonly string WorkingDirectory = Path.GetDirectoryName(ExecutablePath);
 
-        private static readonly Mutex mutex = new Mutex(true, $"Shadowsocks_{ExecutablePath.GetHashCode()}");
+        private static readonly Mutex mutex = new Mutex(true, $"Shadowsocks_{Utils.GetDeterministicHashCode(ExecutablePath)}");
 
         /// <summary>
         /// 应用程序的主入口点。
@@ -74,9 +73,6 @@ namespace Shadowsocks
             // todo: initialize the NLog configuartion
             Model.NLogConfig.TouchAndApplyNLogConfig();
 
-            // .NET Framework 4.7.2 on Win7 compatibility
-            ServicePointManager.SecurityProtocol |=
-                SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
             #endregion
 
             #region Compactibility Check
@@ -88,16 +84,6 @@ namespace Shadowsocks
                 return;
             }
 
-            // Check .NET Framework version
-            if (!Utils.IsSupportedRuntimeVersion())
-            {
-                if (DialogResult.OK == MessageBox.Show(I18N.GetString("Unsupported .NET Framework, please update to {0} or later.", "4.8"),
-                "Shadowsocks Error", MessageBoxButtons.OKCancel, MessageBoxIcon.Error))
-                {
-                    Process.Start("https://dotnet.microsoft.com/download/dotnet-framework/net48");
-                }
-                return;
-            }
             #endregion
 
             #region Event Handlers Setup
@@ -108,6 +94,7 @@ namespace Shadowsocks
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             Application.ApplicationExit += Application_ApplicationExit;
             SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
+            Application.SetHighDpiMode(HighDpiMode.SystemAware);
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             AutoStartup.RegisterForRestart(true);
