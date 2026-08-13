@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +7,7 @@ using System.Windows;
 using Newtonsoft.Json;
 using NLog;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 
 namespace Shadowsocks.Model
 {
@@ -45,8 +46,15 @@ namespace Shadowsocks.Model
         // hidden options
         public bool isIPv6Enabled; // for experimental ipv6 support
         public bool generateLegacyUrl; // for pre-sip002 url compatibility
-        public string geositeUrl; // for custom geosite source (and rule group)
-        public string geositeSha256sumUrl; // optional custom sha256sum url, leave empty to disable checksum verification for your custom geosite source
+        // GeoSite sources are used only by Local PAC. Every source is cached independently
+        // and all successfully loaded databases are merged. The checksum URL is derived as
+        // <source>.sha256sum; checksum absence is non-fatal.
+        public List<string> geositeUrls;
+
+        // Legacy single-source settings kept only for gui-config.json migration.
+        public string geositeUrl;
+        public string geositeSha256sumUrl;
+
         public List<string> geositeDirectGroups;  // groups of domains that we connect without the proxy
         public List<string> geositeProxiedGroups; // groups of domains that we connect via the proxy
         public bool geositePreferDirect; // a.k.a blacklist mode
@@ -84,6 +92,10 @@ namespace Shadowsocks.Model
             // hidden options
             isIPv6Enabled = false;
             generateLegacyUrl = false;
+            geositeUrls = new List<string>()
+            {
+                GeositeUpdater.DefaultSourceUrl,
+            };
             geositeUrl = "";
             geositeSha256sumUrl = "";
             geositeDirectGroups = new List<string>()
@@ -188,12 +200,7 @@ namespace Shadowsocks.Model
         /// <param name="config">A reference of Configuration object.</param>
         public static void Process(ref Configuration config)
         {
-            // Verify if the configured geosite groups exist.
-            // Reset to default if ANY one of the configured group doesn't exist.
-            if (!ValidateGeositeGroupList(config.geositeDirectGroups))
-                ResetGeositeDirectGroup(ref config.geositeDirectGroups);
-            if (!ValidateGeositeGroupList(config.geositeProxiedGroups))
-                ResetGeositeProxiedGroup(ref config.geositeProxiedGroups);
+            NormalizeGeositeSources(config);
 
             // Mark the first run of a new version.
             var appVersion = new Version(UpdateChecker.Version);
@@ -297,6 +304,40 @@ namespace Shadowsocks.Model
             ret.AddRange(groups.Where(g => string.IsNullOrEmpty(g.Key)).SelectMany(g => g));
             ret.AddRange(groups.Where(g => !string.IsNullOrEmpty(g.Key)).SelectMany(g => g));
             return ret;
+        }
+
+        public static List<string> NormalizeGeositeSourceList(IEnumerable<string> sources)
+        {
+            var normalized = (sources ?? Enumerable.Empty<string>())
+                .Select(source => source?.Trim())
+                .Where(source => !string.IsNullOrWhiteSpace(source))
+                .Where(source => Uri.TryCreate(source, UriKind.Absolute, out Uri uri) &&
+                                 (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (normalized.Count == 0)
+                normalized.Add(GeositeUpdater.DefaultSourceUrl);
+
+            return normalized;
+        }
+
+        private static void NormalizeGeositeSources(Configuration config)
+        {
+            if (config == null)
+                return;
+
+            var sources = config.geositeUrls ?? new List<string>();
+
+            // fix28 and older supported one custom URL that replaced the built-in source.
+            // Preserve that behavior during migration rather than silently adding v2fly as
+            // a second database. Checksum URLs are now discovered automatically.
+            if (!string.IsNullOrWhiteSpace(config.geositeUrl))
+                sources = new List<string> { config.geositeUrl };
+
+            config.geositeUrls = NormalizeGeositeSourceList(sources);
+            config.geositeUrl = "";
+            config.geositeSha256sumUrl = "";
         }
 
         /// <summary>

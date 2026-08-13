@@ -364,3 +364,10 @@ MigrationBackup/
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
+
+# Runtime PAC/GeoSite caches
+/dlc.dat
+/online-pac-cache.pac
+/online-pac-cache.meta.json
+
+/geosite-cache/

@@ -177,4 +177,25 @@
   <data name="Copy" xml:space="preserve">
     <value>コピー</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>ローカル PAC で使用する GeoSite データベースです。指定したすべてのソースを結合します。各 URL について Shadowsocks は &lt;URL&gt;.sha256sum を自動的に確認し、チェックサムがなくてもエラーにはなりません。</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>GeoSite URL を 1 つ以上追加します（1 行に 1 URL）：</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>上へ</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>下へ</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>既定値</value>
+  </data>
+  <data name="removeButton_Content" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="saveButton_Content" xml:space="preserve">
+    <value>保存</value>
+  </data>
 </root>

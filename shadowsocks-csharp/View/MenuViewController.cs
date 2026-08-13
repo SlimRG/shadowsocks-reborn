@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -9,6 +9,7 @@ using System.Windows.Forms.Integration;
 using System.Windows.Threading;
 using NLog;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Localization;
 using Shadowsocks.Model;
 using Shadowsocks.Properties;
@@ -44,6 +45,7 @@ namespace Shadowsocks.View
         private ToolStripMenuItem onlinePACItem;
         private ToolStripMenuItem editLocalPACItem;
         private ToolStripMenuItem updateFromGeositeItem;
+        private ToolStripMenuItem geositeSourcesItem;
         private ToolStripMenuItem editGFWUserRuleItem;
         private ToolStripMenuItem editOnlinePACItem;
         private ToolStripMenuItem secureLocalPacUrlToggleItem;
@@ -64,6 +66,7 @@ namespace Shadowsocks.View
         private System.Windows.Window hotkeysWindow;
         private System.Windows.Window forwardProxyWindow;
         private System.Windows.Window onlineConfigWindow;
+        private System.Windows.Window geositeSourcesWindow;
 
         // color definition for icon color transformation
         private readonly Color colorMaskBlue = Color.FromArgb(255, 25, 125, 191);
@@ -275,6 +278,7 @@ namespace Shadowsocks.View
                     new ToolStripSeparator(),
                     editLocalPACItem = CreateMenuItem("Edit Local PAC File...", EditPACFileItem_Click),
                     updateFromGeositeItem = CreateMenuItem("Update Local PAC from Geosite", UpdatePACFromGeositeItem_Click),
+                    geositeSourcesItem = CreateMenuItem("GeoSite Sources...", GeositeSourcesItem_Click),
                     editGFWUserRuleItem = CreateMenuItem("Edit User Rule for Geosite...", EditUserRuleFileForGeositeItem_Click),
                     secureLocalPacUrlToggleItem = CreateMenuItem("Secure Local PAC", SecureLocalPacUrlToggleItem_Click),
                     regenerateLocalPacOnUpdateItem = CreateMenuItem("Regenerate local PAC on version update", RegenerateLocalPacOnUpdateItem_Click),
@@ -530,6 +534,36 @@ namespace Shadowsocks.View
         private void OnlineConfigWindow_Closed(object sender, EventArgs e)
         {
             onlineConfigWindow = null;
+        }
+
+        private void GeositeSourcesItem_Click(object sender, EventArgs e)
+        {
+            if (geositeSourcesWindow == null)
+            {
+                geositeSourcesWindow = new System.Windows.Window()
+                {
+                    Title = I18N.GetString("GeoSite Sources"),
+                    Height = 500,
+                    Width = 740,
+                    MinHeight = 440,
+                    MinWidth = 620,
+                    Content = new GeositeSourcesView()
+                };
+                geositeSourcesWindow.Closed += GeositeSourcesWindow_Closed;
+                ElementHost.EnableModelessKeyboardInterop(geositeSourcesWindow);
+                geositeSourcesWindow.Show();
+            }
+            geositeSourcesWindow.Activate();
+        }
+
+        private void GeositeSourcesWindow_Closed(object sender, EventArgs e)
+        {
+            geositeSourcesWindow = null;
+        }
+
+        public void CloseGeositeSourcesWindow()
+        {
+            geositeSourcesWindow?.Close();
         }
 
         private void hotKeyItem_Click(object sender, EventArgs e)
@@ -860,6 +894,7 @@ namespace Shadowsocks.View
             {
                 this.editLocalPACItem.Enabled = true;
                 this.updateFromGeositeItem.Enabled = true;
+                this.geositeSourcesItem.Enabled = true;
                 this.editGFWUserRuleItem.Enabled = true;
                 this.editOnlinePACItem.Enabled = false;
             }
@@ -867,6 +902,7 @@ namespace Shadowsocks.View
             {
                 this.editLocalPACItem.Enabled = false;
                 this.updateFromGeositeItem.Enabled = false;
+                this.geositeSourcesItem.Enabled = false;
                 this.editGFWUserRuleItem.Enabled = false;
                 this.editOnlinePACItem.Enabled = true;
             }

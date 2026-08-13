@@ -10,7 +10,7 @@ This repository keeps the Shadowsocks for Windows **v4** client architecture and
 
 - PAC and Global Windows system-proxy modes.
 - Local SOCKS5 and HTTP proxy endpoints.
-- GeoSite-based PAC generation and custom user rules.
+- Local PAC generation from an on-demand GeoSite cache, plus cached Online PAC support.
 - SIP003 plugins and UDP relay.
 - Server switching strategies.
 - QR-code import/export and online configuration sources.
@@ -34,6 +34,8 @@ The explicit Windows TFM is required by the current ReactiveUI/System.Reactive s
 - Supported AEAD methods are implemented by `AEADBclEncryptor` using `System.Security.Cryptography`.
 - The old `libsscrypto.dll`, OpenSSL, mbedTLS and libsodium wrappers are not part of the active crypto path. Their legacy source filenames are explicitly excluded in the SDK-style project so stale files left by an in-place archive update cannot be compiled accidentally.
 - System proxy changes are performed in-process through WinINet; the old `sysproxy.exe` helpers are not used.
+- GeoSite is no longer embedded. Local PAC downloads its configured GeoSite source(s) through the active Shadowsocks connection on demand and keeps per-source runtime caches.
+- Online PAC files are downloaded through Shadowsocks, cached locally, and served to WinINet from the local `/pac` endpoint; Windows no longer fetches the remote PAC URL directly.
 - The UI is currently **mixed WinForms/WPF**. A complete Windows 11 WPF/Metro UI migration is not finished yet.
 - The supplied publish profile is currently **framework-dependent, untrimmed, x86 and single-file**. **NativeAOT is not enabled yet.**
 
@@ -102,11 +104,14 @@ On full exit, the system proxy state captured before Shadowsocks started is rest
 
 ## PAC
 
-PAC rules are generated from the GeoSite database from [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community).
+The two PAC sources are independent:
 
-Custom rules belong in `user-rule.txt`; generated `pac.txt` may be replaced after a GeoSite update.
+- **Local PAC** uses one or more configurable GeoSite databases. The default source is [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community), but `PAC → GeoSite Sources...` can replace it or add third-party databases. Sources are downloaded only while Local PAC is active, through the already running Shadowsocks connection, cached independently under `geosite-cache`, and merged by GeoSite group name. For every database URL Shadowsocks automatically tries the adjacent `<URL>.sha256sum`; a missing or unreachable checksum is non-fatal, while a checksum that is present must match. Custom rules belong in `user-rule.txt`; generated `pac.txt` may be replaced after a GeoSite/source update.
+- **Online PAC** does not use GeoSite. The configured remote PAC URL is fetched through the running Shadowsocks connection and stored as `online-pac-cache.pac`. WinINet is always configured with the local Shadowsocks `/pac` URL, so a blocked or temporarily unavailable PAC host does not invalidate an existing cache. HTTP validators (`ETag`/`Last-Modified`) are reused when available.
 
-Relevant settings include `geositeDirectGroups`, `geositeProxiedGroups` and `geositePreferDirect`.
+Until a first-time PAC download finishes, the local PAC endpoint temporarily returns a proxy-all rule instead of falling back to a direct connection.
+
+Local PAC settings include `geositeDirectGroups`, `geositeProxiedGroups` and `geositePreferDirect`.
 
 ## Plugins and HTTP forwarding
 

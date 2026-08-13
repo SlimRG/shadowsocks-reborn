@@ -186,4 +186,25 @@
   <data name="Copy" xml:space="preserve">
     <value>複製</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>用於本機 PAC 的 GeoSite 資料庫。所有列出的來源都會合併。對每個 URL，Shadowsocks 會自動嘗試讀取 &lt;URL&gt;.sha256sum；缺少校驗和不視為錯誤。</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>新增一個或多個 GeoSite URL（每行一個）：</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>上移</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>下移</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>預設</value>
+  </data>
+  <data name="removeButton_Content" xml:space="preserve">
+    <value>移除</value>
+  </data>
+  <data name="saveButton_Content" xml:space="preserve">
+    <value>儲存</value>
+  </data>
 </root>

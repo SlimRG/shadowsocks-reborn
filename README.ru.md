@@ -10,7 +10,7 @@
 
 - Системный прокси Windows в режимах PAC и Global.
 - Локальные SOCKS5- и HTTP-прокси.
-- Генерация PAC по GeoSite и пользовательские правила.
+- Local PAC по лениво загружаемой GeoSite-базе и кэшируемый Online PAC.
 - SIP003-плагины и UDP relay.
 - Стратегии переключения серверов.
 - Импорт и экспорт через QR-коды и онлайн-конфигурации.
@@ -34,6 +34,8 @@
 - Поддерживаемые AEAD-методы реализованы в `AEADBclEncryptor` через `System.Security.Cryptography`.
 - Старые `libsscrypto.dll`, OpenSSL, mbedTLS и libsodium больше не входят в активный crypto-path. Имена legacy `.cs`-файлов явно исключены в SDK-style `.csproj`, поэтому оставшиеся после распаковки поверх старой папки файлы не должны случайно попасть в компиляцию.
 - Системный прокси меняется внутри процесса через WinINet; старые `sysproxy.exe` не используются.
+- GeoSite больше не вшивается в приложение. Local PAC по требованию загружает настроенный источник или несколько источников через активное Shadowsocks-соединение и хранит отдельный runtime-кэш для каждого URL.
+- Online PAC скачивается через Shadowsocks, кэшируется локально и отдаётся WinINet через локальный `/pac`; Windows больше не загружает удалённый PAC URL напрямую.
 - UI пока **смешанный WinForms/WPF**. Полный перенос интерфейса на Windows 11 WPF/Metro ещё не завершён.
 - Текущий профиль публикации — **framework-dependent, untrimmed, x86, single-file**. **NativeAOT пока не включён.**
 
@@ -102,11 +104,14 @@ AEAD-криптография реализована через `Encryption/AEAD
 
 ## PAC
 
-PAC-правила генерируются по базе GeoSite проекта [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community).
+Два источника PAC теперь независимы:
 
-Пользовательские правила следует добавлять в `user-rule.txt`: сгенерированный `pac.txt` может быть заменён при обновлении GeoSite.
+- **Local PAC** использует один или несколько настраиваемых GeoSite-источников. По умолчанию используется [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community), но через `PAC → GeoSite Sources...` его можно заменить или добавить сторонние базы. Источники скачиваются только при активном Local PAC через уже работающее Shadowsocks-соединение, кэшируются независимо в `geosite-cache` и объединяются по именам GeoSite-групп. Для каждого URL автоматически проверяется соседний `<URL>.sha256sum`; отсутствие или недоступность checksum не считается ошибкой, но найденная checksum обязана совпасть. Пользовательские правила находятся в `user-rule.txt`; сгенерированный `pac.txt` может заменяться после обновления GeoSite или списка источников.
+- **Online PAC** GeoSite не использует. Указанный удалённый PAC URL загружается через работающее Shadowsocks-соединение и сохраняется в `online-pac-cache.pac`. WinINet всегда получает локальный URL Shadowsocks `/pac`, поэтому блокировка или временная недоступность хоста PAC не ломает уже существующий кэш. При наличии серверных валидаторов используются `ETag`/`Last-Modified`.
 
-Основные параметры: `geositeDirectGroups`, `geositeProxiedGroups` и `geositePreferDirect`.
+Пока первая загрузка PAC ещё не завершена, локальный PAC endpoint временно возвращает правило proxy-all, а не делает fallback в DIRECT.
+
+К Local PAC относятся параметры `geositeDirectGroups`, `geositeProxiedGroups` и `geositePreferDirect`.
 
 ## Плагины и HTTP-прокси
 

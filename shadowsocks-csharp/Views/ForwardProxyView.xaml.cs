@@ -1,4 +1,4 @@
-using System.Reactive.Disposables;
+﻿using System.Reactive.Disposables;
 using ReactiveUI;
 using Shadowsocks.ViewModels;
 

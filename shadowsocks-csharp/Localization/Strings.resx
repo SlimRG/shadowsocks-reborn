@@ -269,4 +269,19 @@
   <data name="ReleaseNotesUnavailable" xml:space="preserve">
     <value>Failed to get release notes</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>GeoSite databases used by Local PAC. All listed sources are merged. For each URL Shadowsocks automatically tries &lt;URL&gt;.sha256sum; a missing checksum is not an error.</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>Add one or more GeoSite URLs (one per line):</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>Move up</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>Move down</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>Default</value>
+  </data>
 </root>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Windows.Forms;
 using NLog;
@@ -37,9 +37,7 @@ namespace Shadowsocks.Controller
                         : SystemProxyMode.Disabled;
                 }
 
-                string expectedPacUrl = config.useOnlinePac && !string.IsNullOrEmpty(config.pacUrl)
-                    ? config.pacUrl
-                    : pacSrv?.PacUrl;
+                string expectedPacUrl = pacSrv?.PacUrl;
 
                 return !string.IsNullOrEmpty(expectedPacUrl) &&
                        setting.Flags.HasFlag(InternetPerConnectionFlags.AutoProxyUrl) &&
@@ -77,10 +75,11 @@ namespace Shadowsocks.Controller
                     return;
                 }
 
-                string pacUrl = config.useOnlinePac && !string.IsNullOrEmpty(config.pacUrl)
-                    ? config.pacUrl
-                    : pacSrv?.PacUrl ?? throw new InvalidOperationException("PAC server is not initialized.");
+                string pacUrl = pacSrv?.PacUrl ?? throw new InvalidOperationException("PAC server is not initialized.");
 
+                // Both Local PAC and Online PAC are served from localhost. For Online PAC
+                // this points at the persistent cache maintained by OnlinePacCache, so
+                // WinINet never needs direct access to the remote PAC URL.
                 WinINet.ProxyPAC(pacUrl);
             }
             catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)

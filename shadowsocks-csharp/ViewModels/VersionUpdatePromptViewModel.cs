@@ -1,4 +1,4 @@
-using System.Reactive;
+﻿using System.Reactive;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using Shadowsocks.Controller;

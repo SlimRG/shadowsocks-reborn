@@ -167,6 +167,8 @@ namespace Shadowsocks.Controller
             // some logic in configuration updated the config when saving, we need to read it again
             _config = Configuration.Load();
             Configuration.Process(ref _config);
+            if (!_config.useOnlinePac)
+                GeositeUpdater.ConfigureSources(_config.geositeUrls);
 
             NLogConfig.LoadConfiguration();
 
@@ -187,15 +189,27 @@ namespace Shadowsocks.Controller
 
             privoxyRunner = privoxyRunner ?? new PrivoxyRunner();
 
-            _pacDaemon = _pacDaemon ?? new PACDaemon(_config);
-            _pacDaemon.PACFileChanged += PacDaemon_PACFileChanged;
-            _pacDaemon.UserRuleFileChanged += PacDaemon_UserRuleFileChanged;
-            _pacServer = _pacServer ?? new PACServer(_pacDaemon);
-            _pacServer.UpdatePACURL(_config); // So PACServer works when system proxy disabled.
+            if (_pacDaemon == null)
+            {
+                _pacDaemon = new PACDaemon(_config);
+                _pacDaemon.PACFileChanged += PacDaemon_PACFileChanged;
+                _pacDaemon.UserRuleFileChanged += PacDaemon_UserRuleFileChanged;
+            }
+            else
+            {
+                _pacDaemon.UpdateConfiguration(_config);
+            }
 
-            GeositeUpdater.ResetEvent();
-            GeositeUpdater.UpdateCompleted += PacServer_PACUpdateCompleted;
-            GeositeUpdater.Error += PacServer_PACUpdateError;
+            _pacServer = _pacServer ?? new PACServer(_pacDaemon);
+            _pacServer.UpdatePACURL(_config); // Both Local and cached Online PAC are served from localhost.
+
+            // Do not even initialize GeoSite while Online PAC is selected.
+            if (!_config.useOnlinePac)
+            {
+                GeositeUpdater.ResetEvent();
+                GeositeUpdater.UpdateCompleted += PacServer_PACUpdateCompleted;
+                GeositeUpdater.Error += PacServer_PACUpdateError;
+            }
 
             _listener?.Stop();
             StopPlugins();
@@ -248,10 +262,12 @@ namespace Shadowsocks.Controller
                 ReportError(e);
             }
 
-            // Apply the Windows proxy first, then notify the UI. The menu must represent
-            // the effective WinINet state rather than only the persisted desired mode.
+            // Apply the Windows proxy first, then notify the UI. Both PAC modes now point
+            // WinINet at localhost; remote data is refreshed only after the SS listener is up.
             UpdateSystemProxy();
             ConfigChanged?.Invoke(this, new EventArgs());
+
+            _ = RefreshActivePacDataAsync(_config);
         }
 
         protected void SaveConfig(Configuration newConfig)
@@ -344,11 +360,20 @@ namespace Shadowsocks.Controller
 
         private void PacDaemon_PACFileChanged(object sender, EventArgs e)
         {
-            UpdateSystemProxy();
+            if (!_config.useOnlinePac)
+            {
+                _pacServer.UpdatePACURL(_config);
+                UpdateSystemProxy();
+            }
         }
 
         private void PacServer_PACUpdateCompleted(object sender, GeositeResultEventArgs e)
         {
+            if (!_config.useOnlinePac)
+            {
+                _pacServer.UpdatePACURL(_config);
+                UpdateSystemProxy();
+            }
             UpdatePACFromGeositeCompleted?.Invoke(this, e);
         }
 
@@ -360,8 +385,62 @@ namespace Shadowsocks.Controller
         private static readonly IEnumerable<char> IgnoredLineBegins = new[] { '!', '[' };
         private void PacDaemon_UserRuleFileChanged(object sender, EventArgs e)
         {
+            if (_config.useOnlinePac || !GeositeUpdater.IsDatabaseAvailable)
+                return;
+
             GeositeUpdater.MergeAndWritePACFile(_config.geositeDirectGroups, _config.geositeProxiedGroups, _config.geositePreferDirect);
+            _pacServer.UpdatePACURL(_config);
             UpdateSystemProxy();
+        }
+
+        private async Task RefreshActivePacDataAsync(Configuration configAtStart)
+        {
+            try
+            {
+                // Let compound UI mode changes (e.g. PAC -> Global) finish their second
+                // config write before deciding whether a PAC download is still required.
+                await Task.Yield();
+                if (!ReferenceEquals(_config, configAtStart))
+                    return;
+
+                // PAC data is only fetched when PAC mode is actually active. Global and
+                // Disabled modes do not need either GeoSite or an online PAC refresh.
+                if (!configAtStart.enabled || configAtStart.global)
+                    return;
+
+                if (configAtStart.useOnlinePac)
+                {
+                    if (string.IsNullOrWhiteSpace(configAtStart.pacUrl))
+                        return;
+
+                    await OnlinePacCache.RefreshAsync(configAtStart);
+
+                    // A reload may have changed the mode or URL while the request was in flight.
+                    if (_config.enabled && !_config.global && _config.useOnlinePac &&
+                        string.Equals(_config.pacUrl, configAtStart.pacUrl, StringComparison.Ordinal))
+                    {
+                        _pacServer.UpdatePACURL(_config);
+                        UpdateSystemProxy();
+                    }
+                    return;
+                }
+
+                if (!GeositeUpdater.IsDatabaseAvailable || GeositeUpdater.NeedsRefresh)
+                {
+                    await GeositeUpdater.UpdatePACFromGeosite(false);
+                    if (_config.enabled && !_config.global && !_config.useOnlinePac)
+                    {
+                        _pacServer.UpdatePACURL(_config);
+                        UpdateSystemProxy();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Keep the last known-good cache (or the proxy-all bootstrap PAC) and
+                // retry on the next relevant reload/start instead of breaking the client.
+                logger.LogUsefulException(ex);
+            }
         }
 
         public void CopyPacUrl()
@@ -375,6 +454,28 @@ namespace Shadowsocks.Controller
             SaveConfig(_config);
 
             ConfigChanged?.Invoke(this, new EventArgs());
+        }
+
+        public void SaveGeositeSources(List<string> sources)
+        {
+            _config.geositeUrls = Configuration.NormalizeGeositeSourceList(sources);
+
+            // The existing pac.txt may have been generated from a different set of
+            // databases. Remove it before reload so Local PAC is rebuilt from the new
+            // merged source set (or from the safe proxy-all bootstrap while downloading).
+            if (!_config.useOnlinePac)
+            {
+                try
+                {
+                    File.Delete(PACDaemon.PAC_FILE);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogUsefulException(ex);
+                }
+            }
+
+            SaveConfig(_config);
         }
 
         public void UseOnlinePAC(bool useOnlinePac)

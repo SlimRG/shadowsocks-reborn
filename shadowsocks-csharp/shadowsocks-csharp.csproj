@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
@@ -89,4 +89,13 @@
     <Compile Remove="Encryption\AEAD\AEADMbedTLSEncryptor.cs;Encryption\AEAD\AEADOpenSSLEncryptor.cs;Encryption\AEAD\AEADSodiumEncryptor.cs" />
     <Compile Remove="Encryption\MbedTLS.cs;Encryption\OpenSSL.cs;Encryption\Sodium.cs" />
   </ItemGroup>
+  <!-- dlc.dat used to be an embedded build input. Keep a stale copy left by an
+       in-place archive upgrade out of project items/publish output; Local PAC now
+       downloads its runtime GeoSite cache on demand. -->
+  <ItemGroup>
+    <None Remove="Data\dlc.dat" />
+    <Content Remove="Data\dlc.dat" />
+    <EmbeddedResource Remove="Data\dlc.dat" />
+  </ItemGroup>
+
 </Project>

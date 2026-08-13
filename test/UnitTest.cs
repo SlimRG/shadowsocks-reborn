@@ -1,4 +1,4 @@
-using System.Windows.Input;
+﻿using System.Windows.Input;
 using GlobalHotKey;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Controller.Hotkeys;

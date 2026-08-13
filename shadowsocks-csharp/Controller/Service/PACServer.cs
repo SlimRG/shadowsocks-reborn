@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -11,7 +11,7 @@ namespace Shadowsocks.Controller
 {
     public class PACServer : Listener.Service
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         public const string RESOURCE_NAME = "pac";
 
@@ -28,11 +28,12 @@ namespace Shadowsocks.Controller
                 return _cachedPacSecret;
             }
         }
+
         private string _cachedPacSecret = "";
         public string PacUrl { get; private set; } = "";
 
         private Configuration _config;
-        private PACDaemon _pacDaemon;
+        private readonly PACDaemon _pacDaemon;
 
         public PACServer(PACDaemon pacDaemon)
         {
@@ -43,55 +44,51 @@ namespace Shadowsocks.Controller
         {
             _config = config;
             string usedSecret = _config.secureLocalPac ? $"&secret={PacSecret}" : "";
-            string contentHash = GetHash(_pacDaemon.GetPACContent());
+            string contentHash = GetHash(GetContentForHash());
             PacUrl = $"http://{config.LocalHost}:{config.localPort}/{RESOURCE_NAME}?hash={contentHash}{usedSecret}";
             logger.Debug("Set PAC URL:" + PacUrl);
         }
 
-        private static string GetHash(string content)
+        private string GetContentForHash()
         {
-            return HttpServerUtilityUrlToken.Encode(MD5.HashData(Encoding.ASCII.GetBytes(content)));
+            if (UseOnlinePac())
+            {
+                if (OnlinePacCache.TryGetContent(_config.pacUrl, out string cached))
+                    return cached;
+
+                string proxy = $"PROXY {_config.LocalHost}:{_config.localPort};";
+                return BuildProxyAllPac(proxy);
+            }
+
+            return _pacDaemon.GetPACContent();
         }
+
+        private static string GetHash(string content)
+            => HttpServerUtilityUrlToken.Encode(MD5.HashData(Encoding.UTF8.GetBytes(content)));
 
         public override bool Handle(byte[] firstPacket, int length, Socket socket, object state)
         {
             if (socket.ProtocolType != ProtocolType.Tcp)
-            {
                 return false;
-            }
 
             try
             {
-                /*
-                 *  RFC 7230
-                 *  
-                    GET /hello.txt HTTP/1.1
-                    User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3
-                    Host: www.example.com
-                    Accept-Language: en, mi 
-                 */
-
                 string request = Encoding.UTF8.GetString(firstPacket, 0, length);
                 string[] lines = request.Split('\r', '\n');
-                bool hostMatch = false, pathMatch = false, useSocks = false;
+                bool hostMatch = false, pathMatch = false;
                 bool secretMatch = !_config.secureLocalPac;
 
-                if (lines.Length < 2)   // need at lease RequestLine + Host
-                {
+                if (lines.Length < 2)
                     return false;
-                }
 
-                // parse request line
                 string requestLine = lines[0];
-                // GET /pac?t=yyyyMMddHHmmssfff&secret=foobar HTTP/1.1
                 string[] requestItems = requestLine.Split(' ');
                 if (requestItems.Length == 3 && requestItems[0] == "GET")
                 {
                     int index = requestItems[1].IndexOf('?');
                     if (index < 0)
-                    {
                         index = requestItems[1].Length;
-                    }
+
                     string resourceString = requestItems[1].Substring(0, index).Remove(0, 1);
                     if (string.Equals(resourceString, RESOURCE_NAME, StringComparison.OrdinalIgnoreCase))
                     {
@@ -100,45 +97,33 @@ namespace Shadowsocks.Controller
                         {
                             string queryString = requestItems[1].Substring(index);
                             if (queryString.Contains(PacSecret))
-                            {
                                 secretMatch = true;
-                            }
                         }
                     }
                 }
 
-                // parse request header
                 for (int i = 1; i < lines.Length; i++)
                 {
                     if (string.IsNullOrEmpty(lines[i]))
                         continue;
 
-                    string[] kv = lines[i].Split(new char[] { ':' }, 2);
-                    if (kv.Length == 2)
+                    string[] kv = lines[i].Split(new[] { ':' }, 2);
+                    if (kv.Length == 2 && kv[0] == "Host" &&
+                        kv[1].Trim() == ((IPEndPoint)socket.LocalEndPoint).ToString())
                     {
-                        if (kv[0] == "Host")
-                        {
-                            if (kv[1].Trim() == ((IPEndPoint)socket.LocalEndPoint).ToString())
-                            {
-                                hostMatch = true;
-                            }
-                        }
+                        hostMatch = true;
                     }
                 }
 
-                if (hostMatch && pathMatch)
-                {
-                    if (!secretMatch)
-                    {
-                        socket.Close(); // Close immediately
-                    }
-                    else
-                    {
-                        SendResponse(socket, useSocks);
-                    }
-                    return true;
-                }
-                return false;
+                if (!hostMatch || !pathMatch)
+                    return false;
+
+                if (!secretMatch)
+                    socket.Close();
+                else
+                    SendResponse(socket);
+
+                return true;
             }
             catch (ArgumentException)
             {
@@ -146,27 +131,41 @@ namespace Shadowsocks.Controller
             }
         }
 
-
-
-        public void SendResponse(Socket socket, bool useSocks)
+        private void SendResponse(Socket socket)
         {
             try
             {
                 IPEndPoint localEndPoint = (IPEndPoint)socket.LocalEndPoint;
+                string proxy = GetPACAddress(localEndPoint);
+                string pacContent;
 
-                string proxy = GetPACAddress(localEndPoint, useSocks);
+                if (UseOnlinePac())
+                {
+                    // Serve the remote PAC byte-for-byte logically from the local cache.
+                    // If this is the first run and the cache is not ready yet, proxy-all is
+                    // a safe bootstrap that avoids a direct-network leak.
+                    pacContent = OnlinePacCache.TryGetContent(_config.pacUrl, out string cached)
+                        ? cached
+                        : BuildProxyAllPac(proxy);
+                }
+                else
+                {
+                    pacContent = $"var __PROXY__ = '{proxy}';\n" + _pacDaemon.GetPACContent();
+                }
 
-                string pacContent = $"var __PROXY__ = '{proxy}';\n" + _pacDaemon.GetPACContent();
+                byte[] body = Encoding.UTF8.GetBytes(pacContent);
                 string responseHead =
-$@"HTTP/1.1 200 OK
-Server: ShadowsocksWindows/{UpdateChecker.Version}
-Content-Type: application/x-ns-proxy-autoconfig
-Content-Length: {Encoding.UTF8.GetBytes(pacContent).Length}
-Connection: Close
-
-";
-                byte[] response = Encoding.UTF8.GetBytes(responseHead + pacContent);
-                socket.BeginSend(response, 0, response.Length, 0, new AsyncCallback(SendCallback), socket);
+                    $"HTTP/1.1 200 OK\r\n" +
+                    $"Server: ShadowsocksWindows/{UpdateChecker.Version}\r\n" +
+                    "Content-Type: application/x-ns-proxy-autoconfig; charset=utf-8\r\n" +
+                    $"Content-Length: {body.Length}\r\n" +
+                    "Cache-Control: no-cache\r\n" +
+                    "Connection: Close\r\n\r\n";
+                byte[] head = Encoding.UTF8.GetBytes(responseHead);
+                byte[] response = new byte[head.Length + body.Length];
+                Buffer.BlockCopy(head, 0, response, 0, head.Length);
+                Buffer.BlockCopy(body, 0, response, head.Length, body.Length);
+                socket.BeginSend(response, 0, response.Length, 0, SendCallback, socket);
             }
             catch (Exception e)
             {
@@ -175,7 +174,7 @@ Connection: Close
             }
         }
 
-        private void SendCallback(IAsyncResult ar)
+        private static void SendCallback(IAsyncResult ar)
         {
             Socket conn = (Socket)ar.AsyncState;
             try
@@ -183,15 +182,19 @@ Connection: Close
                 conn.Shutdown(SocketShutdown.Send);
             }
             catch
-            { }
+            {
+            }
         }
 
+        private bool UseOnlinePac()
+            => _config != null && _config.useOnlinePac && !string.IsNullOrWhiteSpace(_config.pacUrl);
 
-        private string GetPACAddress(IPEndPoint localEndPoint, bool useSocks)
-        {
-            return localEndPoint.AddressFamily == AddressFamily.InterNetworkV6
-                ? $"{(useSocks ? "SOCKS5" : "PROXY")} [{localEndPoint.Address}]:{_config.localPort};"
-                : $"{(useSocks ? "SOCKS5" : "PROXY")} {localEndPoint.Address}:{_config.localPort};";
-        }
+        private static string BuildProxyAllPac(string proxy)
+            => $"function FindProxyForURL(url, host) {{ return '{proxy}'; }}\n";
+
+        private string GetPACAddress(IPEndPoint localEndPoint)
+            => localEndPoint.AddressFamily == AddressFamily.InterNetworkV6
+                ? $"PROXY [{localEndPoint.Address}]:{_config.localPort};"
+                : $"PROXY {localEndPoint.Address}:{_config.localPort};";
     }
 }

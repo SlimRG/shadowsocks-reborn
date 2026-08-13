@@ -180,4 +180,22 @@
   <data name="Copy" xml:space="preserve">
     <value>copie</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Bases GeoSite utilisées par le PAC local. Toutes les sources indiquées sont fusionnées. Pour chaque URL, Shadowsocks essaie automatiquement &lt;URL&gt;.sha256sum ; l’absence de somme de contrôle n’est pas une erreur.</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>Ajoutez une ou plusieurs URL GeoSite (une par ligne) :</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>Monter</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>Descendre</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>Par défaut</value>
+  </data>
+  <data name="saveButton_Content" xml:space="preserve">
+    <value>Enregistrer</value>
+  </data>
 </root>

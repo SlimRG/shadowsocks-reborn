@@ -177,4 +177,25 @@
   <data name="Copy" xml:space="preserve">
     <value>부</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>로컬 PAC에서 사용하는 GeoSite 데이터베이스입니다. 나열된 모든 소스를 병합합니다. 각 URL에 대해 Shadowsocks가 &lt;URL&gt;.sha256sum을 자동으로 확인하며, 체크섬이 없어도 오류로 처리하지 않습니다.</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>GeoSite URL을 하나 이상 추가하세요(한 줄에 하나씩):</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>위로</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>아래로</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>기본값</value>
+  </data>
+  <data name="removeButton_Content" xml:space="preserve">
+    <value>제거</value>
+  </data>
+  <data name="saveButton_Content" xml:space="preserve">
+    <value>저장</value>
+  </data>
 </root>

@@ -1,4 +1,4 @@
-using System.Reactive.Disposables;
+﻿using System.Reactive.Disposables;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using Shadowsocks.ViewModels;

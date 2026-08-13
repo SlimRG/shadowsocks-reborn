@@ -234,4 +234,19 @@
   <data name="sip008UpdateAllFailure" xml:space="preserve">
     <value>下列来源更新失败:\n\n</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>用于本地 PAC 的 GeoSite 数据库。所有列出的源都会合并。对于每个 URL，Shadowsocks 会自动尝试读取 &lt;URL&gt;.sha256sum；缺少校验和并不视为错误。</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>添加一个或多个 GeoSite URL（每行一个）：</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>上移</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>下移</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>默认</value>
+  </data>
 </root>

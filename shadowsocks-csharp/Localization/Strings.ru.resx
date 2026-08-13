@@ -269,4 +269,19 @@
   <data name="ReleaseNotesUnavailable" xml:space="preserve">
     <value>Не удалось получить примечания к выпуску</value>
   </data>
+  <data name="geositeSourcesDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Базы GeoSite для локального PAC. Все указанные источники объединяются. Для каждого URL Shadowsocks автоматически проверяет &lt;URL&gt;.sha256sum; отсутствие контрольной суммы не является ошибкой.</value>
+  </data>
+  <data name="addGeositeSourcesTextBlock_Text" xml:space="preserve">
+    <value>Добавьте один или несколько URL GeoSite (по одному в строке):</value>
+  </data>
+  <data name="moveUpButton_Content" xml:space="preserve">
+    <value>Вверх</value>
+  </data>
+  <data name="moveDownButton_Content" xml:space="preserve">
+    <value>Вниз</value>
+  </data>
+  <data name="restoreDefaultButton_Content" xml:space="preserve">
+    <value>По умолчанию</value>
+  </data>
 </root>
