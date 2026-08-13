@@ -1,17 +1,14 @@
-﻿using NLog;
-using Shadowsocks.Properties;
-using Shadowsocks.Util;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using Newtonsoft.Json;
-using Shadowsocks.Model;
-using System.Net;
-using System.Net.Http;
-using System.Threading.Tasks;
 using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using NLog;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.Controller
 {
@@ -211,7 +208,7 @@ namespace Shadowsocks.Controller
                 groupName = "";
                 attribute = "";
                 return false;
-            }    
+            }
             return true;
         }
 

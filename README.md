@@ -4,148 +4,121 @@
 
 **English** | [Русский](README.ru.md) | [中文说明](https://github.com/shadowsocks/shadowsocks-windows/wiki/Shadowsocks-Windows-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)
 
-This repository contains the Shadowsocks Windows v4 client migrated to **.NET 10** while preserving the original architecture and behavior as closely as possible.
+This repository keeps the Shadowsocks for Windows **v4** client architecture and ports it to **.NET 10**. The goal is compatibility with current Windows/.NET while preserving the v4 transport, encryption, configuration, plugin and server-selection behavior.
 
 ## Features
 
-- System proxy configuration.
-- PAC and global proxy modes.
-- GeoSite and user-defined PAC rules.
+- PAC and Global Windows system-proxy modes.
 - Local SOCKS5 and HTTP proxy endpoints.
-- Server auto-switching strategies.
-- UDP relay.
-- SIP003 plugins.
+- GeoSite-based PAC generation and custom user rules.
+- SIP003 plugins and UDP relay.
+- Server switching strategies.
+- QR-code import/export and online configuration sources.
 - Global hotkeys.
-- QR-code import/export.
-- Online configuration support.
+- Localized WinForms/WPF UI.
+- Log viewer with a built-in traffic chart.
 
-## Requirements
+## Requirements and architecture
 
-- Windows supported by .NET 10 Desktop.
-- .NET 10 Desktop Runtime (x86) for the framework-dependent published build.
-- Microsoft Visual C++ Redistributable (x86) may be required by the bundled native components.
+- Target framework: `net10.0-windows10.0.19041.0`.
+- Publish RID: `win-x86`.
+- .NET 10 Desktop Runtime (x86) is required for the framework-dependent publish.
+- The main process remains x86 because bundled `libsscrypto.dll` is loaded in-process and is 32-bit.
+- `privoxy.exe` is bundled as an x86 helper process.
 
-> The application is intentionally built as **x86** because the bundled `libsscrypto.dll` is 32-bit. Privoxy is also bundled as an x86 helper process, while both x86 and x64 variants of `sysproxy` are included.
+The explicit Windows TFM is required by the current ReactiveUI/System.Reactive stack so the Windows dispatcher implementation is selected correctly.
 
-## Download and publish
+## Build
 
-Published builds are produced as a framework-dependent, x86, single-file executable.
-
-```powershell
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj `
-  -c Release `
-  -p:Platform=x86 `
-  -p:PublishProfile=FolderProfile
-```
-
-The publish output is written under:
-
-```text
-shadowsocks-csharp\bin\x86\Release\net10.0-windows\win-x86\publish\
-```
-
-## Basic usage
-
-1. Start Shadowsocks and find its icon in the notification area.
-2. Add one or more servers from the **Servers** menu.
-3. Select **Enable System Proxy** to route applications that use the Windows system proxy.
-4. Alternatively, configure an application manually to use the local SOCKS5 or HTTP proxy at `127.0.0.1:1080` by default. The local port can be changed in the server settings.
-
-## PAC
-
-PAC rules are generated from the GeoSite database from [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community).
-
-Two modes are supported:
-
-- **Whitelist mode** (`geositePreferDirect = false`, default): domains from the direct groups bypass the proxy; unmatched domains use the proxy.
-- **Blacklist mode** (`geositePreferDirect = true`): domains from the proxied groups use the proxy; direct-group exceptions bypass it; unmatched domains connect directly.
-
-Relevant configuration properties in `gui-config.json`:
-
-- `geositeDirectGroups` — initialized with `cn` and `geolocation-!cn@cn`.
-- `geositeProxiedGroups` — initialized with `geolocation-!cn`.
-- `geositePreferDirect` — selects whitelist/blacklist behavior.
-
-### User-defined PAC rules
-
-Use `user-rule.txt` for custom PAC rules. Direct edits to generated `pac.txt` can be overwritten when the GeoSite database is updated.
-
-For Microsoft Store/UWP applications, Windows may require importing the Internet Explorer/system proxy into WinHTTP from an elevated terminal:
+Use a .NET 10 SDK on Windows:
 
 ```cmd
-netsh winhttp import proxy source=ie
-```
-
-## Server auto switching
-
-Available strategies include:
-
-1. Load balancing — select a server randomly.
-2. High availability — prefer a server with lower latency and packet loss.
-3. Total package loss — use availability statistics to select a server.
-
-Custom strategies can implement the `IStrategy` interface.
-
-## UDP
-
-Applications that do not support SOCKS5 UDP directly may require software such as SocksCap or ProxyCap to route their UDP traffic through Shadowsocks.
-
-## Multiple instances
-
-To run multiple instances independently, place each copy in a different directory and configure a different local port. Instance identification is derived deterministically from the executable path so IPC and single-instance behavior remain stable on modern .NET.
-
-## Plugins
-
-Configure a plugin executable path, relative or absolute, in the server editor. Forward proxy settings are not used while a SIP003 plugin is active.
-
-See the upstream documentation for [non-SIP003 plugins](https://github.com/shadowsocks/shadowsocks-windows/wiki/Working-with-non-SIP003-standard-Plugin).
-
-## Global hotkeys
-
-Hotkeys can be registered automatically at startup. If multiple Shadowsocks instances are running, use different key combinations for each instance.
-
-- Focus a hotkey field and press the desired combination to assign it.
-- Press **Backspace** to clear the current combination.
-- Green indicates successful registration.
-- Yellow indicates a conflict with another application.
-
-## Development
-
-The solution targets `net10.0-windows` and keeps the application and tests on x86.
-
-```powershell
 dotnet restore .\shadowsocks-windows.sln
 dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x86
 dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x86
 ```
 
-Migration-specific details are documented in [NET10-MIGRATION.md](NET10-MIGRATION.md).
+Publish with the supplied profile:
 
-## Main managed dependencies
+```cmd
+dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x86 -p:PublishProfile=FolderProfile
+```
 
-| Component | Purpose |
-| --- | --- |
-| ReactiveUI / ReactiveUI.WPF | WPF MVVM and bindings |
-| WPFLocalizeExtension | WPF localization |
-| MdXaml / AvalonEdit | Markdown rendering |
-| Newtonsoft.Json | Configuration and API JSON |
-| NLog | Logging |
-| Google.Protobuf | GeoSite data model |
-| ZXing.Net | QR-code support |
-| GlobalHotKeyCore | Global keyboard shortcuts |
-| Caseless.Fody / Fody | Case-insensitive string comparison weaving |
+Output:
+
+```text
+shadowsocks-csharp\bin\x86\Release\net10.0-windows10.0.19041.0\win-x86\publish\
+```
+
+The publish is framework-dependent, untrimmed and single-file.
+
+## Configuration
+
+Application settings are stored in `gui-config.json`, including Log Viewer state.
+
+`Shadowsocks.dll.config` is not used. The old `ApplicationSettingsBase`/`app.config` settings path has been removed.
+
+`Shadowsocks.pdb` is optional at runtime. Keep it while testing to retain source file and line information in stack traces.
+
+## System proxy
+
+The legacy `sysproxy.exe` / `sysproxy64.exe` path has been removed. System proxy settings are applied directly through WinINet.
+
+The selected mode is persisted in `gui-config.json`:
+
+- Disabled: `enabled = false`
+- Global: `enabled = true`, `global = true`
+- PAC: `enabled = true`, `global = false`
+
+At startup and after internal reloads, Shadowsocks reapplies the saved mode and reads the effective Windows state back. Tray/menu state follows the effective state, not only the JSON flags.
+
+On full exit, the system proxy state captured before Shadowsocks started is restored. The selected Shadowsocks mode remains saved and is reapplied on the next start.
+
+## PAC
+
+PAC rules are generated from the GeoSite database from [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community).
+
+Custom rules belong in `user-rule.txt`; generated `pac.txt` may be replaced after a GeoSite update.
+
+Relevant settings include `geositeDirectGroups`, `geositeProxiedGroups` and `geositePreferDirect`.
+
+## Plugins and HTTP forwarding
+
+Configure a plugin executable in the server editor. Relative and absolute paths are supported.
+
+Privoxy startup is synchronized with the local HTTP forwarder so normal traffic is not accepted before Privoxy starts listening. During reload, active forwarding handlers are closed before Privoxy is stopped.
+
+See the upstream guide for [non-SIP003 plugins](https://github.com/shadowsocks/shadowsocks-windows/wiki/Working-with-non-SIP003-standard-Plugin).
+
+## UDP
+
+Applications that do not support SOCKS5 UDP directly may require a routing tool such as SocksCap or ProxyCap.
+
+Listener cancellation during normal stop/reload is treated as expected shutdown. Unexpected socket failures are still logged.
+
+## Localization
+
+The classic WinForms UI uses `shadowsocks-csharp/Data/i18n.csv`. WPF views use `shadowsocks-csharp/Localization/Strings*.resx`.
+
+When adding user-visible text, add it to the appropriate localization source instead of leaving a hard-coded UI string.
+
+## Diagnostics
+
+Runtime logging uses NLog. Real `Win32Exception` failures are logged with the native error code, HRESULT and stack trace.
+
+`ERROR_PARTIAL_COPY (299)` is ignored only at the specific cross-bitness process-inspection call where it is expected.
+
+For runtime reports, keep the complete WARN/ERROR entry and stack trace. Keeping `Shadowsocks.pdb` next to the executable makes those traces substantially more useful.
 
 ## Bundled native components
 
 | Component | Architecture | Purpose |
 | --- | --- | --- |
-| `libsscrypto.dll` | x86 | Shadowsocks native cryptography |
+| `libsscrypto.dll` | x86 | In-process Shadowsocks cryptography |
 | `privoxy.exe` | x86 | Local HTTP-to-SOCKS bridge |
-| `sysproxy.exe` | x86 | Windows system-proxy helper |
-| `sysproxy64.exe` | x64 | Windows system-proxy helper on 64-bit Windows |
+
+The current port does not use `sysproxy.exe`, `sysproxy64.exe`, Costura, `System.Windows.Forms.DataVisualization`, `System.Data.SqlClient` or `sni.dll`.
 
 ## License
 
-Shadowsocks for Windows is distributed under the [GNU General Public License v3.0](LICENSE.txt).
-
-The repository also contains third-party components under their respective licenses. See their upstream projects for details.
+Shadowsocks for Windows is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components remain under their respective licenses.

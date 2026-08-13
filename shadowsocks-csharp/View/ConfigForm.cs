@@ -1,11 +1,11 @@
-using Shadowsocks.Controller;
-using Shadowsocks.Model;
-using Shadowsocks.Properties;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Shadowsocks.Controller;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
 
 namespace Shadowsocks.View
 {
@@ -106,6 +106,8 @@ namespace Shadowsocks.View
         private void UpdateTexts()
         {
             I18N.TranslateForm(this);
+            toolTip1.SetToolTip(PluginOptionsLabel, I18N.GetString("Environment variables for plugin program"));
+            toolTip1.SetToolTip(PluginArgumentsLabel, I18N.GetString("Plugin arguments are not part of SIP003. They are passed as command-line arguments. Mandatory: %SS_LOCAL_HOST%, %SS_LOCAL_PORT%, %SS_REMOTE_HOST%, %SS_REMOTE_PORT%. Optional: %SS_PLUGIN_OPTIONS%."));
             toolTip1.SetToolTip(PortableModeCheckBox, I18N.GetString("Restart required"));
         }
 

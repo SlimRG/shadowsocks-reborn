@@ -1,17 +1,15 @@
-﻿using NLog;
 using System;
-using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.IO.Compression;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using NLog;
 using Shadowsocks.Controller;
 using Shadowsocks.Model;
-using System.Drawing;
 using ZXing;
-using ZXing.QrCode;
 using ZXing.Common;
+using ZXing.QrCode;
 using ZXing.Windows.Compatibility;
 
 namespace Shadowsocks.Util
@@ -248,7 +246,7 @@ namespace Shadowsocks.Util
             }
             catch (ArgumentException ae)
             {
-                MessageBox.Show("OpenRegKey: " + ae.ToString());
+                MessageBox.Show(I18N.GetString("Failed to open registry key: {0}", ae));
                 return null;
             }
             catch (Exception e)

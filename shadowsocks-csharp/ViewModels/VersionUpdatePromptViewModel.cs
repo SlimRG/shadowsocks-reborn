@@ -1,7 +1,8 @@
-﻿using Newtonsoft.Json.Linq;
+using System.Reactive;
+using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using Shadowsocks.Controller;
-using System.Reactive;
+using Shadowsocks.Localization;
 
 namespace Shadowsocks.ViewModels
 {
@@ -11,9 +12,13 @@ namespace Shadowsocks.ViewModels
         {
             _updateChecker = Program.MenuController.updateChecker;
             _releaseObject = releaseObject;
-            ReleaseNotes = string.Concat(
-                $"# {((bool)_releaseObject["prerelease"] ? "⚠ Pre-release" : "ℹ Release")} {(string)_releaseObject["tag_name"] ?? "Failed to get tag name"}\r\n",
-                (string)_releaseObject["body"] ?? "Failed to get release notes");
+            string releaseKind = (bool)_releaseObject["prerelease"]
+                ? "⚠ " + LocalizationProvider.GetLocalizedValue<string>("ReleaseKindPreRelease")
+                : "ℹ " + LocalizationProvider.GetLocalizedValue<string>("ReleaseKindRelease");
+            string tagName = (string)_releaseObject["tag_name"] ?? LocalizationProvider.GetLocalizedValue<string>("ReleaseTagUnavailable");
+            string releaseNotes = (string)_releaseObject["body"] ?? LocalizationProvider.GetLocalizedValue<string>("ReleaseNotesUnavailable");
+
+            ReleaseNotes = $"# {releaseKind} {tagName}\r\n{releaseNotes}";
 
             Update = ReactiveCommand.CreateFromTask(_updateChecker.DoUpdate);
             SkipVersion = ReactiveCommand.Create(_updateChecker.SkipUpdate);

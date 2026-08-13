@@ -121,63 +121,152 @@
     <value>Пароль</value>
   </data>
   <data name="Type" xml:space="preserve">
-    <value>тип</value>
+    <value>Тип</value>
   </data>
   <data name="Address" xml:space="preserve">
-    <value>адрес</value>
+    <value>Адрес</value>
   </data>
   <data name="Port" xml:space="preserve">
-    <value>порт</value>
+    <value>Порт</value>
   </data>
   <data name="Timeout" xml:space="preserve">
     <value>Таймаут (сек)</value>
   </data>
   <data name="cancelButton_Content" xml:space="preserve">
-    <value>Отмена</value>
+    <value>_Отмена</value>
   </data>
   <data name="okButton_Content" xml:space="preserve">
-    <value>ОК</value>
+    <value>_ОК</value>
   </data>
   <data name="ToggleSystemProxy" xml:space="preserve">
-    <value>ВКЛ/ВЫКЛ системный прокси-сервер</value>
+    <value>Включить/выключить системный прокси</value>
   </data>
   <data name="ToggleProxyMode" xml:space="preserve">
-    <value>Переключение режима прокси-сервера</value>
+    <value>Переключить режим прокси</value>
   </data>
   <data name="AllowClientsFromLAN" xml:space="preserve">
-    <value>Общий доступ к подключению</value>
+    <value>Разрешить подключения из локальной сети</value>
   </data>
   <data name="OpenLogsWindow" xml:space="preserve">
-    <value>Просмотр журналов</value>
+    <value>Открыть журнал</value>
   </data>
   <data name="SwitchToPreviousServer" xml:space="preserve">
-    <value>Переключить на пред. сервер</value>
+    <value>Переключиться на предыдущий сервер</value>
   </data>
   <data name="SwitchToNextServer" xml:space="preserve">
-    <value>Переключить на след. сервер</value>
+    <value>Переключиться на следующий сервер</value>
   </data>
   <data name="RegisterHotkeysAtStartup" xml:space="preserve">
-    <value>Применить все</value>
+    <value>Применять горячие клавиши при запуске</value>
   </data>
   <data name="registerAllButton_Content" xml:space="preserve">
-    <value>Применять при запуске программы</value>
+    <value>_Применить все</value>
   </data>
   <data name="addButton_Content" xml:space="preserve">
-    <value>Добавить</value>
+    <value>_Добавить</value>
   </data>
   <data name="skipVersionButton_Content" xml:space="preserve">
-    <value>пропустить версию</value>
+    <value>_Пропустить версию</value>
   </data>
   <data name="copyLinkButton_Content" xml:space="preserve">
-    <value>копировать ссылку</value>
+    <value>_Копировать ссылку</value>
   </data>
   <data name="removeButton_Content" xml:space="preserve">
-    <value>Удалить</value>
+    <value>_Удалить</value>
   </data>
   <data name="updateButton_Content" xml:space="preserve">
-    <value>Обновить</value>
+    <value>_Обновить</value>
   </data>
   <data name="Copy" xml:space="preserve">
-    <value>копировать</value>
+    <value>_Копировать</value>
+  </data>
+  <data name="NoProxy" xml:space="preserve">
+    <value>Без прокси</value>
+  </data>
+  <data name="SOCKS5" xml:space="preserve">
+    <value>SOCKS5</value>
+  </data>
+  <data name="HTTP" xml:space="preserve">
+    <value>HTTP</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>Параметры</value>
+  </data>
+  <data name="CredentialsOptional" xml:space="preserve">
+    <value>Учётные данные (необязательно)</value>
+  </data>
+  <data name="Username" xml:space="preserve">
+    <value>Имя пользователя</value>
+  </data>
+  <data name="saveButton_Content" xml:space="preserve">
+    <value>_Сохранить</value>
+  </data>
+  <data name="updateAllButton_Content" xml:space="preserve">
+    <value>Обновить все</value>
+  </data>
+  <data name="updatePromptTitle" xml:space="preserve">
+    <value>Доступно обновление.</value>
+  </data>
+  <data name="updatePromptBody" xml:space="preserve">
+    <value>Ознакомьтесь с примечаниями к выпуску и выберите, устанавливать ли обновление.</value>
+  </data>
+  <data name="notNowButton_Content" xml:space="preserve">
+    <value>_Не сейчас</value>
+  </data>
+  <data name="ForwardProxy" xml:space="preserve">
+    <value>Прямой прокси</value>
+  </data>
+  <data name="ServerSharing" xml:space="preserve">
+    <value>Поделиться конфигурацией сервера</value>
+  </data>
+  <data name="Hotkeys" xml:space="preserve">
+    <value>Горячие клавиши</value>
+  </data>
+  <data name="OnlineConfigDelivery" xml:space="preserve">
+    <value>Онлайн-конфигурации</value>
+  </data>
+  <data name="VersionUpdate" xml:space="preserve">
+    <value>Обновление Shadowsocks</value>
+  </data>
+  <data name="sip008UpdateSuccess" xml:space="preserve">
+    <value>Выбранный источник успешно обновлён.</value>
+  </data>
+  <data name="sip008UpdateFailure" xml:space="preserve">
+    <value>Не удалось обновить источник. Подробности смотрите в журнале.</value>
+  </data>
+  <data name="sip008UpdateAllSuccess" xml:space="preserve">
+    <value>Все источники успешно обновлены.</value>
+  </data>
+  <data name="sip008UpdateAllFailure" xml:space="preserve">
+    <value>Не удалось обновить следующие источники:
+
+</value>
+  </data>
+  <data name="ForwardProxyAddressRequired" xml:space="preserve">
+    <value>Адрес не может быть пустым.</value>
+  </data>
+  <data name="ForwardProxyPortOutOfRange" xml:space="preserve">
+    <value>Порт {0} вне допустимого диапазона (0, 65535].</value>
+  </data>
+  <data name="ForwardProxyTimeoutOutOfRange" xml:space="preserve">
+    <value>Таймаут {0} вне допустимого диапазона (0, 10].</value>
+  </data>
+  <data name="ForwardProxyCredentialsPairRequired" xml:space="preserve">
+    <value>Укажите и имя пользователя, и пароль.</value>
+  </data>
+  <data name="OnlineConfigHttpWarning" xml:space="preserve">
+    <value>Внимание: получение онлайн-конфигурации по обычному HTTP небезопасно!</value>
+  </data>
+  <data name="ReleaseKindPreRelease" xml:space="preserve">
+    <value>Предварительная версия</value>
+  </data>
+  <data name="ReleaseKindRelease" xml:space="preserve">
+    <value>Релиз</value>
+  </data>
+  <data name="ReleaseTagUnavailable" xml:space="preserve">
+    <value>Не удалось получить номер версии</value>
+  </data>
+  <data name="ReleaseNotesUnavailable" xml:space="preserve">
+    <value>Не удалось получить примечания к выпуску</value>
   </data>
 </root>

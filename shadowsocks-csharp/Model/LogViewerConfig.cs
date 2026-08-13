@@ -11,6 +11,11 @@ namespace Shadowsocks.Model
         public bool topMost;
         public bool wrapText;
         public bool toolbarShown;
+        public int width = 600;
+        public int height = 400;
+        public int top;
+        public int left;
+        public bool maximized = true;
 
         public Font Font { get; set; } = new Font("Consolas", 8F);
 
@@ -28,41 +33,39 @@ namespace Shadowsocks.Model
 
         #region Size
 
-        public void SaveSize()
-        {
-            Properties.Settings.Default.Save();
-        }
-
         [JsonIgnore]
         public int Width
         {
-            get { return Properties.Settings.Default.LogViewerWidth; }
-            set { Properties.Settings.Default.LogViewerWidth = value; }
+            get { return width; }
+            set { width = value; }
         }
 
         [JsonIgnore]
         public int Height
         {
-            get { return Properties.Settings.Default.LogViewerHeight; }
-            set { Properties.Settings.Default.LogViewerHeight = value; }
+            get { return height; }
+            set { height = value; }
         }
+
         [JsonIgnore]
         public int Top
         {
-            get { return Properties.Settings.Default.LogViewerTop; }
-            set { Properties.Settings.Default.LogViewerTop = value; }
+            get { return top; }
+            set { top = value; }
         }
+
         [JsonIgnore]
         public int Left
         {
-            get { return Properties.Settings.Default.LogViewerLeft; }
-            set { Properties.Settings.Default.LogViewerLeft = value; }
+            get { return left; }
+            set { left = value; }
         }
+
         [JsonIgnore]
         public bool Maximized
         {
-            get { return Properties.Settings.Default.LogViewerMaximized; }
-            set { Properties.Settings.Default.LogViewerMaximized = value; }
+            get { return maximized; }
+            set { maximized = value; }
         }
 
         [JsonIgnore]

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using NLog;
@@ -9,6 +10,9 @@ namespace Shadowsocks.Controller
     class PortForwarder : Listener.Service
     {
         private readonly int _targetPort;
+        private readonly object _handlersLock = new();
+        private readonly HashSet<Handler> _handlers = [];
+        private bool _stopping;
 
         public PortForwarder(int targetPort)
         {
@@ -21,19 +25,57 @@ namespace Shadowsocks.Controller
             {
                 return false;
             }
-            new Handler().Start(firstPacket, length, socket, _targetPort);
+
+            Handler handler;
+            lock (_handlersLock)
+            {
+                if (_stopping)
+                {
+                    socket.Close();
+                    return true;
+                }
+
+                handler = new Handler(RemoveHandler);
+                _handlers.Add(handler);
+            }
+
+            handler.Start(firstPacket, length, socket, _targetPort);
             return true;
+        }
+
+        public override void Stop()
+        {
+            Handler[] handlers;
+            lock (_handlersLock)
+            {
+                _stopping = true;
+                handlers = [.. _handlers];
+            }
+
+            foreach (Handler handler in handlers)
+            {
+                handler.Close();
+            }
+        }
+
+        private void RemoveHandler(Handler handler)
+        {
+            lock (_handlersLock)
+            {
+                _handlers.Remove(handler);
+            }
         }
 
         private class Handler
         {
-            private static Logger logger = LogManager.GetCurrentClassLogger();
+            private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
+            private readonly Action<Handler> _onClosed;
             private byte[] _firstPacket;
             private int _firstPacketLength;
             private Socket _local;
             private WrappedSocket _remote;
-            private bool _closed = false;
+            private volatile bool _closed;
             private bool _localShutdown = false;
             private bool _remoteShutdown = false;
             private const int RecvSize = 2048;
@@ -45,23 +87,41 @@ namespace Shadowsocks.Controller
             // instance-based lock
             private readonly object _Lock = new object();
 
+            public Handler(Action<Handler> onClosed)
+            {
+                _onClosed = onClosed;
+            }
+
             public void Start(byte[] firstPacket, int length, Socket socket, int targetPort)
             {
-                _firstPacket = firstPacket;
-                _firstPacketLength = length;
-                _local = socket;
+                lock (_Lock)
+                {
+                    if (_closed)
+                    {
+                        socket.Close();
+                        return;
+                    }
+
+                    _firstPacket = firstPacket;
+                    _firstPacketLength = length;
+                    _local = socket;
+                    _remote = new WrappedSocket();
+                }
+
                 try
                 {
                     // Local Port Forward use IP as is
                     EndPoint remoteEP = SocketUtil.GetEndPoint(_local.AddressFamily == AddressFamily.InterNetworkV6 ? "[::1]" : "127.0.0.1", targetPort);
 
                     // Connect to the remote endpoint.
-                    _remote = new WrappedSocket();
                     _remote.BeginConnect(remoteEP, ConnectCallback, null);
                 }
                 catch (Exception e)
                 {
-                    logger.LogUsefulException(e);
+                    if (!_closed)
+                    {
+                        logger.LogUsefulException(e);
+                    }
                     Close();
                 }
             }
@@ -80,7 +140,10 @@ namespace Shadowsocks.Controller
                 }
                 catch (Exception e)
                 {
-                    logger.LogUsefulException(e);
+                    if (!_closed)
+                    {
+                        logger.LogUsefulException(e);
+                    }
                     Close();
                 }
             }
@@ -238,11 +301,15 @@ namespace Shadowsocks.Controller
                     try
                     {
                         _local.Shutdown(SocketShutdown.Both);
-                        _local.Close();
                     }
-                    catch (Exception e)
+                    catch (SocketException)
                     {
-                        logger.LogUsefulException(e);
+                        // Expected if the peer already closed while the forwarder is stopping.
+                    }
+                    finally
+                    {
+                        _local.Close();
+                        _local = null;
                     }
                 }
                 if (_remote != null)
@@ -250,13 +317,19 @@ namespace Shadowsocks.Controller
                     try
                     {
                         _remote.Shutdown(SocketShutdown.Both);
-                        _remote.Dispose();
                     }
-                    catch (SocketException e)
+                    catch (SocketException)
                     {
-                        logger.LogUsefulException(e);
+                        // Expected if the peer already closed while the forwarder is stopping.
+                    }
+                    finally
+                    {
+                        _remote.Dispose();
+                        _remote = null;
                     }
                 }
+
+                _onClosed(this);
             }
         }
     }

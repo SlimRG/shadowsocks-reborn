@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using NLog;
@@ -37,7 +37,7 @@ namespace Shadowsocks.Encryption
         public static byte[] MD5(byte[] input)
         {
             byte[] output = new byte[16];
-            if (md5_ret(input, (uint) input.Length, output) != 0)
+            if (md5_ret(input, (uint)input.Length, output) != 0)
                 throw new System.Exception("mbedtls: MD5 failure");
             return output;
         }

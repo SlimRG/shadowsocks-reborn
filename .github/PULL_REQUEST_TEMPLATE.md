@@ -1,21 +1,18 @@
-## Please follow the guide below
+## Checklist
 
-- You will be asked some questions, please read them **carefully** and answer honestly
-- Put an `x` into all the boxes [ ] relevant to your *pull request* (like that [x])
-- Use *Preview* tab to see how your *pull request* will actually look like
+- [ ] I searched for similar issues and pull requests.
+- [ ] I built the solution with the .NET 10 SDK.
+- [ ] I ran the relevant tests.
+- [ ] I updated translations when user-visible text changed.
+- [ ] I updated documentation when requirements, configuration, or behavior changed.
 
-- [ ] [Searched](https://github.com/shadowsocks/shadowsocks-windows/search?q=is%3Apr&type=Issues) for similar pull requests
-- [ ] Compiled the code with Visual Studio
-- [ ] Require translation update
-- [ ] Require document update (readme.md, wikipage, etc)
+## Change type
 
-### What is the purpose of your *pull request*?
 - [ ] Bug fix
-- [ ] Improvement
+- [ ] Improvement/refactoring
 - [ ] New feature
+- [ ] Documentation
 
----
+## Description
 
-### Description of your *pull request* and other information
-
-Explanation of your *pull request* in arbitrary form goes here. Please make sure the description explains the purpose and effect of your *pull request* and is worded well enough to be understood. Provide as much context and examples as possible.
+Describe the purpose of the change, the affected behavior, and any compatibility considerations. Include reproduction steps or test evidence when relevant.

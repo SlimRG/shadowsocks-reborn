@@ -222,26 +222,6 @@ namespace Shadowsocks.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        public static byte[] sysproxy_exe {
-            get {
-                object obj = ResourceManager.GetObject("sysproxy_exe", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        public static byte[] sysproxy64_exe {
-            get {
-                object obj = ResourceManager.GetObject("sysproxy64_exe", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to ! Put user rules line by line in this file.
         ///! See https://adblockplus.org/en/filter-cheatsheet
         ///.

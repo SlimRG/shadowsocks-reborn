@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -120,7 +120,7 @@ namespace Shadowsocks
                 await MainController.UpdateAllOnlineConfig();
             });
 
-#region IPC handler and argument processing
+            #region IPC handler and argument processing
             IPCService ipcService = new IPCService();
             Task.Run(() => ipcService.RunServer());
             ipcService.OpenUrlRequested += (_, e) => MainController.AskAddServerBySSURL(e.Url);
@@ -129,8 +129,8 @@ namespace Shadowsocks
             {
                 MainController.AskAddServerBySSURL(Options.OpenUrl);
             }
-#endregion
-            
+            #endregion
+
             Application.Run();
         }
 

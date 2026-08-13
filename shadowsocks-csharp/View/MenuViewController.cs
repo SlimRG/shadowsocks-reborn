@@ -1,10 +1,3 @@
-﻿using NLog;
-using Shadowsocks.Controller;
-using Shadowsocks.Localization;
-using Shadowsocks.Model;
-using Shadowsocks.Properties;
-using Shadowsocks.Util;
-using Shadowsocks.Views;
 using System;
 using System.Diagnostics;
 using System.Drawing;
@@ -14,9 +7,13 @@ using System.Text;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using System.Windows.Threading;
-using ZXing;
-using ZXing.Common;
-using ZXing.QrCode;
+using NLog;
+using Shadowsocks.Controller;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
+using Shadowsocks.Views;
 
 namespace Shadowsocks.View
 {
@@ -125,8 +122,9 @@ namespace Shadowsocks.View
         private void UpdateTrayIconAndNotifyText()
         {
             Configuration config = controller.GetCurrentConfiguration();
-            bool enabled = config.enabled;
-            bool global = config.global;
+            SystemProxyMode proxyMode = controller.GetSystemProxyMode();
+            bool enabled = proxyMode != SystemProxyMode.Disabled;
+            bool global = proxyMode == SystemProxyMode.Global;
 
             Color colorMask = SelectColorMask(enabled, global);
             Size iconSize = SelectIconSize();
@@ -148,7 +146,7 @@ namespace Shadowsocks.View
             // show more info by hacking the P/Invoke declaration for NOTIFYICONDATA inside Windows Forms
             string text = I18N.GetString("Shadowsocks") + " " + UpdateChecker.Version + "\n" +
                           (enabled ?
-                              I18N.GetString("System Proxy On: ") + (global ? I18N.GetString("Global") : I18N.GetString("PAC")) :
+                              I18N.GetString("System Proxy On:") + " " + (global ? I18N.GetString("Global") : I18N.GetString("PAC")) :
                               I18N.GetString("Running: Port {0}", config.localPort))  // this feedback is very important because they need to know Shadowsocks is running
                           + "\n" + serverInfo;
             if (text.Length > 127)
@@ -352,7 +350,7 @@ namespace Shadowsocks.View
         {
             Configuration config = controller.GetCurrentConfiguration();
             UpdateServersMenu();
-            UpdateSystemProxyItemsEnabledStatus(config);
+            UpdateSystemProxyItemsEnabledStatus();
             ShareOverLANItem.Checked = config.shareOverLan;
             VerboseLoggingToggleItem.Checked = config.isVerboseLogging;
             ShowPluginOutputToggleItem.Checked = config.showPluginOutput;
@@ -600,51 +598,40 @@ namespace Shadowsocks.View
 
         private void controller_EnableStatusChanged(object sender, EventArgs e)
         {
-            disableItem.Checked = !controller.GetCurrentConfiguration().enabled;
+            UpdateSystemProxyItemsEnabledStatus();
         }
 
         private void EnableItem_Click(object sender, EventArgs e)
         {
             controller.ToggleEnable(false);
-            Configuration config = controller.GetCurrentConfiguration();
-            UpdateSystemProxyItemsEnabledStatus(config);
+            UpdateSystemProxyItemsEnabledStatus();
         }
 
         void controller_EnableGlobalChanged(object sender, EventArgs e)
         {
-            globalModeItem.Checked = controller.GetCurrentConfiguration().global;
-            PACModeItem.Checked = !globalModeItem.Checked;
+            UpdateSystemProxyItemsEnabledStatus();
         }
 
-        private void UpdateSystemProxyItemsEnabledStatus(Configuration config)
+        private void UpdateSystemProxyItemsEnabledStatus()
         {
-            disableItem.Checked = !config.enabled;
-            if (!config.enabled)
-            {
-                globalModeItem.Checked = false;
-                PACModeItem.Checked = false;
-            }
-            else
-            {
-                globalModeItem.Checked = config.global;
-                PACModeItem.Checked = !config.global;
-            }
+            SystemProxyMode mode = controller.GetSystemProxyMode();
+            disableItem.Checked = mode == SystemProxyMode.Disabled;
+            globalModeItem.Checked = mode == SystemProxyMode.Global;
+            PACModeItem.Checked = mode == SystemProxyMode.Pac;
         }
 
         private void GlobalModeItem_Click(object sender, EventArgs e)
         {
             controller.ToggleEnable(true);
             controller.ToggleGlobal(true);
-            Configuration config = controller.GetCurrentConfiguration();
-            UpdateSystemProxyItemsEnabledStatus(config);
+            UpdateSystemProxyItemsEnabledStatus();
         }
 
         private void PACModeItem_Click(object sender, EventArgs e)
         {
             controller.ToggleEnable(true);
             controller.ToggleGlobal(false);
-            Configuration config = controller.GetCurrentConfiguration();
-            UpdateSystemProxyItemsEnabledStatus(config);
+            UpdateSystemProxyItemsEnabledStatus();
         }
 
         #endregion
@@ -675,7 +662,7 @@ namespace Shadowsocks.View
             int serverCount = 0;
             bool overflow = false;
             bool needAdd = true;
-            
+
             Configuration configuration = controller.GetCurrentConfiguration();
             for (int i = 0; i < configuration.configs.Count; i++)
             {
@@ -700,10 +687,11 @@ namespace Shadowsocks.View
                         items.Insert(strategyCount + serverCount, item);
                         serverCount++;
                     }
-                    
+
                     if (overflow)
                     {
-                        items.Insert(strategyCount + serverCount, new ToolStripMenuItem($"... more than {maxCount} (total {configuration.configs.Count})", null, Config_Click));
+                        items.Insert(strategyCount + serverCount,
+                            new ToolStripMenuItem(I18N.GetString("... more than {0} (total {1})", maxCount, configuration.configs.Count), null, Config_Click));
                         break;
                     }
 

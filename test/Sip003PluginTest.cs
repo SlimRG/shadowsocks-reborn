@@ -1,11 +1,9 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Threading;
-using System.Collections.Generic;
-using Shadowsocks.Model;
-using Shadowsocks.Controller.Service;
 using System.Diagnostics;
 using System.Net;
+using System.Threading;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Shadowsocks.Controller.Service;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.Test
 {
@@ -198,14 +196,14 @@ namespace Shadowsocks.Test
             var penv = ProcessEnvironment.ReadEnvironmentVariables(p);
             var pcmd = ProcessEnvironment.GetCommandLine(p).Trim();
             pcmd = pcmd.IndexOf(' ') >= 0 ? pcmd.Substring(pcmd.IndexOf(' ') + 1) : "";
-            
+
             Assert.AreEqual(serverAddress, penv["SS_REMOTE_HOST"]);
             Assert.AreEqual(serverPort.ToString(), penv["SS_REMOTE_PORT"]);
             Assert.AreEqual(IPAddress.Loopback.ToString(), penv["SS_LOCAL_HOST"]);
-            
+
             int _ignored;
             Assert.IsTrue(int.TryParse(penv["SS_LOCAL_PORT"], out _ignored));
-            
+
             Assert.AreEqual(pluginOpts, penv["SS_PLUGIN_OPTIONS"]);
             Assert.AreEqual(pluginArgs, pcmd);
 

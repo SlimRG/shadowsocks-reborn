@@ -237,7 +237,7 @@ namespace Shadowsocks.Model
             }
             catch (Exception e)
             {
-                MessageBox.Show($"Cannot get the log level from NLog config file. Please check if the nlog config file exists with corresponding XML nodes.\n{e.Message}");
+                MessageBox.Show(I18N.GetString("Cannot get the log level from the NLog configuration: {0}", e.Message));
             }
         }
 

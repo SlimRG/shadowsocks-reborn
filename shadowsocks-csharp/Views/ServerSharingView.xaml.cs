@@ -1,7 +1,7 @@
-﻿using ReactiveUI;
-using Shadowsocks.ViewModels;
 using System.Reactive.Disposables;
 using System.Windows.Input;
+using ReactiveUI;
+using Shadowsocks.ViewModels;
 
 namespace Shadowsocks.Views
 {

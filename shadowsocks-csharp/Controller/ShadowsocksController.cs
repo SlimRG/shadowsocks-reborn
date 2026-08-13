@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -6,16 +6,13 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using System.Windows.Forms;
 using NLog;
 using Shadowsocks.Controller.Service;
 using Shadowsocks.Controller.Strategy;
 using Shadowsocks.Model;
-using Shadowsocks.Util;
 using WPFLocalizeExtension.Engine;
 
 namespace Shadowsocks.Controller
@@ -251,8 +248,10 @@ namespace Shadowsocks.Controller
                 ReportError(e);
             }
 
-            ConfigChanged?.Invoke(this, new EventArgs());
+            // Apply the Windows proxy first, then notify the UI. The menu must represent
+            // the effective WinINet state rather than only the persisted desired mode.
             UpdateSystemProxy();
+            ConfigChanged?.Invoke(this, new EventArgs());
         }
 
         protected void SaveConfig(Configuration newConfig)
@@ -269,6 +268,7 @@ namespace Shadowsocks.Controller
         public HttpClient GetHttpClient() => httpClient;
         public Server GetCurrentServer() => _config.GetCurrentServer();
         public Configuration GetCurrentConfiguration() => _config;
+        internal SystemProxyMode GetSystemProxyMode() => SystemProxy.GetCurrentMode(_config, _pacServer);
 
         public Server GetAServer(IStrategyCallerType type, IPEndPoint localIPEndPoint, EndPoint destEndPoint)
         {
@@ -506,7 +506,6 @@ namespace Shadowsocks.Controller
         public void SaveLogViewerConfig(LogViewerConfig newConfig)
         {
             _config.logViewer = newConfig;
-            newConfig.SaveSize();
             Configuration.Save(_config);
 
             ConfigChanged?.Invoke(this, new EventArgs());

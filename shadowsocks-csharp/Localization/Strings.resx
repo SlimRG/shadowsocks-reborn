@@ -238,6 +238,35 @@
     <value>Successfully updated all sources!</value>
   </data>
   <data name="sip008UpdateAllFailure" xml:space="preserve">
-    <value>The following sources failed to update:\n\n</value>
+    <value>The following sources failed to update:
+
+</value>
+  </data>
+  <data name="ForwardProxyAddressRequired" xml:space="preserve">
+    <value>Address can't be empty or whitespace.</value>
+  </data>
+  <data name="ForwardProxyPortOutOfRange" xml:space="preserve">
+    <value>{0} is out of range (0, 65535].</value>
+  </data>
+  <data name="ForwardProxyTimeoutOutOfRange" xml:space="preserve">
+    <value>{0} is out of range (0, 10].</value>
+  </data>
+  <data name="ForwardProxyCredentialsPairRequired" xml:space="preserve">
+    <value>You must provide both username and password.</value>
+  </data>
+  <data name="OnlineConfigHttpWarning" xml:space="preserve">
+    <value>Warning: getting online configuration from plain HTTP sources is NOT secure!</value>
+  </data>
+  <data name="ReleaseKindPreRelease" xml:space="preserve">
+    <value>Pre-release</value>
+  </data>
+  <data name="ReleaseKindRelease" xml:space="preserve">
+    <value>Release</value>
+  </data>
+  <data name="ReleaseTagUnavailable" xml:space="preserve">
+    <value>Failed to get tag name</value>
+  </data>
+  <data name="ReleaseNotesUnavailable" xml:space="preserve">
+    <value>Failed to get release notes</value>
   </data>
 </root>

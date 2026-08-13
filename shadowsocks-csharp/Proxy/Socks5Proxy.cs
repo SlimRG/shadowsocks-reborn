@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -108,7 +108,7 @@ namespace Shadowsocks.Proxy
                     default:
                         throw new Exception(I18N.GetString("Proxy request failed"));
                 }
-                port = ((IPEndPoint) DestEndPoint).Port;
+                port = ((IPEndPoint)DestEndPoint).Port;
                 var addr = ((IPEndPoint)DestEndPoint).Address.GetAddressBytes();
                 Array.Copy(addr, 0, request, 4, request.Length - 4 - 2);
             }
@@ -118,8 +118,8 @@ namespace Shadowsocks.Proxy
             request[1] = 1;
             request[2] = 0;
             request[3] = atyp;
-            request[request.Length - 2] = (byte) ((port >> 8) & 0xff);
-            request[request.Length - 1] = (byte) (port & 0xff);
+            request[request.Length - 2] = (byte)((port >> 8) & 0xff);
+            request[request.Length - 1] = (byte)(port & 0xff);
 
             var st = new Socks5State();
             st.Callback = callback;
@@ -169,18 +169,18 @@ namespace Shadowsocks.Proxy
         {
             _remote.Dispose();
         }
-        
+
 
         private void ConnectCallback(IAsyncResult ar)
         {
-            var state = (Socks5State) ar.AsyncState;
+            var state = (Socks5State)ar.AsyncState;
             try
             {
                 _remote.EndConnect(ar);
 
                 _remote.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                byte[] handshake = {5, 1, 0};
+                byte[] handshake = { 5, 1, 0 };
                 _remote.BeginSend(handshake, 0, handshake.Length, 0, Socks5HandshakeSendCallback, state);
             }
             catch (Exception ex)

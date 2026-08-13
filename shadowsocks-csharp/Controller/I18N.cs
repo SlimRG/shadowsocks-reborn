@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualBasic.FileIO;
-using NLog;
-using Shadowsocks.Properties;
-using Shadowsocks.Util;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.VisualBasic.FileIO;
+using NLog;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.Controller
 {
@@ -63,8 +63,8 @@ namespace Shadowsocks.Controller
                 while (!csvParser.EndOfData)
                 {
                     string[] translations = csvParser.ReadFields();
-                    string source = translations[enIndex];
-                    string translation = translations[targetIndex];
+                    string source = translations[enIndex].Trim();
+                    string translation = translations[targetIndex].Trim();
 
                     // source string or translation empty
                     if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(translation)) continue;

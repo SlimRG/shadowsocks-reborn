@@ -1,12 +1,13 @@
-﻿using ReactiveUI;
-using ReactiveUI.Validation.Extensions;
-using ReactiveUI.Validation.Helpers;
-using Shadowsocks.Controller;
-using Shadowsocks.Model;
-using Shadowsocks.View;
 using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
+using ReactiveUI;
+using ReactiveUI.Validation.Extensions;
+using ReactiveUI.Validation.Helpers;
+using Shadowsocks.Controller;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.View;
 
 namespace Shadowsocks.ViewModels
 {
@@ -19,11 +20,17 @@ namespace Shadowsocks.ViewModels
             _menuViewController = Program.MenuController;
 
             if (!_config.proxy.useProxy)
+            {
                 NoProxy = true;
+            }
             else if (_config.proxy.proxyType == 0)
+            {
                 UseSocks5Proxy = true;
+            }
             else
+            {
                 UseHttpProxy = true;
+            }
 
             Address = _config.proxy.proxyServer;
             Port = _config.proxy.proxyPort;
@@ -38,20 +45,20 @@ namespace Shadowsocks.ViewModels
             AddressRule = this.ValidationRule(
                 viewModel => viewModel.Address,
                 address => !string.IsNullOrWhiteSpace(address),
-                "Address can't be empty or whitespaces.");
+                LocalizationProvider.GetLocalizedValue<string>("ForwardProxyAddressRequired"));
             PortRule = this.ValidationRule(
                 viewModel => viewModel.Port,
                 port => port > 0 && port <= 65535,
-                port => $"{port} is out of range (0, 65535].");
+                port => string.Format(LocalizationProvider.GetLocalizedValue<string>("ForwardProxyPortOutOfRange"), port));
             TimeoutRule = this.ValidationRule(
                 viewModel => viewModel.Timeout,
                 timeout => timeout > 0 && timeout <= 10,
-                timeout => $"{timeout} is out of range (0, 10].");
+                timeout => string.Format(LocalizationProvider.GetLocalizedValue<string>("ForwardProxyTimeoutOutOfRange"), timeout));
 
             var authValid = this
                 .WhenAnyValue(x => x.Username, x => x.Password, (username, password) => new { Username = username, Password = password })
                 .Select(x => string.IsNullOrWhiteSpace(x.Username) == string.IsNullOrWhiteSpace(x.Password));
-            AuthRule = this.ValidationRule(authValid, "You must provide both username and password.");
+            AuthRule = this.ValidationRule(authValid, LocalizationProvider.GetLocalizedValue<string>("ForwardProxyCredentialsPairRequired"));
 
             var canSave = this.IsValid();
 
@@ -145,7 +152,9 @@ namespace Shadowsocks.ViewModels
                 authPwd = Password
             };
             if (NoProxy)
+            {
                 forwardProxyConfig.useProxy = false;
+            }
             else if (UseSocks5Proxy)
             {
                 forwardProxyConfig.useProxy = true;

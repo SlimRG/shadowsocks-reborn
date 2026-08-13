@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Windows.Forms;
+using System.Threading;
 using NLog;
 using Shadowsocks.Model;
 using Shadowsocks.Properties;
@@ -17,6 +17,7 @@ namespace Shadowsocks.Controller
     class PrivoxyRunner
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
+        private const int ErrorPartialCopy = 299;
 
         private static int _uid;
         private static string _uniqueConfigFile;
@@ -82,7 +83,45 @@ namespace Shadowsocks.Controller
                  * when ss exit unexpectedly, this process will be forced killed by system.
                  */
                 _privoxyJob.AddProcess(_process.Handle);
+
+                try
+                {
+                    WaitUntilReady(configuration.isIPv6Enabled);
+                }
+                catch
+                {
+                    Stop();
+                    throw;
+                }
             }
+        }
+
+        private void WaitUntilReady(bool isIPv6Enabled)
+        {
+            IPAddress address = isIPv6Enabled ? IPAddress.IPv6Loopback : IPAddress.Loopback;
+            AddressFamily addressFamily = isIPv6Enabled ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork;
+            const int attempts = 100;
+
+            for (int attempt = 0; attempt < attempts; attempt++)
+            {
+                if (_process.HasExited)
+                {
+                    throw new InvalidOperationException($"Privoxy exited during startup with code {_process.ExitCode}.");
+                }
+
+                using TcpClient probe = new(addressFamily);
+                try
+                {
+                    probe.Connect(address, _runningPort);
+                    return;
+                }
+                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.ConnectionRefused)
+                {
+                    Thread.Sleep(20);
+                }
+            }
+
+            throw new TimeoutException($"Privoxy did not start listening on {address}:{_runningPort} within 2 seconds.");
         }
 
         public void Stop()
@@ -135,12 +174,19 @@ namespace Shadowsocks.Controller
                 return Utils.GetTempPath("ss_privoxy.exe").Equals(path);
 
             }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == ErrorPartialCopy)
+            {
+                // ERROR_PARTIAL_COPY: an x86 process cannot inspect modules of a 64-bit
+                // process. This is expected only while probing whether an existing process
+                // belongs to this Shadowsocks instance, so suppress it here rather than
+                // globally suppressing unrelated Win32Exception instances.
+                return false;
+            }
             catch (Exception ex)
             {
                 /*
                  * Sometimes Process.GetProcessesByName will return some processes that
                  * are already dead, and that will cause exceptions here.
-                 * We could simply ignore those exceptions.
                  */
                 logger.LogUsefulException(ex);
                 return false;

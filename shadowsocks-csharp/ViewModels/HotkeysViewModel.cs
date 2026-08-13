@@ -1,10 +1,10 @@
-﻿using ReactiveUI;
-using Shadowsocks.Controller;
-using Shadowsocks.Model;
-using Shadowsocks.View;
 using System.Reactive;
 using System.Text;
 using System.Windows.Input;
+using ReactiveUI;
+using Shadowsocks.Controller;
+using Shadowsocks.Model;
+using Shadowsocks.View;
 
 namespace Shadowsocks.ViewModels
 {
@@ -15,7 +15,7 @@ namespace Shadowsocks.ViewModels
             _config = Program.MainController.GetCurrentConfiguration();
             _controller = Program.MainController;
             _menuViewController = Program.MenuController;
-            
+
             HotkeySystemProxy = _config.hotkey.SwitchSystemProxy;
             HotkeyProxyMode = _config.hotkey.SwitchSystemProxyMode;
             HotkeyAllowLan = _config.hotkey.SwitchAllowLan;

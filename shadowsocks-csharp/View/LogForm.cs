@@ -1,16 +1,15 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Windows.Forms;
-using System.Collections.Generic;
 using System.Linq;
-
-using Shadowsocks.Controller;
-using Shadowsocks.Properties;
-using Shadowsocks.Model;
-using Shadowsocks.Util;
 using System.Text;
+using System.Windows.Forms;
 using NLog;
+using Shadowsocks.Controller;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.View
 {
@@ -50,13 +49,13 @@ namespace Shadowsocks.View
             {
                 this.filename = nLogConfig.GetLogFileName();
             }
-            catch(Exception)
+            catch (Exception)
             {
                 // failed to get the file name
             }
             if (string.IsNullOrEmpty(this.filename))
             {
-                LogMessageTextBox.AppendText("Cannot get the log file name from NLog config file. Please check if the nlog config file exists with corresponding XML nodes.");
+                LogMessageTextBox.AppendText(I18N.GetString("Cannot get the log file name from NLog config file. Please check whether the NLog configuration contains the required XML nodes."));
             }
 
             LogViewerConfig config = controller.GetCurrentConfiguration().logViewer;
@@ -195,7 +194,7 @@ namespace Shadowsocks.View
         private void UpdateContent()
         {
             this.Text = I18N.GetString("Log Viewer") +
-                        $" [in: {Utils.FormatBytes(controller.InboundCounter)}, out: {Utils.FormatBytes(controller.OutboundCounter)}]";
+                        $" [{I18N.GetString("In")}: {Utils.FormatBytes(controller.InboundCounter)}, {I18N.GetString("Out")}: {Utils.FormatBytes(controller.OutboundCounter)}]";
 
             if (string.IsNullOrEmpty(filename) || !File.Exists(filename))
                 return;

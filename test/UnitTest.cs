@@ -1,12 +1,7 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Shadowsocks.Controller;
-using GlobalHotKey;
 using System.Windows.Input;
-using System.Threading;
-using System.Collections.Generic;
+using GlobalHotKey;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Controller.Hotkeys;
-using System.Diagnostics;
 
 
 namespace Shadowsocks.Test

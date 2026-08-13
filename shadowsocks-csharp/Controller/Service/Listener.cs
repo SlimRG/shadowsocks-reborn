@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -125,6 +125,11 @@ namespace Shadowsocks.Controller
             }
             catch (ObjectDisposedException)
             {
+                // Expected when the UDP listener is stopped.
+            }
+            catch (SocketException e) when (IsExpectedSocketShutdown(e))
+            {
+                // .NET 7+ reports cancellation of a pending BeginReceiveFrom as OperationAborted.
             }
             catch (Exception ex)
             {
@@ -132,16 +137,26 @@ namespace Shadowsocks.Controller
             }
             finally
             {
-                try
+                // Do not re-arm a callback belonging to a UDP socket that has been
+                // stopped or replaced during a controller restart.
+                if (ReferenceEquals(socket, _udpSocket))
                 {
-                    socket.BeginReceiveFrom(state.buffer, 0, state.buffer.Length, 0, ref state.remoteEndPoint, new AsyncCallback(RecvFromCallback), state);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // do nothing
-                }
-                catch (Exception)
-                {
+                    try
+                    {
+                        socket.BeginReceiveFrom(state.buffer, 0, state.buffer.Length, 0, ref state.remoteEndPoint, new AsyncCallback(RecvFromCallback), state);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Expected during shutdown.
+                    }
+                    catch (SocketException e) when (IsExpectedSocketShutdown(e))
+                    {
+                        // Expected during shutdown on .NET 7+.
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Debug(ex);
+                    }
                 }
             }
         }
@@ -225,7 +240,7 @@ namespace Shadowsocks.Controller
                         return;
                     }
                 }
-                Shutdown:
+            Shutdown:
                 // no service found for this
                 if (conn.ProtocolType == ProtocolType.Tcp)
                 {

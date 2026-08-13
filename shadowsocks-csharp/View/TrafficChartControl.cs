@@ -13,8 +13,8 @@ namespace Shadowsocks.View
         private static readonly Color OutboundColor = Color.FromArgb(128, 128, 255);
         private static readonly Color GridColor = Color.LightGray;
 
-        private float[] _inboundPoints = Array.Empty<float>();
-        private float[] _outboundPoints = Array.Empty<float>();
+        private float[] _inboundPoints = [];
+        private float[] _outboundPoints = [];
         private float _maximum = 1F;
         private string _unitName = string.Empty;
         private string _inboundValue = string.Empty;
@@ -49,8 +49,8 @@ namespace Shadowsocks.View
             string inboundValue,
             string outboundValue)
         {
-            _inboundPoints = inboundPoints?.ToArray() ?? Array.Empty<float>();
-            _outboundPoints = outboundPoints?.ToArray() ?? Array.Empty<float>();
+            _inboundPoints = inboundPoints is null ? [] : inboundPoints.ToArray();
+            _outboundPoints = outboundPoints is null ? [] : outboundPoints.ToArray();
             _maximum = Math.Max(1F, maximum);
             _unitName = unitName ?? string.Empty;
             _inboundValue = inboundValue ?? string.Empty;
@@ -68,33 +68,34 @@ namespace Shadowsocks.View
 
             Rectangle client = ClientRectangle;
             if (client.Width <= 8 || client.Height <= 8)
+            {
                 return;
+            }
 
             int axisWidth = Math.Min(58, Math.Max(38, client.Width / 8));
             int legendWidth = Math.Min(160, Math.Max(100, client.Width / 3));
             int top = 4;
             int bottom = 4;
-            Rectangle plot = new Rectangle(
+            Rectangle plot = new(
                 axisWidth,
                 top,
                 Math.Max(1, client.Width - axisWidth - legendWidth - 4),
                 Math.Max(1, client.Height - top - bottom));
 
-            using (var gridPen = new Pen(GridColor, 1F))
-            using (var inboundPen = new Pen(InboundColor, 2F))
-            using (var outboundPen = new Pen(OutboundColor, 2F))
-            using (var textBrush = new SolidBrush(ForeColor))
-            using (var mutedBrush = new SolidBrush(SystemColors.GrayText))
-            {
-                DrawGrid(graphics, plot, gridPen);
-                DrawYAxisLabels(graphics, plot, textBrush);
-                DrawSeries(graphics, plot, _inboundPoints, inboundPen);
-                DrawSeries(graphics, plot, _outboundPoints, outboundPen);
-                DrawLegend(graphics, plot.Right + 8, client.Height, inboundPen, outboundPen, textBrush, mutedBrush);
-            }
+            using Pen gridPen = new(GridColor, 1F);
+            using Pen inboundPen = new(InboundColor, 2F);
+            using Pen outboundPen = new(OutboundColor, 2F);
+            using SolidBrush textBrush = new(ForeColor);
+            using SolidBrush mutedBrush = new(SystemColors.GrayText);
+
+            DrawGrid(graphics, plot, gridPen);
+            DrawYAxisLabels(graphics, plot, textBrush);
+            DrawSeries(graphics, plot, _inboundPoints, inboundPen);
+            DrawSeries(graphics, plot, _outboundPoints, outboundPen);
+            DrawLegend(graphics, plot.Right + 8, client.Height, inboundPen, outboundPen, textBrush, mutedBrush);
         }
 
-        private void DrawGrid(Graphics graphics, Rectangle plot, Pen gridPen)
+        private static void DrawGrid(Graphics graphics, Rectangle plot, Pen gridPen)
         {
             const int horizontalLines = 4;
             for (int i = 0; i <= horizontalLines; i++)
@@ -130,14 +131,16 @@ namespace Shadowsocks.View
             }
         }
 
-        private void DrawSeries(Graphics graphics, Rectangle plot, IReadOnlyList<float> points, Pen pen)
+        private void DrawSeries(Graphics graphics, Rectangle plot, float[] points, Pen pen)
         {
-            if (points == null || points.Count == 0)
+            if (points.Length == 0)
+            {
                 return;
+            }
 
-            PointF[] mapped = new PointF[points.Count];
-            float denominator = Math.Max(1, points.Count - 1);
-            for (int i = 0; i < points.Count; i++)
+            PointF[] mapped = new PointF[points.Length];
+            float denominator = Math.Max(1, points.Length - 1);
+            for (int i = 0; i < points.Length; i++)
             {
                 float normalized = Math.Clamp(points[i] / _maximum, 0F, 1F);
                 mapped[i] = new PointF(
@@ -146,9 +149,13 @@ namespace Shadowsocks.View
             }
 
             if (mapped.Length == 1)
+            {
                 graphics.DrawEllipse(pen, mapped[0].X - 1F, mapped[0].Y - 1F, 2F, 2F);
+            }
             else
+            {
                 graphics.DrawLines(pen, mapped);
+            }
         }
 
         private void DrawLegend(

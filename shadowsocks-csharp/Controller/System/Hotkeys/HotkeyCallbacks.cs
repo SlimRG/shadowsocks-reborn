@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 
 namespace Shadowsocks.Controller.Hotkeys
@@ -30,7 +30,7 @@ namespace Shadowsocks.Controller.Hotkeys
         }
 
         #region Singleton 
-        
+
         private static HotkeyCallbacks Instance { get; set; }
 
         private readonly ShadowsocksController _controller;

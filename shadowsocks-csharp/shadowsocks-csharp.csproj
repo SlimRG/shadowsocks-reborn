@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>Shadowsocks</RootNamespace>
     <AssemblyName>Shadowsocks</AssemblyName>
     <ApplicationIcon>shadowsocks.ico</ApplicationIcon>
@@ -52,11 +52,6 @@
       <DesignTime>true</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Update="Properties\\Settings.Designer.cs">
-      <AutoGen>true</AutoGen>
-      <DesignTimeSharedInput>true</DesignTimeSharedInput>
-      <DependentUpon>Settings.settings</DependentUpon>
-    </Compile>
   </ItemGroup>
 
   <ItemGroup>
@@ -74,9 +69,13 @@
     <EmbeddedResource Update="View\\LogForm.resx">
       <DependentUpon>LogForm.cs</DependentUpon>
     </EmbeddedResource>
-    <None Update="Properties\\Settings.settings">
-      <Generator>SettingsSingleFileGenerator</Generator>
-      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
-    </None>
+  </ItemGroup>
+
+  <!-- Legacy ApplicationSettingsBase files were replaced by gui-config.json.
+       Remove them explicitly so an old file left in an upgraded working tree
+       cannot recreate Shadowsocks.dll.config or compile the old Settings class. -->
+  <ItemGroup>
+    <Compile Remove="Settings.cs;Properties\\Settings.Designer.cs" />
+    <None Remove="app.config;Properties\\Settings.settings" />
   </ItemGroup>
 </Project>

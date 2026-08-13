@@ -1,39 +1,46 @@
 ---
-name: Bug报告 （中文）
-about: 反馈Bug
-title: ''
-labels: bug report
-assignees: ''
-
+name: Bug 报告（中文）
+about: 反馈可复现的客户端问题
+title: ""
+labels: "bug report"
+assignees: ""
 ---
 
 <!--
-- 影梭（Shadowsocks）是一个开源非盈利项目，不提供任何托管服务。如果你是从服务提供商购买的服务，请联系他们。
-- 如果你有非影梭Windows客户端相关的问题，请去 https://github.com/shadowsocks
-- 提问前请先阅读wiki https://github.com/shadowsocks/shadowsocks-windows/wiki/Troubleshooting.
-- 并在Issue Board中搜索 https://github.com/shadowsocks/shadowsocks-windows/issues?utf8=%E2%9C%93&q=is%3Aissue
-- 请按照以下格式描述你的问题，描述不清的问题将会被关闭。
+Shadowsocks 是开源非营利项目，不提供代理托管服务。如服务由第三方提供，请先联系服务提供商。
+提交前请搜索现有 Issue，并阅读 upstream Troubleshooting 文档。
+日志、配置和截图中请删除密码、服务器地址、订阅地址等敏感信息。
 -->
 
-### 简要描述问题
+## 问题描述
 
-### 环境
+请简要、清晰地描述问题。
 
-- Shadowsocks客户端版本：
-- 操作系统版本：
-- .NET版本：
+## 环境
 
-### 操作步骤
+- Shadowsocks 客户端版本：
+- Windows 版本：
+- .NET Runtime/SDK 版本：
+- 构建架构：x86
 
+## 复现步骤
 
-### 期望的结果
+1.
+2.
+3.
 
+## 期望结果
 
-### 实际结果
+请描述预期行为。
 
+## 实际结果
 
-### 配置文件和日志文件（请隐去敏感信息）
+请描述实际行为。
 
-```
+## 配置和日志
+
+请先移除所有敏感信息。
+
+```text
 在此粘贴日志
 ```

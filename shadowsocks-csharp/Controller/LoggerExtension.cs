@@ -1,11 +1,8 @@
-﻿using System;
+using System;
 using System.ComponentModel;
-using System.IO;
-using System.Net.Sockets;
 using System.Net;
-using System.Diagnostics;
+using System.Net.Sockets;
 using System.Text;
-using Shadowsocks.Util.SystemProxy;
 
 namespace NLog
 {
@@ -84,31 +81,14 @@ namespace NLog
             else if (e is ObjectDisposedException)
             {
             }
-            else if (e is Win32Exception)
+            else if (e is Win32Exception ex)
             {
-                var ex = (Win32Exception)e;
-
-                // Win32Exception (0x80004005): A 32 bit processes cannot access modules of a 64 bit process.
-                if ((uint)ex.ErrorCode != 0x80004005)
-                {
-                    logger.Warn(e);
-                }
-            }
-            else if (e is ProxyException)
-            {
-                var ex = (ProxyException)e;
-                switch (ex.Type)
-                {
-                    case ProxyExceptionType.FailToRun:
-                    case ProxyExceptionType.QueryReturnMalformed:
-                    case ProxyExceptionType.SysproxyExitError:
-                        logger.Error($"sysproxy - {ex.Type.ToString()}:{ex.Message}");
-                        break;
-                    case ProxyExceptionType.QueryReturnEmpty:
-                    case ProxyExceptionType.Unspecific:
-                        logger.Error($"sysproxy - {ex.Type.ToString()}");
-                        break;
-                }
+                // Never suppress Win32Exception by HRESULT. Win32Exception.ErrorCode can be
+                // the generic E_FAIL (0x80004005) for unrelated native failures, which used
+                // to hide real errors such as failed WinINet proxy updates.
+                logger.Warn(
+                    e,
+                    $"Win32 API failure (NativeErrorCode={ex.NativeErrorCode}, HRESULT=0x{unchecked((uint)ex.ErrorCode):X8}).");
             }
             else
             {

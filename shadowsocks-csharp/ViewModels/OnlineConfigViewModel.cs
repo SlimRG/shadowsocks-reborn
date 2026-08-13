@@ -1,10 +1,3 @@
-﻿using ReactiveUI;
-using ReactiveUI.Validation.Extensions;
-using ReactiveUI.Validation.Helpers;
-using Shadowsocks.Controller;
-using Shadowsocks.Localization;
-using Shadowsocks.Model;
-using Shadowsocks.View;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -13,6 +6,13 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
 using System.Windows;
+using ReactiveUI;
+using ReactiveUI.Validation.Extensions;
+using ReactiveUI.Validation.Helpers;
+using Shadowsocks.Controller;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.View;
 
 namespace Shadowsocks.ViewModels
 {
@@ -32,7 +32,7 @@ namespace Shadowsocks.ViewModels
             AddressRule = this.ValidationRule(
                 viewModel => viewModel.Address,
                 address => address.StartsWith("http://"),
-                "Warning: getting online configuration from plain HTTP sources is NOT secure!");
+                LocalizationProvider.GetLocalizedValue<string>("OnlineConfigHttpWarning"));
 
             var canUpdateCopyRemove = this.WhenAnyValue(
                 x => x.SelectedSource,
