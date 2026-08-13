@@ -97,16 +97,13 @@ namespace Shadowsocks.Controller
 
         public void Stop()
         {
-            if (_tcpSocket != null)
-            {
-                _tcpSocket.Close();
-                _tcpSocket = null;
-            }
-            if (_udpSocket != null)
-            {
-                _udpSocket.Close();
-                _udpSocket = null;
-            }
+            Socket tcpSocket = _tcpSocket;
+            _tcpSocket = null;
+            tcpSocket?.Close();
+
+            Socket udpSocket = _udpSocket;
+            _udpSocket = null;
+            udpSocket?.Close();
 
             _services.ForEach(s => s.Stop());
         }
@@ -167,6 +164,11 @@ namespace Shadowsocks.Controller
             }
             catch (ObjectDisposedException)
             {
+                // Expected when the listener is stopped on .NET Framework / .NET 5-6.
+            }
+            catch (SocketException e) when (IsExpectedSocketShutdown(e))
+            {
+                // .NET 7+ reports cancellation of a pending BeginAccept as OperationAborted.
             }
             catch (Exception e)
             {
@@ -174,21 +176,36 @@ namespace Shadowsocks.Controller
             }
             finally
             {
-                try
+                // Do not re-arm a callback belonging to a listener that has been stopped
+                // or replaced during a controller restart.
+                if (ReferenceEquals(listener, _tcpSocket))
                 {
-                    listener.BeginAccept(
-                        new AsyncCallback(AcceptCallback),
-                        listener);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // do nothing
-                }
-                catch (Exception e)
-                {
-                    logger.LogUsefulException(e);
+                    try
+                    {
+                        listener.BeginAccept(
+                            new AsyncCallback(AcceptCallback),
+                            listener);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Expected during shutdown.
+                    }
+                    catch (SocketException e) when (IsExpectedSocketShutdown(e))
+                    {
+                        // Expected during shutdown on .NET 7+.
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogUsefulException(e);
+                    }
                 }
             }
+        }
+
+        private static bool IsExpectedSocketShutdown(SocketException exception)
+        {
+            return exception.SocketErrorCode == SocketError.OperationAborted
+                || exception.SocketErrorCode == SocketError.Interrupted;
         }
 
         private void ReceiveCallback(IAsyncResult ar)

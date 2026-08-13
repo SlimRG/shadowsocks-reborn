@@ -123,14 +123,6 @@ namespace Shadowsocks.Controller
                                 hostMatch = true;
                             }
                         }
-                        //else if (kv[0] == "User-Agent")
-                        //{
-                        //    // we need to drop connections when changing servers
-                        //    if (kv[1].IndexOf("Chrome") >= 0)
-                        //    {
-                        //        useSocks = true;
-                        //    }
-                        //}
                     }
                 }
 

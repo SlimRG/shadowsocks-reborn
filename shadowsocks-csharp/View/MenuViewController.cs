@@ -38,7 +38,7 @@ namespace Shadowsocks.View
         private ToolStripMenuItem AutoStartupItem;
         private ToolStripMenuItem ProtocolHandlerItem;
         private ToolStripMenuItem ShareOverLANItem;
-        private ToolStripSeparator SeperatorItem;
+        private ToolStripSeparator SeparatorItem;
         private ToolStripMenuItem ConfigItem;
         private ToolStripMenuItem ServersItem;
         private ToolStripMenuItem globalModeItem;
@@ -264,7 +264,7 @@ namespace Shadowsocks.View
                     globalModeItem = CreateMenuItem("Global", GlobalModeItem_Click)
                 }),
                 ServersItem = CreateMenuGroup("Servers", new ToolStripItem[] {
-                    SeperatorItem = new ToolStripSeparator(),
+                    SeparatorItem = new ToolStripSeparator(),
                     ConfigItem = CreateMenuItem("Edit Servers...", Config_Click),
                     new ToolStripSeparator(),
                     CreateMenuItem("Share Server Config...", QRCodeItem_Click),
@@ -654,7 +654,7 @@ namespace Shadowsocks.View
         private void UpdateServersMenu()
         {
             var items = ServersItem.DropDownItems;
-            while (items[0] != SeperatorItem)
+            while (items[0] != SeparatorItem)
             {
                 items.RemoveAt(0);
             }
@@ -668,7 +668,7 @@ namespace Shadowsocks.View
                 strategyCount++;
             }
 
-            // user wants a seperator item between strategy and servers menugroup
+            // user wants a separator item between strategy and servers menu group
             items.Insert(strategyCount++, new ToolStripSeparator());
 
             int maxCount = 20;
@@ -741,7 +741,7 @@ namespace Shadowsocks.View
             ShowConfigForm();
         }
 
-        void openURLFromQRCode()
+        private void OpenUrlFromQrCode()
         {
             Process.Start(new ProcessStartInfo(_urlToOpen) { UseShellExecute = true });
         }
@@ -779,7 +779,7 @@ namespace Shadowsocks.View
                 if (result.ToLowerInvariant().StartsWith("http://") || result.ToLowerInvariant().StartsWith("https://"))
                 {
                     _urlToOpen = result;
-                    openURLFromQRCode();
+                    OpenUrlFromQrCode();
                 }
                 else if (controller.AddServerBySSURL(result))
                 {

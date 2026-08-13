@@ -335,11 +335,6 @@ namespace Shadowsocks.Model
                 server = (server ?? GetDefaultServer());
 
                 config.configs.Insert(index.GetValueOrDefault(config.configs.Count), server);
-
-                //if (index.HasValue)
-                //    config.configs.Insert(index.Value, server);
-                //else
-                //    config.configs.Add(server);
             }
             return server;
         }

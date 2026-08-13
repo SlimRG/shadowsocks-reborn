@@ -6,21 +6,21 @@ using Shadowsocks.Util;
 
 namespace Shadowsocks.Controller
 {
-    class RequestAddUrlEventArgs : EventArgs
+    internal sealed class RequestAddUrlEventArgs : EventArgs
     {
-        public readonly string Url;
-
         public RequestAddUrlEventArgs(string url)
         {
-            this.Url = url;
+            Url = url;
         }
+
+        public string Url { get; }
     }
 
     internal class IPCService
     {
-        private const int INT32_LEN = 4;
-        private const int OP_OPEN_URL = 1;
-        private static readonly string PIPE_PATH = $"Shadowsocks\\{Utils.GetDeterministicHashCode(Program.ExecutablePath)}";
+        private const int Int32Length = 4;
+        private const int OpenUrlOpcode = 1;
+        private static readonly string PipePath = $"Shadowsocks\\{Utils.GetDeterministicHashCode(Program.ExecutablePath)}";
 
         public event EventHandler<RequestAddUrlEventArgs> OpenUrlRequested;
 
@@ -29,18 +29,17 @@ namespace Shadowsocks.Controller
             byte[] buf = new byte[4096];
             while (true)
             {
-                using (NamedPipeServerStream stream = new NamedPipeServerStream(PIPE_PATH))
+                using (NamedPipeServerStream stream = new NamedPipeServerStream(PipePath))
                 {
                     await stream.WaitForConnectionAsync();
-                    await stream.ReadExactlyAsync(buf.AsMemory(0, INT32_LEN));
+                    await stream.ReadExactlyAsync(buf.AsMemory(0, Int32Length));
                     int opcode = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buf, 0));
-                    if (opcode == OP_OPEN_URL)
+                    if (opcode == OpenUrlOpcode)
                     {
-                        await stream.ReadExactlyAsync(buf.AsMemory(0, INT32_LEN));
+                        await stream.ReadExactlyAsync(buf.AsMemory(0, Int32Length));
                         int strlen = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buf, 0));
                         if (strlen < 0 || strlen > buf.Length)
                         {
-                            stream.Close();
                             continue;
                         }
 
@@ -49,14 +48,13 @@ namespace Shadowsocks.Controller
 
                         OpenUrlRequested?.Invoke(this, new RequestAddUrlEventArgs(url));
                     }
-                    stream.Close();
                 }
             }
         }
 
         private static (NamedPipeClientStream, bool) TryConnect()
         {
-            NamedPipeClientStream pipe = new NamedPipeClientStream(PIPE_PATH);
+            NamedPipeClientStream pipe = new NamedPipeClientStream(PipePath);
             bool exist;
             try
             {
@@ -70,25 +68,24 @@ namespace Shadowsocks.Controller
             return (pipe, exist);
         }
 
-        public static bool AnotherInstanceRunning()
-        {
-            (NamedPipeClientStream pipe, bool exist) = TryConnect();
-            pipe.Dispose();
-            return exist;
-        }
-
         public static void RequestOpenUrl(string url)
         {
-            (NamedPipeClientStream pipe, bool exist) = TryConnect();
-            if(!exist) return;
-            byte[] opAddUrl = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(OP_OPEN_URL));
-            pipe.Write(opAddUrl, 0, INT32_LEN); // opcode addurl
-            byte[] b = Encoding.UTF8.GetBytes(url);
-            byte[] blen = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(b.Length));
-            pipe.Write(blen, 0, INT32_LEN);
-            pipe.Write(b, 0, b.Length);
-            pipe.Close();
-            pipe.Dispose();
+            (NamedPipeClientStream pipe, bool exists) = TryConnect();
+            using (pipe)
+            {
+                if (!exists)
+                {
+                    return;
+                }
+
+                byte[] opcode = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(OpenUrlOpcode));
+                pipe.Write(opcode, 0, Int32Length);
+
+                byte[] urlBytes = Encoding.UTF8.GetBytes(url);
+                byte[] length = BitConverter.GetBytes(IPAddress.HostToNetworkOrder(urlBytes.Length));
+                pipe.Write(length, 0, Int32Length);
+                pipe.Write(urlBytes, 0, urlBytes.Length);
+            }
         }
     }
 }

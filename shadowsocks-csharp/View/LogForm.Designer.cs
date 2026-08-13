@@ -29,10 +29,6 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.LogMessageTextBox = new System.Windows.Forms.TextBox();
             this.MainMenu = new System.Windows.Forms.MenuStrip();
             this.FileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -52,14 +48,13 @@
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.ToolbarFlowLayoutPanel = new System.Windows.Forms.FlowLayoutPanel();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
-            this.trafficChart = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.trafficChart = new Shadowsocks.View.TrafficChartControl();
             this.tableLayoutPanel1.SuspendLayout();
             this.ToolbarFlowLayoutPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.trafficChart)).BeginInit();
             this.SuspendLayout();
             // 
             // LogMessageTextBox
@@ -235,47 +230,12 @@
             // 
             // trafficChart
             // 
-            chartArea1.AxisX.LabelStyle.Enabled = false;
-            chartArea1.AxisX.MajorGrid.Interval = 5D;
-            chartArea1.AxisX.MajorGrid.LineColor = System.Drawing.Color.LightGray;
-            chartArea1.AxisX.MajorTickMark.Enabled = false;
-            chartArea1.AxisX.Maximum = 61D;
-            chartArea1.AxisX.Minimum = 1D;
-            chartArea1.AxisY.IntervalAutoMode = System.Windows.Forms.DataVisualization.Charting.IntervalAutoMode.VariableCount;
-            chartArea1.AxisY.LabelAutoFitMaxFontSize = 8;
-            chartArea1.AxisY.LabelStyle.Interval = 0D;
-            chartArea1.AxisY.MajorGrid.LineColor = System.Drawing.Color.LightGray;
-            chartArea1.AxisY.MajorTickMark.Enabled = false;
-            chartArea1.AxisY2.MajorGrid.LineColor = System.Drawing.Color.LightGray;
-            chartArea1.AxisY2.Minimum = 0D;
-            chartArea1.Name = "ChartArea1";
-            this.trafficChart.ChartAreas.Add(chartArea1);
             this.trafficChart.Dock = System.Windows.Forms.DockStyle.Fill;
-            legend1.MaximumAutoSize = 25F;
-            legend1.Name = "Legend1";
-            this.trafficChart.Legends.Add(legend1);
             this.trafficChart.Location = new System.Drawing.Point(0, 0);
             this.trafficChart.Name = "trafficChart";
-            this.trafficChart.Palette = System.Windows.Forms.DataVisualization.Charting.ChartColorPalette.None;
-            series1.BorderWidth = 2;
-            series1.ChartArea = "ChartArea1";
-            series1.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
-            series1.Color = System.Drawing.Color.FromArgb(255, 128, 0);
-            series1.IsXValueIndexed = true;
-            series1.Legend = "Legend1";
-            series1.Name = "Inbound";
-            series2.BorderWidth = 2;
-            series2.ChartArea = "ChartArea1";
-            series2.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Spline;
-            series2.Color = System.Drawing.Color.FromArgb(128, 128, 255);
-            series2.IsXValueIndexed = true;
-            series2.Legend = "Legend1";
-            series2.Name = "Outbound";
-            this.trafficChart.Series.Add(series1);
-            this.trafficChart.Series.Add(series2);
             this.trafficChart.Size = new System.Drawing.Size(378, 42);
             this.trafficChart.TabIndex = 0;
-            this.trafficChart.Text = "chart1";
+            // 
             // 
             // LogForm
             // 
@@ -301,7 +261,6 @@
             this.splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.trafficChart)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -327,6 +286,6 @@
         private System.Windows.Forms.ToolStripSeparator ToolStripMenuItemSeparater;
         private System.Windows.Forms.ToolStripMenuItem ShowToolbarToolStripMenuItem;
         private System.Windows.Forms.SplitContainer splitContainer1;
-        private System.Windows.Forms.DataVisualization.Charting.Chart trafficChart;
+        private Shadowsocks.View.TrafficChartControl trafficChart;
     }
 }

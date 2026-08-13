@@ -1,21 +1,16 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
-using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using CommandLine;
 using Microsoft.Win32;
 using NLog;
-using ReactiveUI;
 using Shadowsocks.Controller;
 using Shadowsocks.Controller.Hotkeys;
 using Shadowsocks.Util;
 using Shadowsocks.View;
-using Splat;
 using WPFLocalizeExtension.Engine;
 
 namespace Shadowsocks
@@ -30,22 +25,23 @@ namespace Shadowsocks
         public static string[] Args { get; private set; }
 
         // https://github.com/dotnet/runtime/issues/13051#issuecomment-510267727
-        public static readonly string ExecutablePath = Process.GetCurrentProcess().MainModule?.FileName;
-        public static readonly string WorkingDirectory = Path.GetDirectoryName(ExecutablePath);
+        public static readonly string ExecutablePath = Process.GetCurrentProcess().MainModule?.FileName
+            ?? Application.ExecutablePath;
+        public static readonly string WorkingDirectory = Path.GetDirectoryName(ExecutablePath)
+            ?? AppContext.BaseDirectory;
 
         private static readonly Mutex mutex = new Mutex(true, $"Shadowsocks_{Utils.GetDeterministicHashCode(ExecutablePath)}");
 
         /// <summary>
         /// 应用程序的主入口点。
         /// </summary>
-        /// </summary>
         [STAThread]
         private static void Main(string[] args)
         {
-            #region Single Instance and IPC
+            #region Single instance and IPC
             bool hasAnotherInstance = !mutex.WaitOne(TimeSpan.Zero, true);
 
-            // store args for further use
+            // Store arguments for later use.
             Args = args;
             Parser.Default.ParseArguments<CommandLineOption>(args)
                 .WithParsed(opt => Options = opt)
@@ -68,15 +64,14 @@ namespace Shadowsocks
             }
             #endregion
 
-            #region Enviroment Setup
+            #region Environment setup
             Directory.SetCurrentDirectory(WorkingDirectory);
-            // todo: initialize the NLog configuartion
             Model.NLogConfig.TouchAndApplyNLogConfig();
 
             #endregion
 
-            #region Compactibility Check
-            // Check OS since we are using dual-mode socket
+            #region Compatibility check
+            // Check the OS because the client uses dual-mode sockets.
             if (!Utils.IsWinVistaOrHigher())
             {
                 MessageBox.Show(I18N.GetString("Unsupported operating system, use Windows Vista at least."),
@@ -86,11 +81,11 @@ namespace Shadowsocks
 
             #endregion
 
-            #region Event Handlers Setup
+            #region Event handlers setup
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-            // handle UI exceptions
+            // Handle UI exceptions.
             Application.ThreadException += Application_ThreadException;
-            // handle non-UI exceptions
+            // Handle non-UI exceptions.
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             Application.ApplicationExit += Application_ApplicationExit;
             SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
@@ -99,10 +94,6 @@ namespace Shadowsocks
             Application.SetCompatibleTextRenderingDefault(false);
             AutoStartup.RegisterForRestart(true);
             #endregion
-
-            // We would use this in v5.
-            // Parameters would have to be dropped from views' constructors (VersionUpdatePromptView)
-            //Locator.CurrentMutable.RegisterViewsForViewModels(Assembly.GetCallingAssembly());
 
             // Workaround for hosting WPF controls in a WinForms app.
             // We have to manually set the culture for the LocalizeDictionary instance.
@@ -122,17 +113,17 @@ namespace Shadowsocks
             HotKeys.Init(MainController);
             MainController.Start();
 
-            // Update online config 
+            // Update online configuration after startup.
             Task.Run(async () =>
             {
-                await Task.Delay(10 * 1000);
+                await Task.Delay(TimeSpan.FromSeconds(10));
                 await MainController.UpdateAllOnlineConfig();
             });
 
-#region IPC Handler and Arguement Process
+#region IPC handler and argument processing
             IPCService ipcService = new IPCService();
             Task.Run(() => ipcService.RunServer());
-            ipcService.OpenUrlRequested += (_1, e) => MainController.AskAddServerBySSURL(e.Url);
+            ipcService.OpenUrlRequested += (_, e) => MainController.AskAddServerBySSURL(e.Url);
 
             if (!string.IsNullOrWhiteSpace(Options.OpenUrl))
             {
@@ -141,10 +132,9 @@ namespace Shadowsocks
 #endregion
             
             Application.Run();
-
         }
 
-        private static int exited = 0;
+        private static int exited;
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             if (Interlocked.Increment(ref exited) == 1)
@@ -207,7 +197,7 @@ namespace Shadowsocks
 
         private static void Application_ApplicationExit(object sender, EventArgs e)
         {
-            // detach static event handlers
+            // Detach static event handlers.
             Application.ApplicationExit -= Application_ApplicationExit;
             SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
             Application.ThreadException -= Application_ThreadException;

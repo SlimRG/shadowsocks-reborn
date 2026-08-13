@@ -1,5 +1,4 @@
-﻿using Shadowsocks.Controller;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -51,13 +50,17 @@ namespace Shadowsocks.Util
         public static Bitmap AddBitmapOverlay(Bitmap original, params Bitmap[] overlays)
         {
             Bitmap bitmap = new Bitmap(original.Width, original.Height, PixelFormat.Format64bppArgb);
-            Graphics canvas = Graphics.FromImage(bitmap);
-            canvas.DrawImage(original, new Point(0, 0));
-            foreach (Bitmap overlay in overlays)
+            using (Graphics canvas = Graphics.FromImage(bitmap))
             {
-                canvas.DrawImage(new Bitmap(overlay, original.Size), new Point(0, 0));
+                canvas.DrawImage(original, Point.Empty);
+                foreach (Bitmap overlay in overlays)
+                {
+                    using (Bitmap resizedOverlay = new Bitmap(overlay, original.Size))
+                    {
+                        canvas.DrawImage(resizedOverlay, Point.Empty);
+                    }
+                }
             }
-            canvas.Save();
             return bitmap;
         }
 
@@ -103,10 +106,10 @@ namespace Shadowsocks.Util
 
         public static int GetScreenDpi()
         {
-            Graphics graphics = Graphics.FromHwnd(IntPtr.Zero);
-            int dpi = (int)graphics.DpiX;
-            graphics.Dispose();
-            return dpi;
+            using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
+            {
+                return (int)graphics.DpiX;
+            }
         }
     }
 }

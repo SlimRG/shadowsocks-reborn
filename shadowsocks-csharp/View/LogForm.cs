@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -37,8 +36,6 @@ namespace Shadowsocks.View
         BandwidthScaleInfo bandwidthScale;
         List<float> inboundPoints = new List<float>();
         List<float> outboundPoints = new List<float>();
-        TextAnnotation inboundAnnotation = new TextAnnotation();
-        TextAnnotation outboundAnnotation = new TextAnnotation();
         #endregion
 
         public LogForm(ShadowsocksController controller)
@@ -115,17 +112,13 @@ namespace Shadowsocks.View
 
             if (trafficChart.IsHandleCreated)
             {
-                trafficChart.Series["Inbound"].Points.DataBindY(inboundPoints);
-                trafficChart.Series["Outbound"].Points.DataBindY(outboundPoints);
-                trafficChart.ChartAreas[0].AxisY.LabelStyle.Format = "{0:0.##} " + bandwidthScale.unitName;
-                trafficChart.ChartAreas[0].AxisY.Maximum = bandwidthScale.value;
-                inboundAnnotation.AnchorDataPoint = trafficChart.Series["Inbound"].Points.Last();
-                inboundAnnotation.Text = Utils.FormatBandwidth(lastInbound);
-                outboundAnnotation.AnchorDataPoint = trafficChart.Series["Outbound"].Points.Last();
-                outboundAnnotation.Text = Utils.FormatBandwidth(lastOutbound);
-                trafficChart.Annotations.Clear();
-                trafficChart.Annotations.Add(inboundAnnotation);
-                trafficChart.Annotations.Add(outboundAnnotation);
+                trafficChart.SetData(
+                    inboundPoints,
+                    outboundPoints,
+                    (float)bandwidthScale.value,
+                    bandwidthScale.unitName,
+                    Utils.FormatBandwidth(lastInbound),
+                    Utils.FormatBandwidth(lastOutbound));
             }
         }
 
@@ -163,8 +156,9 @@ namespace Shadowsocks.View
         private void UpdateTexts()
         {
             I18N.TranslateForm(this);
-            trafficChart.Series["Inbound"].LegendText = I18N.GetString("Inbound");
-            trafficChart.Series["Outbound"].LegendText = I18N.GetString("Outbound");
+            trafficChart.SetLegendText(
+                I18N.GetString("Inbound"),
+                I18N.GetString("Outbound"));
         }
 
         private void Timer_Tick(object sender, EventArgs e)

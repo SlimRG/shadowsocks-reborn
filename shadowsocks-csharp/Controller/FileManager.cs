@@ -8,7 +8,7 @@ namespace Shadowsocks.Controller
 {
     public static class FileManager
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         public static bool ByteArrayToFile(string fileName, byte[] content)
         {
@@ -32,7 +32,7 @@ namespace Shadowsocks.Controller
             byte[] buffer = new byte[4096];
             int n;
 
-            using(var fs = File.Create(fileName))
+            using (var fs = File.Create(fileName))
             using (var input = new GZipStream(new MemoryStream(content),
                     CompressionMode.Decompress, false))
             {

@@ -191,7 +191,7 @@ namespace Shadowsocks.Test
             plugin.StartIfNeeded();
 
             Process[] processes = Process.GetProcessesByName(pluginName);
-            Assert.AreEqual(processes.Length, 1);
+            Assert.AreEqual(1, processes.Length);
             Process p = processes[0];
 
 
@@ -199,15 +199,15 @@ namespace Shadowsocks.Test
             var pcmd = ProcessEnvironment.GetCommandLine(p).Trim();
             pcmd = pcmd.IndexOf(' ') >= 0 ? pcmd.Substring(pcmd.IndexOf(' ') + 1) : "";
             
-            Assert.AreEqual(penv["SS_REMOTE_HOST"], serverAddress);
-            Assert.AreEqual(penv["SS_REMOTE_PORT"], serverPort.ToString());
-            Assert.AreEqual(penv["SS_LOCAL_HOST"], IPAddress.Loopback.ToString());
+            Assert.AreEqual(serverAddress, penv["SS_REMOTE_HOST"]);
+            Assert.AreEqual(serverPort.ToString(), penv["SS_REMOTE_PORT"]);
+            Assert.AreEqual(IPAddress.Loopback.ToString(), penv["SS_LOCAL_HOST"]);
             
             int _ignored;
             Assert.IsTrue(int.TryParse(penv["SS_LOCAL_PORT"], out _ignored));
             
-            Assert.AreEqual(penv["SS_PLUGIN_OPTIONS"], pluginOpts);
-            Assert.AreEqual(pcmd, pluginArgs);
+            Assert.AreEqual(pluginOpts, penv["SS_PLUGIN_OPTIONS"]);
+            Assert.AreEqual(pluginArgs, pcmd);
 
 
             plugin.Dispose();
