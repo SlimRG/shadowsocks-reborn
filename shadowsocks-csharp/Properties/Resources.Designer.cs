@@ -120,16 +120,6 @@ namespace Shadowsocks.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        public static byte[] libsscrypto_dll {
-            get {
-                object obj = ResourceManager.GetObject("libsscrypto_dll", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
         ///&lt;!-- Warning: Configuration may reset after shadowsocks upgrade. --&gt;
         ///&lt;!-- If you messed it up, delete this file and Shadowsocks will create a new one. --&gt;

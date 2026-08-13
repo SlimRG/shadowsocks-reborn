@@ -15,42 +15,14 @@ namespace Shadowsocks.Encryption
 
         static EncryptorFactory()
         {
-            var AEADMbedTLSEncryptorSupportedCiphers = AEADMbedTLSEncryptor.SupportedCiphers();
-            var AEADSodiumEncryptorSupportedCiphers = AEADSodiumEncryptor.SupportedCiphers();
-            var PlainEncryptorSupportedCiphers = PlainEncryptor.SupportedCiphers();
-
-            if (Sodium.AES256GCMAvailable)
+            foreach (string method in AEADBclEncryptor.SupportedCiphers())
             {
-                // prefer to aes-256-gcm in libsodium
-                AEADMbedTLSEncryptorSupportedCiphers.Remove("aes-256-gcm");
-            }
-            else
-            {
-                AEADSodiumEncryptorSupportedCiphers.Remove("aes-256-gcm");
+                _registeredEncryptors.Add(method, typeof(AEADBclEncryptor));
             }
 
-            foreach (string method in AEADOpenSSLEncryptor.SupportedCiphers())
+            foreach (string method in PlainEncryptor.SupportedCiphers())
             {
-                if (!_registeredEncryptors.ContainsKey(method))
-                    _registeredEncryptors.Add(method, typeof(AEADOpenSSLEncryptor));
-            }
-
-            foreach (string method in AEADSodiumEncryptorSupportedCiphers)
-            {
-                if (!_registeredEncryptors.ContainsKey(method))
-                    _registeredEncryptors.Add(method, typeof(AEADSodiumEncryptor));
-            }
-
-            foreach (string method in AEADMbedTLSEncryptorSupportedCiphers)
-            {
-                if (!_registeredEncryptors.ContainsKey(method))
-                    _registeredEncryptors.Add(method, typeof(AEADMbedTLSEncryptor));
-            }
-
-            foreach (string method in PlainEncryptorSupportedCiphers)
-            {
-                if (!_registeredEncryptors.ContainsKey(method))
-                    _registeredEncryptors.Add(method, typeof(PlainEncryptor));
+                _registeredEncryptors.Add(method, typeof(PlainEncryptor));
             }
         }
 
@@ -62,7 +34,10 @@ namespace Shadowsocks.Encryption
             }
 
             method = method.ToLowerInvariant();
-            Type t = _registeredEncryptors[method];
+            if (!_registeredEncryptors.TryGetValue(method, out Type t))
+            {
+                throw new NotSupportedException($"Encryption method '{method}' is not supported.");
+            }
 
             ConstructorInfo c = t.GetConstructor(ConstructorTypes);
             if (c == null) throw new System.Exception("Invalid ctor");

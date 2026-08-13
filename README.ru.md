@@ -4,7 +4,7 @@
 
 [English](README.md) | **Русский** | [中文说明](https://github.com/shadowsocks/shadowsocks-windows/wiki/Shadowsocks-Windows-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)
 
-Этот репозиторий сохраняет архитектуру клиента Shadowsocks for Windows **v4** и переносит её на **.NET 10**. Основная цель — совместимость с современными Windows/.NET без ненужного изменения транспорта, шифрования, формата конфигурации, плагинов и логики выбора серверов.
+Этот репозиторий сохраняет архитектуру клиента Shadowsocks for Windows **v4** и поэтапно переносит её на **.NET 10**. Основная цель — совместимость с современными Windows/.NET без ненужного изменения транспорта, шифрования, формата конфигурации, плагинов и логики выбора серверов.
 
 ## Возможности
 
@@ -23,10 +23,19 @@
 - Target framework: `net10.0-windows10.0.19041.0`.
 - Publish RID: `win-x86`.
 - Для framework-dependent публикации требуется .NET 10 Desktop Runtime (x86).
-- Основной процесс остаётся x86: встроенная `libsscrypto.dll` загружается в процесс и является 32-битной.
+- Текущий профиль публикации остаётся `win-x86`, но требования к x86 из-за in-process crypto DLL больше нет.
 - `privoxy.exe` поставляется как отдельный x86-процесс.
 
-Явная Windows-версия в TFM нужна текущему стеку ReactiveUI/System.Reactive, чтобы NuGet выбирал Windows-реализацию dispatcher scheduler.
+Явная Windows-версия в TFM нужна текущему стеку ReactiveUI/System.Reactive, чтобы NuGet выбирал Windows-реализацию dispatcher scheduler. Для ChaCha20-Poly1305 также требуется поддержка платформой, которую сообщает `ChaCha20Poly1305.IsSupported`.
+
+## Текущее состояние порта
+
+- Основной проект и тесты переведены на `.NET 10` для Windows.
+- Поддерживаемые AEAD-методы реализованы в `AEADBclEncryptor` через `System.Security.Cryptography`.
+- Старые `libsscrypto.dll`, OpenSSL, mbedTLS и libsodium больше не входят в активный crypto-path. Имена legacy `.cs`-файлов явно исключены в SDK-style `.csproj`, поэтому оставшиеся после распаковки поверх старой папки файлы не должны случайно попасть в компиляцию.
+- Системный прокси меняется внутри процесса через WinINet; старые `sysproxy.exe` не используются.
+- UI пока **смешанный WinForms/WPF**. Полный перенос интерфейса на Windows 11 WPF/Metro ещё не завершён.
+- Текущий профиль публикации — **framework-dependent, untrimmed, x86, single-file**. **NativeAOT пока не включён.**
 
 ## Сборка
 
@@ -50,7 +59,24 @@ dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Plat
 shadowsocks-csharp\bin\x86\Release\net10.0-windows10.0.19041.0\win-x86\publish\
 ```
 
-Профиль создаёт framework-dependent, untrimmed, single-file публикацию.
+Профиль создаёт framework-dependent, untrimmed, single-file публикацию. `PublishAot` в текущем профиле не включён.
+
+### Очистка рабочей папки после обновления поверх старой версии
+
+Проект рассчитан на ситуацию, когда новый архив распаковывается поверх старого checkout. Известные удалённые Settings- и native-crypto-файлы явно исключены из компиляции. Если Visual Studio всё ещё показывает ошибки из таких файлов, перезагрузите solution, удалите старые каталоги `bin`/`obj` и выполните rebuild.
+
+Не нужно возвращать `libsscrypto.dll` или чинить старые OpenSSL/mbedTLS/libsodium-wrapper'ы только ради компиляции оставшихся legacy-файлов: активная реализация находится в `Encryption\AEAD\AEADBclEncryptor.cs`.
+
+## Криптография
+
+AEAD-криптография реализована через `Encryption/AEAD/AEADBclEncryptor.cs` и `System.Security.Cryptography`; старая встроенная `libsscrypto.dll` больше не используется:
+
+- `aes-128-gcm`, `aes-192-gcm`, `aes-256-gcm` используют `AesGcm`;
+- `chacha20-ietf-poly1305` использует `ChaCha20Poly1305`;
+- старое Shadowsocks-преобразование пароля через MD5 сохранено ради совместимости протокола;
+- session subkey выводится через HKDF-SHA1 с `ss-subkey`, как требует классический Shadowsocks AEAD.
+
+`xchacha20-ietf-poly1305` удалён. Старые локальные конфигурации с этим методом при загрузке переключаются на `chacha20-ietf-poly1305`; на удалённом сервере необходимо выставить тот же метод.
 
 ## Конфигурация
 
@@ -114,10 +140,9 @@ Upstream-документация по [плагинам, не соответс�
 
 | Компонент | Архитектура | Назначение |
 | --- | --- | --- |
-| `libsscrypto.dll` | x86 | Встроенная криптография Shadowsocks |
 | `privoxy.exe` | x86 | Локальный HTTP-to-SOCKS bridge |
 
-Текущий порт не использует `sysproxy.exe`, `sysproxy64.exe`, Costura, `System.Windows.Forms.DataVisualization`, `System.Data.SqlClient` и `sni.dll`.
+Текущий порт не содержит `libsscrypto.dll` и не использует `sysproxy.exe`, `sysproxy64.exe`, Costura, `System.Windows.Forms.DataVisualization`, `System.Data.SqlClient` и `sni.dll`.
 
 ## Лицензия
 

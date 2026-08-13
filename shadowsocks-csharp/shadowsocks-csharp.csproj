@@ -78,4 +78,15 @@
     <Compile Remove="Settings.cs;Properties\\Settings.Designer.cs" />
     <None Remove="app.config;Properties\\Settings.settings" />
   </ItemGroup>
+
+  <!-- The .NET 10 port uses the managed BCL AEAD implementation in
+       Encryption\AEAD\AEADBclEncryptor.cs. SDK-style projects implicitly
+       compile every *.cs file under the project directory, so legacy native
+       crypto files left behind when this archive is extracted over an older
+       checkout would otherwise be compiled as well. They depend on the
+       removed libsscrypto resource and on fields that no longer exist. -->
+  <ItemGroup>
+    <Compile Remove="Encryption\AEAD\AEADMbedTLSEncryptor.cs;Encryption\AEAD\AEADOpenSSLEncryptor.cs;Encryption\AEAD\AEADSodiumEncryptor.cs" />
+    <Compile Remove="Encryption\MbedTLS.cs;Encryption\OpenSSL.cs;Encryption\Sodium.cs" />
+  </ItemGroup>
 </Project>

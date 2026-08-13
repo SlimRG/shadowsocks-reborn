@@ -33,7 +33,6 @@ namespace Shadowsocks.View
                 "aes-192-gcm",
                 "aes-128-gcm",
                 "chacha20-ietf-poly1305",
-                "xchacha20-ietf-poly1305",
             };
             public static EncryptionMethod[] AllMethods
             {

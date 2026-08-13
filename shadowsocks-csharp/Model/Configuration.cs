@@ -205,6 +205,21 @@ namespace Shadowsocks.Model
             // Add an empty server configuration
             if (config.configs.Count == 0)
                 config.configs.Add(GetDefaultServer());
+
+            // XChaCha20-Poly1305 depended on the removed native libsodium backend.
+            // Keep old gui-config.json files loadable, but the remote server must also
+            // be changed to the replacement method before the connection can succeed.
+            foreach (Server server in config.configs)
+            {
+                if (string.Equals(server.method, "xchacha20-ietf-poly1305", StringComparison.OrdinalIgnoreCase))
+                {
+                    logger.Warn(
+                        $"Encryption method 'xchacha20-ietf-poly1305' is no longer supported for {server.server}:{server.server_port}; " +
+                        $"using '{Server.DefaultMethod}' locally. The remote server must use the same method.");
+                    server.method = Server.DefaultMethod;
+                }
+            }
+
             // Selected server
             if (config.index == -1 && string.IsNullOrEmpty(config.strategy))
                 config.index = 0;

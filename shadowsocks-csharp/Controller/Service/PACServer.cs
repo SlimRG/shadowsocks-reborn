@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using NLog;
 using Shadowsocks.Encryption;
@@ -49,7 +50,7 @@ namespace Shadowsocks.Controller
 
         private static string GetHash(string content)
         {
-            return HttpServerUtilityUrlToken.Encode(MbedTLS.MD5(Encoding.ASCII.GetBytes(content)));
+            return HttpServerUtilityUrlToken.Encode(MD5.HashData(Encoding.ASCII.GetBytes(content)));
         }
 
         public override bool Handle(byte[] firstPacket, int length, Socket socket, object state)

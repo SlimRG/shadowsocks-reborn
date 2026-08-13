@@ -9,7 +9,7 @@ Keep pull requests focused. Avoid unrelated protocol, configuration or UI change
 - Target framework: `net10.0-windows10.0.19041.0`
 - Application/test architecture: x86
 
-The application must remain x86 until the bundled in-process `libsscrypto.dll` is replaced with a compatible build.
+The current release profile is x86. Cryptography no longer imposes an in-process x86 native-library requirement. The current publish baseline is framework-dependent/single-file; NativeAOT is not enabled yet.
 
 ## Build and validate
 
@@ -20,7 +20,9 @@ dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x86
 dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x86 -p:PublishProfile=FolderProfile
 ```
 
-Delete stale `bin`/`obj` before diagnosing problems after TFM, WPF dependency or publish-profile changes.
+Delete stale `bin`/`obj` before diagnosing problems after TFM, WPF dependency or publish-profile changes. This is especially important after extracting a new archive over an older working tree.
+
+The SDK-style project explicitly excludes retired `Settings` and native-crypto source filenames. Do not make stale `AEADMbedTLSEncryptor`, `AEADOpenSSLEncryptor`, `AEADSodiumEncryptor`, `MbedTLS`, `OpenSSL` or `Sodium` files compile again; remove/ignore them and keep the active BCL implementation in `AEADBclEncryptor`.
 
 A successful build is not enough for runtime-sensitive changes. Exercise the code path you changed.
 
@@ -31,6 +33,10 @@ A successful build is not enough for runtime-sensitive changes. Exercise the cod
 - Keep system-proxy integration in-process; do not reintroduce `sysproxy.exe` / `sysproxy64.exe`.
 - Do not reintroduce `System.Windows.Forms.DataVisualization` / `System.Data.SqlClient` solely for the traffic chart.
 - Do not globally suppress `Win32Exception`. Filter an expected native error only at the call site where it is known to be harmless.
+- Keep classic AEAD wire compatibility: MD5 password derivation and HKDF-SHA1/`ss-subkey` are protocol requirements, not upgradeable hash choices.
+- Do not reintroduce `libsscrypto.dll`, OpenSSL, mbedTLS or libsodium for the supported AEAD methods without a concrete compatibility requirement.
+- Keep documentation explicit about the current publish mode: do not describe the build as NativeAOT until `PublishAot` is actually enabled and the complete application is validated under AOT.
+- Treat the current WinForms/WPF UI as transitional; do not claim the Windows 11 WPF/Metro migration is complete until the remaining WinForms surfaces are replaced.
 
 ## Runtime checks
 

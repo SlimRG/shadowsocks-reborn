@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using NLog;
 using Shadowsocks.Controller;
@@ -35,8 +36,7 @@ namespace Shadowsocks.Encryption.AEAD
         // internal name in the crypto library
         protected string _innerLibName;
         protected EncryptorInfo CipherInfo;
-        protected static byte[] _Masterkey = null;
-        protected byte[] _sessionKey;
+        protected byte[] _masterKey;
         protected int keyLen;
         protected int saltLen;
         protected int tagLen;
@@ -88,12 +88,11 @@ namespace Shadowsocks.Encryption.AEAD
         protected void InitKey(string password)
         {
             byte[] passbuf = Encoding.UTF8.GetBytes(password);
-            // init master key
-            if (_Masterkey == null) _Masterkey = new byte[keyLen];
-            if (_Masterkey.Length != keyLen) Array.Resize(ref _Masterkey, keyLen);
-            DeriveKey(passbuf, _Masterkey, keyLen);
-            // init session key
-            if (_sessionKey == null) _sessionKey = new byte[keyLen];
+            // The master key belongs to this encryptor instance. Keeping it per-instance
+            // prevents concurrent connections to servers with different passwords from
+            // overwriting each other's key material.
+            _masterKey = new byte[keyLen];
+            DeriveKey(passbuf, _masterKey, keyLen);
         }
 
         public void DeriveKey(byte[] password, byte[] key, int keylen)
@@ -105,13 +104,13 @@ namespace Shadowsocks.Encryption.AEAD
             {
                 if (i == 0)
                 {
-                    md5sum = MbedTLS.MD5(password);
+                    md5sum = MD5.HashData(password);
                 }
                 else
                 {
                     Array.Copy(md5sum, 0, result, 0, MD5_LEN);
                     Array.Copy(password, 0, result, MD5_LEN, password.Length);
-                    md5sum = MbedTLS.MD5(result);
+                    md5sum = MD5.HashData(result);
                 }
                 Array.Copy(md5sum, 0, key, i, Math.Min(MD5_LEN, keylen - i));
                 i += MD5_LEN;
@@ -120,16 +119,26 @@ namespace Shadowsocks.Encryption.AEAD
 
         public void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
-            int ret = MbedTLS.hkdf(salt, saltLen, masterKey, keyLen, InfoBytes, InfoBytes.Length, sessionKey,
-                keyLen);
-            if (ret != 0) throw new System.Exception("failed to generate session key");
+            HKDF.DeriveKey(
+                HashAlgorithmName.SHA1,
+                masterKey.AsSpan(0, keyLen),
+                sessionKey.AsSpan(0, keyLen),
+                salt.AsSpan(0, saltLen),
+                InfoBytes);
         }
 
         protected void IncrementNonce(bool isEncrypt)
         {
             lock (_nonceIncrementLock)
             {
-                Sodium.sodium_increment(isEncrypt ? _encNonce : _decNonce, nonceLen);
+                byte[] nonce = isEncrypt ? _encNonce : _decNonce;
+                // Shadowsocks AEAD treats the nonce as a little-endian unsigned integer.
+                for (int i = 0; i < nonceLen; i++)
+                {
+                    nonce[i]++;
+                    if (nonce[i] != 0)
+                        break;
+                }
             }
         }
 

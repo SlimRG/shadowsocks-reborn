@@ -20,17 +20,11 @@ namespace Shadowsocks.ViewModels
             _menuViewController = Program.MenuController;
 
             if (!_config.proxy.useProxy)
-            {
                 NoProxy = true;
-            }
             else if (_config.proxy.proxyType == 0)
-            {
                 UseSocks5Proxy = true;
-            }
             else
-            {
                 UseHttpProxy = true;
-            }
 
             Address = _config.proxy.proxyServer;
             Port = _config.proxy.proxyPort;
@@ -152,9 +146,7 @@ namespace Shadowsocks.ViewModels
                 authPwd = Password
             };
             if (NoProxy)
-            {
                 forwardProxyConfig.useProxy = false;
-            }
             else if (UseSocks5Proxy)
             {
                 forwardProxyConfig.useProxy = true;
