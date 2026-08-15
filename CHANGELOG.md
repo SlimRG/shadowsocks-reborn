@@ -39,6 +39,7 @@ All notable changes in the Reborn fork are documented here. The original upstrea
 - Added GitHub Actions CI and tagged draft-release packaging.
 - Added a PowerShell release builder that produces a ZIP and SHA-256 checksum.
 - Added repository preflight validation for linked `.resx` resources before CI/release builds.
+- Aligned CI/release restore and publish operations on the explicit `win-x64` RID so required .NET and Windows Desktop runtime packs are restored before `publish --no-restore`.
 - Updated update-checker/project links to `SlimRG/shadowsocks-reborn`.
 - Refreshed README, contribution guidance, issue templates and release metadata.
 

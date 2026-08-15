@@ -88,14 +88,22 @@ try {
 
     & (Join-Path $PSScriptRoot 'Validate-Repository.ps1')
 
-    Invoke-DotNet -Arguments @('restore', $solution, '-p:Platform=x64')
+    Invoke-DotNet -Arguments @('restore', $solution, '-p:Platform=x64', '-r', 'win-x64')
     Invoke-DotNet -Arguments @('build', $solution, '-c', 'Release', '-p:Platform=x64', '-m:1', '--no-restore')
     Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '-p:Platform=x64', '--no-build')
+    Invoke-DotNet -Arguments @(
+        'restore', $project,
+        '-p:Platform=x64',
+        '-p:PublishProfile=FolderProfile',
+        '-r', 'win-x64'
+    )
     Invoke-DotNet -Arguments @(
         'publish', $project,
         '-c', 'Release',
         '-p:Platform=x64',
         '-p:PublishProfile=FolderProfile',
+        '-r', 'win-x64',
+        '--no-self-contained',
         '-o', $publishDir,
         '--no-restore'
     )

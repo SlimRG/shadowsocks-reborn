@@ -17,7 +17,7 @@ The main application publish is framework-dependent and single-file. `Shadowsock
 Run from a clean or cleaned working tree:
 
 ```cmd
-dotnet restore .\shadowsocks-windows.sln
+dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
 dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
 dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 ```

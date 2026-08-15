@@ -32,7 +32,7 @@ jobs:
         run: dotnet --info
 
       - name: Restore
-        run: dotnet restore .\shadowsocks-windows.sln -p:Platform=x64
+        run: dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
 
       - name: Build
         run: dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1 --no-restore
@@ -40,8 +40,11 @@ jobs:
       - name: Test
         run: dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 
+      - name: Restore publish runtime
+        run: dotnet restore .\shadowsocks-csharp\shadowsocks-csharp.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
+
       - name: Publish
-        run: dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -o .\artifacts\publish --no-restore
+        run: dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained -o .\artifacts\publish --no-restore
 
       - name: Validate publish
         shell: pwsh

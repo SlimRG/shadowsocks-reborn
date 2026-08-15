@@ -63,7 +63,7 @@ curl.exe -4 --noproxy "*" https://example.com
 На Windows с .NET 10 SDK:
 
 ```cmd
-dotnet restore .\shadowsocks-windows.sln
+dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
 dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
 dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 ```
@@ -71,7 +71,7 @@ dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 Публикация:
 
 ```cmd
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile
+dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
 ```
 
 Полная подготовка release ZIP и SHA-256:
