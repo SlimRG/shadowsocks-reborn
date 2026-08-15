@@ -1,28 +1,26 @@
----
+﻿---
 name: Bug report (English)
-about: Report a reproducible client problem
+about: Report a reproducible Shadowsocks Reborn problem
 title: ""
-labels: ""
+labels: bug
 assignees: ""
 ---
 
-<!--
-Shadowsocks is a non-profit open-source project and does not provide hosted proxy services.
-For service-provider/account problems, contact your provider.
-Search existing issues and review the upstream troubleshooting guide before submitting.
-Remove all sensitive information from logs and configuration snippets.
--->
+<!-- Search existing issues first. Remove credentials, server addresses, subscription URLs, PAC secrets and tokens. -->
 
-## Bug description
+## Problem
 
-Describe the problem clearly and concisely.
+Describe the problem and what you expected to happen.
 
 ## Environment
 
-- Shadowsocks client version:
-- Windows version:
-- .NET runtime/SDK version:
-- Build architecture: x86
+- Shadowsocks Reborn version/commit:
+- Windows version/build:
+- Installation: release ZIP / source build
+- .NET 10 Desktop Runtime version:
+- Traffic mode: User / Admin
+- System proxy mode: Disabled / PAC / Global
+- Portable mode: yes / no
 
 ## Steps to reproduce
 
@@ -30,18 +28,23 @@ Describe the problem clearly and concisely.
 2.
 3.
 
-## Expected behavior
+## Admin Mode details
 
-Describe what should happen.
+<!-- Delete this section when the problem is unrelated to Admin Mode. -->
 
-## Actual behavior
+- Did UAC succeed: yes / no
+- WinDivert menu status: active / paused / inactive
+- Does the log contain `WinDivert capture confirmed`: yes / no
+- Was a Game Mode application running: yes / no
 
-Describe what happens instead.
+## Logs
 
-## Configuration and logs
-
-Remove passwords, server addresses, subscription URLs, and other sensitive information.
+Paste the complete relevant WARN/ERROR and stack trace.
 
 ```text
-PASTE LOG HERE
+PASTE SANITIZED LOG HERE
 ```
+
+## Additional context
+
+Add screenshots or minimal configuration fragments when useful. Remove private data first.

@@ -1,14 +1,14 @@
+﻿using Shadowsocks.Model;
 using System;
 using System.Net;
 using System.Net.Http;
-using Shadowsocks.Model;
 
-namespace Shadowsocks.Controller
+namespace Shadowsocks.Controller.Service
 {
     /// <summary>
     /// Creates HTTP clients that explicitly use the local Shadowsocks HTTP endpoint.
-    /// The request enters the mixed local listener, is forwarded to Privoxy and then
-    /// leaves through the currently selected Shadowsocks server.
+    /// The request enters the mixed local listener, is handled by the managed HTTP proxy
+    /// and then leaves through the currently selected Shadowsocks server.
     /// </summary>
     internal static class LocalProxyHttpClient
     {

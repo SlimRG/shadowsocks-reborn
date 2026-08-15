@@ -1,43 +1,62 @@
-# Shadowsocks for Windows
+﻿# Shadowsocks Reborn for Windows
 
 <img src="shadowsocks-csharp/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
 
-**English** | [Русский](README.ru.md) | [中文说明](https://github.com/shadowsocks/shadowsocks-windows/wiki/Shadowsocks-Windows-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)
+**English** | [Русский](README.ru.md)
 
-This repository keeps the Shadowsocks for Windows **v4** client architecture and incrementally ports it to **.NET 10**. The goal is compatibility with current Windows/.NET while preserving the v4 transport, encryption, configuration, plugin and server-selection behavior.
+`shadowsocks-reborn` is a Windows-focused continuation of the classic Shadowsocks for Windows v4 client. The current codebase targets **.NET 10**, **Windows 10 2004 (build 19041) or newer**, and **x64 only** while preserving the classic Shadowsocks protocol/configuration model.
 
-## Features
+> Current release line: **5.0**. This fork is not the upstream `shadowsocks/shadowsocks-windows` repository.
 
-- PAC and Global Windows system-proxy modes.
-- Local SOCKS5 and HTTP proxy endpoints.
-- Local PAC generation from an on-demand GeoSite cache, plus cached Online PAC support.
-- SIP003 plugins and UDP relay.
-- Server switching strategies.
-- QR-code import/export and online configuration sources.
-- Global hotkeys.
-- Localized WinForms/WPF UI.
-- Log viewer with a built-in traffic chart.
+## Highlights
 
-## Requirements and architecture
+- .NET 10 desktop application targeting `net10.0-windows10.0.19041.0`.
+- x64-only application, tests and elevated network helper.
+- BCL AEAD crypto through `System.Security.Cryptography`; retired native crypto wrappers are no longer used.
+- In-process WinINet system-proxy integration; `sysproxy.exe` is removed.
+- Managed HTTP/1.1 and HTTPS `CONNECT` proxy; Privoxy is removed.
+- Local PAC with configurable GeoSite sources and cached Online PAC.
+- Application-aware `Proxy`, `Direct` and `Block` routing.
+- Optional transparent TCP/UDP capture in Admin Mode through WinDivert.
+- Automatic Game Mode that temporarily tears down WinDivert while configured applications are running.
+- SIP003 plugins, classic Shadowsocks UDP relay, QR import/export, hotkeys and localized WinForms/WPF UI.
 
-- Target framework: `net10.0-windows10.0.19041.0`.
-- Publish RID: `win-x86`.
-- .NET 10 Desktop Runtime (x86) is required for the framework-dependent publish.
-- The current publish profile remains `win-x86`; there is no longer an in-process x86 crypto DLL requirement.
-- `privoxy.exe` is bundled as an x86 helper process.
+## Traffic modes
 
-The explicit Windows TFM is required by the current ReactiveUI/System.Reactive stack so the Windows dispatcher implementation is selected correctly. ChaCha20-Poly1305 additionally requires platform support reported by `ChaCha20Poly1305.IsSupported`.
+The tray exposes only two selectable traffic modes:
 
-## Port status
+- **User Mode** — no elevation and no driver. Application rules apply to traffic that reaches the Windows/local HTTP proxy. Applications that bypass the system proxy and arbitrary UDP/QUIC sockets are not transparently captured.
+- **Admin Mode** — requests UAC, downloads the official x64 WinDivert runtime on demand and starts the elevated `Shadowsocks.NetworkService.exe` broker. TCP/UDP traffic is classified by application and routed as `Proxy`, `Direct` or `Block`.
 
-- The application and test projects target `.NET 10` on Windows.
-- Supported AEAD methods are implemented by `AEADBclEncryptor` using `System.Security.Cryptography`.
-- The old `libsscrypto.dll`, OpenSSL, mbedTLS and libsodium wrappers are not part of the active crypto path. Their legacy source filenames are explicitly excluded in the SDK-style project so stale files left by an in-place archive update cannot be compiled accidentally.
-- System proxy changes are performed in-process through WinINet; the old `sysproxy.exe` helpers are not used.
-- GeoSite is no longer embedded. Local PAC downloads its configured GeoSite source(s) through the active Shadowsocks connection on demand and keeps per-source runtime caches.
-- Online PAC files are downloaded through Shadowsocks, cached locally, and served to WinINet from the local `/pac` endpoint; Windows no longer fetches the remote PAC URL directly.
-- The UI is currently **mixed WinForms/WPF**. A complete Windows 11 WPF/Metro UI migration is not finished yet.
-- The supplied publish profile is currently **framework-dependent, untrimmed, x86 and single-file**. **NativeAOT is not enabled yet.**
+**Game Mode is not a third traffic mode.** It is an automatic compatibility state. When Admin Mode is selected and a configured process/path pattern starts, the WinDivert capture child is stopped and the WinDivert driver service is removed. When the matching application exits, Admin Mode is restored automatically.
+
+The menu reports the runtime state as `WinDivert: active`, `paused (game running)` or `inactive`.
+
+## WinDivert verification
+
+A successful Admin Mode startup is logged only after the elevated capture child has completed `WinDivertOpen`. Look for a message similar to:
+
+```text
+WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
+```
+
+For a functional A/B test, add a `Block` rule for `curl.exe`, disable the Windows system proxy for the test, then compare a direct request in User Mode and Admin Mode:
+
+```cmd
+curl.exe -4 --noproxy "*" https://example.com
+```
+
+The request should bypass application routing in User Mode and be blocked in Admin Mode.
+
+## Requirements
+
+For running a release build:
+
+- Windows 10 version 2004 / build 19041 or newer, or Windows 11;
+- x64 OS;
+- .NET 10 Desktop Runtime x64 for the main application.
+
+`Shadowsocks.NetworkService.exe` is published self-contained and does not require a separate .NET runtime. WinDivert is optional and is downloaded only when Admin Mode is enabled.
 
 ## Build
 
@@ -45,110 +64,55 @@ Use a .NET 10 SDK on Windows:
 
 ```cmd
 dotnet restore .\shadowsocks-windows.sln
-dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x86
-dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x86
+dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
+dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 ```
 
-Publish with the supplied profile:
+Publish the application with the supplied profile:
 
 ```cmd
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x86 -p:PublishProfile=FolderProfile
+dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile
 ```
 
-Output:
+Or build the complete release package and SHA-256 file:
 
-```text
-shadowsocks-csharp\bin\x86\Release\net10.0-windows10.0.19041.0\win-x86\publish\
+```powershell
+.\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-The publish is framework-dependent, untrimmed and single-file. `PublishAot` is not enabled in the current profile.
+The product publish contains the main framework-dependent single-file application plus the self-contained single-file elevated helper. The release archive must therefore keep `Shadowsocks.exe` and `Shadowsocks.NetworkService.exe` together.
 
-### Cleaning an upgraded working tree
+## Configuration and runtime data
 
-The repository is intended to tolerate extracting a newer archive over an older checkout. Known retired settings and native-crypto source files are explicitly excluded from compilation. If Visual Studio still shows errors originating from one of these retired files, close/reload the solution and delete stale `bin`/`obj` directories before rebuilding.
+- Main settings: `gui-config.json`.
+- Custom PAC rules: `user-rule.txt`.
+- Local GeoSite and Online PAC data are cached at runtime and are not embedded in the executable.
+- In portable mode, optional WinDivert files are stored below the local `runtime` directory; otherwise they are stored below `%LOCALAPPDATA%\Shadowsocks\runtime`.
 
-Do **not** restore `libsscrypto.dll` or fix the retired OpenSSL/mbedTLS/libsodium wrappers just to make those stale files compile; the active implementation is `Encryption\AEAD\AEADBclEncryptor.cs`.
+The repository intentionally excludes retired `ApplicationSettingsBase`, Privoxy, sysproxy and native crypto artifacts from compilation/publish so an old in-place checkout cannot silently reintroduce them.
 
-## Cryptography
+## PAC and HTTP forwarding
 
-AEAD cryptography uses `System.Security.Cryptography` through `Encryption/AEAD/AEADBclEncryptor.cs` instead of the legacy bundled `libsscrypto.dll`:
+Local PAC downloads configured GeoSite sources through the active Shadowsocks connection and keeps per-source caches. Online PAC is also downloaded through Shadowsocks and served to WinINet from the local `/pac` endpoint so Windows does not need direct access to the remote PAC host.
 
-- `aes-128-gcm`, `aes-192-gcm`, `aes-256-gcm` use `AesGcm`;
-- `chacha20-ietf-poly1305` uses `ChaCha20Poly1305`;
-- password-to-key derivation keeps the legacy Shadowsocks MD5 construction for protocol compatibility;
-- session subkeys use HKDF-SHA1 with `ss-subkey`, as required by the classic Shadowsocks AEAD protocol.
+`ManagedHttpProxyService` handles HTTP/1.1 and HTTPS `CONNECT` directly in managed code. HTTPS remains a byte tunnel, so HTTP/2 negotiated inside TLS works without an HTTP/2 parser in the local proxy. FTP gatewaying is not implemented.
 
-`xchacha20-ietf-poly1305` has been removed. Old local configurations using it are changed to `chacha20-ietf-poly1305` when loaded; the remote server must be configured to use the same method.
+## DNS status
 
-## Configuration
+The configuration/IPC contract already contains `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy modes, but transparent DNS interception/routing is **not implemented in 5.0.0**. Do not rely on these settings for DNS enforcement yet.
 
-Application settings are stored in `gui-config.json`, including Log Viewer state.
+## UI status
 
-`Shadowsocks.dll.config` is not used. The old `ApplicationSettingsBase`/`app.config` settings path has been removed.
+The UI is still a **mixed WinForms/WPF** application. Migration to a complete Windows 11 WPF/Metro interface is not finished.
 
-`Shadowsocks.pdb` is optional at runtime. Keep it while testing to retain source file and line information in stack traces.
+## Development
 
-## System proxy
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for releases. Current release history is in [CHANGELOG.md](CHANGELOG.md); the original upstream history is retained in `CHANGES`.
 
-The legacy `sysproxy.exe` / `sysproxy64.exe` path has been removed. System proxy settings are applied directly through WinINet.
+## Security and privacy
 
-The selected mode is persisted in `gui-config.json`:
-
-- Disabled: `enabled = false`
-- Global: `enabled = true`, `global = true`
-- PAC: `enabled = true`, `global = false`
-
-At startup and after internal reloads, Shadowsocks reapplies the saved mode and reads the effective Windows state back. Tray/menu state follows the effective state, not only the JSON flags.
-
-On full exit, the system proxy state captured before Shadowsocks started is restored. The selected Shadowsocks mode remains saved and is reapplied on the next start.
-
-## PAC
-
-The two PAC sources are independent:
-
-- **Local PAC** uses one or more configurable GeoSite databases. The default source is [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community), but `PAC → GeoSite Sources...` can replace it or add third-party databases. Sources are downloaded only while Local PAC is active, through the already running Shadowsocks connection, cached independently under `geosite-cache`, and merged by GeoSite group name. For every database URL Shadowsocks automatically tries the adjacent `<URL>.sha256sum`; a missing or unreachable checksum is non-fatal, while a checksum that is present must match. Custom rules belong in `user-rule.txt`; generated `pac.txt` may be replaced after a GeoSite/source update.
-- **Online PAC** does not use GeoSite. The configured remote PAC URL is fetched through the running Shadowsocks connection and stored as `online-pac-cache.pac`. WinINet is always configured with the local Shadowsocks `/pac` URL, so a blocked or temporarily unavailable PAC host does not invalidate an existing cache. HTTP validators (`ETag`/`Last-Modified`) are reused when available.
-
-Until a first-time PAC download finishes, the local PAC endpoint temporarily returns a proxy-all rule instead of falling back to a direct connection.
-
-Local PAC settings include `geositeDirectGroups`, `geositeProxiedGroups` and `geositePreferDirect`.
-
-## Plugins and HTTP forwarding
-
-Configure a plugin executable in the server editor. Relative and absolute paths are supported.
-
-Privoxy startup is synchronized with the local HTTP forwarder so normal traffic is not accepted before Privoxy starts listening. During reload, active forwarding handlers are closed before Privoxy is stopped.
-
-See the upstream guide for [non-SIP003 plugins](https://github.com/shadowsocks/shadowsocks-windows/wiki/Working-with-non-SIP003-standard-Plugin).
-
-## UDP
-
-Applications that do not support SOCKS5 UDP directly may require a routing tool such as SocksCap or ProxyCap.
-
-Listener cancellation during normal stop/reload is treated as expected shutdown. Unexpected socket failures are still logged.
-
-## Localization
-
-The classic WinForms UI uses `shadowsocks-csharp/Data/i18n.csv`. WPF views use `shadowsocks-csharp/Localization/Strings*.resx`.
-
-When adding user-visible text, add it to the appropriate localization source instead of leaving a hard-coded UI string.
-
-## Diagnostics
-
-Runtime logging uses NLog. Real `Win32Exception` failures are logged with the native error code, HRESULT and stack trace.
-
-`ERROR_PARTIAL_COPY (299)` is ignored only at the specific cross-bitness process-inspection call where it is expected.
-
-For runtime reports, keep the complete WARN/ERROR entry and stack trace. Keeping `Shadowsocks.pdb` next to the executable makes those traces substantially more useful.
-
-## Bundled native components
-
-| Component | Architecture | Purpose |
-| --- | --- | --- |
-| `privoxy.exe` | x86 | Local HTTP-to-SOCKS bridge |
-
-The current port does not bundle `libsscrypto.dll` and does not use `sysproxy.exe`, `sysproxy64.exe`, Costura, `System.Windows.Forms.DataVisualization`, `System.Data.SqlClient` or `sni.dll`.
+Do not post passwords, server addresses, subscription URLs, PAC secrets or full private configurations in public issues. See [SECURITY.md](SECURITY.md) for reporting guidance.
 
 ## License
 
-Shadowsocks for Windows is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components remain under their respective licenses.
+Shadowsocks for Windows is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components retain their own licenses.

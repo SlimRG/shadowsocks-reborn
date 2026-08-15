@@ -1,10 +1,10 @@
-﻿using System.Reactive;
-using System.Text;
-using System.Windows.Input;
-using ReactiveUI;
+﻿using ReactiveUI;
 using Shadowsocks.Controller;
 using Shadowsocks.Model;
 using Shadowsocks.View;
+using System.Reactive;
+using System.Text;
+using System.Windows.Input;
 
 namespace Shadowsocks.ViewModels
 {

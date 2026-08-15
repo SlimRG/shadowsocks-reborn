@@ -1,4 +1,8 @@
-﻿using System;
+﻿using NLog;
+using Shadowsocks.Controller;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,9 +13,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using NLog;
 using Shadowsocks.Model;
-using Shadowsocks.Properties;
 
 namespace Shadowsocks.Controller.Service
 {

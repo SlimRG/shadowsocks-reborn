@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using NLog;
+using Shadowsocks.Controller;
 
 namespace Shadowsocks.Util.ProcessManagement
 {
@@ -36,7 +37,7 @@ namespace Shadowsocks.Util.ProcessManagement
                 Marshal.StructureToPtr(extendedInfo, extendedInfoPtr, false);
 
                 if (!SetInformationJobObject(handle, JobObjectInfoType.ExtendedLimitInformation, extendedInfoPtr,
-                        (uint)length))
+                        (uint) length))
                     throw new Exception(string.Format("Unable to set information.  Error: {0}",
                         Marshal.GetLastWin32Error()));
             }

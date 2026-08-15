@@ -1,154 +1,118 @@
-# Shadowsocks для Windows
+﻿# Shadowsocks Reborn для Windows
 
-<img src="shadowsocks-csharp/Resources/ssw128.png" alt="Логотип Shadowsocks" width="64">
+<img src="shadowsocks-csharp/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
 
-[English](README.md) | **Русский** | [中文说明](https://github.com/shadowsocks/shadowsocks-windows/wiki/Shadowsocks-Windows-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)
+[English](README.md) | **Русский**
 
-Этот репозиторий сохраняет архитектуру клиента Shadowsocks for Windows **v4** и поэтапно переносит её на **.NET 10**. Основная цель — совместимость с современными Windows/.NET без ненужного изменения транспорта, шифрования, формата конфигурации, плагинов и логики выбора серверов.
+`shadowsocks-reborn` — Windows-ориентированное продолжение классического Shadowsocks for Windows v4. Текущая кодовая база переведена на **.NET 10**, поддерживает **Windows 10 2004 (сборка 19041) и новее** и собирается **только под x64**, сохраняя классическую модель протокола и конфигурации Shadowsocks.
 
-## Возможности
+> Текущая ветка релизов: **5.0**. Это отдельный fork, а не upstream-репозиторий `shadowsocks/shadowsocks-windows`.
 
-- Системный прокси Windows в режимах PAC и Global.
-- Локальные SOCKS5- и HTTP-прокси.
-- Local PAC по лениво загружаемой GeoSite-базе и кэшируемый Online PAC.
-- SIP003-плагины и UDP relay.
-- Стратегии переключения серверов.
-- Импорт и экспорт через QR-коды и онлайн-конфигурации.
-- Глобальные горячие клавиши.
-- Локализованный WinForms/WPF-интерфейс.
-- Просмотр журнала со встроенным графиком трафика.
+## Основные возможности
 
-## Требования и архитектура
+- .NET 10, TFM `net10.0-windows10.0.19041.0`.
+- Только x64 для приложения, тестов и elevated helper.
+- AEAD через `System.Security.Cryptography`; старые native crypto wrappers больше не используются.
+- Управление системным proxy через WinINet внутри процесса; `sysproxy.exe` удалён.
+- Managed HTTP/1.1 и HTTPS `CONNECT` proxy; Privoxy удалён.
+- Local PAC с настраиваемыми GeoSite-источниками и кэшируемый Online PAC.
+- Маршрутизация приложений `Proxy` / `Direct` / `Block`.
+- Опциональный прозрачный TCP/UDP-перехват в Admin Mode через WinDivert.
+- Автоматический Game Mode, временно полностью отключающий WinDivert при запуске выбранных приложений.
+- SIP003 plugins, классический UDP relay Shadowsocks, QR import/export, hotkeys и локализованный WinForms/WPF UI.
 
-- Target framework: `net10.0-windows10.0.19041.0`.
-- Publish RID: `win-x86`.
-- Для framework-dependent публикации требуется .NET 10 Desktop Runtime (x86).
-- Текущий профиль публикации остаётся `win-x86`, но требования к x86 из-за in-process crypto DLL больше нет.
-- `privoxy.exe` поставляется как отдельный x86-процесс.
+## Режимы трафика
 
-Явная Windows-версия в TFM нужна текущему стеку ReactiveUI/System.Reactive, чтобы NuGet выбирал Windows-реализацию dispatcher scheduler. Для ChaCha20-Poly1305 также требуется поддержка платформой, которую сообщает `ChaCha20Poly1305.IsSupported`.
+В tray есть только два выбираемых режима:
 
-## Текущее состояние порта
+- **User Mode** — без UAC и драйвера. Правила приложений применяются к трафику, который реально проходит через системный/локальный HTTP proxy. Прямые сокеты приложений, произвольный UDP и QUIC прозрачно не перехватываются.
+- **Admin Mode** — запрашивает UAC, при необходимости загружает официальный x64 WinDivert и запускает elevated broker `Shadowsocks.NetworkService.exe`. TCP/UDP классифицируются по приложению и получают действие `Proxy`, `Direct` или `Block`.
 
-- Основной проект и тесты переведены на `.NET 10` для Windows.
-- Поддерживаемые AEAD-методы реализованы в `AEADBclEncryptor` через `System.Security.Cryptography`.
-- Старые `libsscrypto.dll`, OpenSSL, mbedTLS и libsodium больше не входят в активный crypto-path. Имена legacy `.cs`-файлов явно исключены в SDK-style `.csproj`, поэтому оставшиеся после распаковки поверх старой папки файлы не должны случайно попасть в компиляцию.
-- Системный прокси меняется внутри процесса через WinINet; старые `sysproxy.exe` не используются.
-- GeoSite больше не вшивается в приложение. Local PAC по требованию загружает настроенный источник или несколько источников через активное Shadowsocks-соединение и хранит отдельный runtime-кэш для каждого URL.
-- Online PAC скачивается через Shadowsocks, кэшируется локально и отдаётся WinINet через локальный `/pac`; Windows больше не загружает удалённый PAC URL напрямую.
-- UI пока **смешанный WinForms/WPF**. Полный перенос интерфейса на Windows 11 WPF/Metro ещё не завершён.
-- Текущий профиль публикации — **framework-dependent, untrimmed, x86, single-file**. **NativeAOT пока не включён.**
+**Game Mode не является третьим режимом трафика.** Это автоматическое состояние совместимости. Если выбран Admin Mode и запускается приложение из настроенного списка, capture-child WinDivert останавливается, а служба драйвера WinDivert удаляется. После закрытия приложения Admin Mode восстанавливается автоматически.
+
+В меню отображается фактический runtime-статус: `WinDivert: активен`, `приостановлен (игра запущена)` или `неактивен`.
+
+## Как проверить WinDivert
+
+Admin Mode считается успешно запущенным только после того, как elevated capture-child выполнил `WinDivertOpen`. В логе должна появиться строка примерно такого вида:
+
+```text
+WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
+```
+
+Для функционального A/B-теста добавь правило `curl.exe -> Block`, на время теста отключи системный proxy и сравни прямой запрос в User Mode и Admin Mode:
+
+```cmd
+curl.exe -4 --noproxy "*" https://example.com
+```
+
+В User Mode запрос должен пройти мимо application routing, а в Admin Mode — блокироваться.
+
+## Требования
+
+Для запуска release-сборки:
+
+- Windows 10 версии 2004 / сборка 19041 или новее, либо Windows 11;
+- x64 OS;
+- .NET 10 Desktop Runtime x64 для основного приложения.
+
+`Shadowsocks.NetworkService.exe` публикуется self-contained и отдельного .NET Runtime не требует. WinDivert опционален и загружается только при включении Admin Mode.
 
 ## Сборка
 
-Используйте .NET 10 SDK под Windows:
+На Windows с .NET 10 SDK:
 
 ```cmd
 dotnet restore .\shadowsocks-windows.sln
-dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x86
-dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x86
+dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
+dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
 ```
 
 Публикация:
 
 ```cmd
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x86 -p:PublishProfile=FolderProfile
+dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile
 ```
 
-Результат:
+Полная подготовка release ZIP и SHA-256:
 
-```text
-shadowsocks-csharp\bin\x86\Release\net10.0-windows10.0.19041.0\win-x86\publish\
+```powershell
+.\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-Профиль создаёт framework-dependent, untrimmed, single-file публикацию. `PublishAot` в текущем профиле не включён.
+Продуктовая публикация содержит основной framework-dependent single-file EXE и отдельный self-contained single-file elevated helper. Поэтому в release-архиве `Shadowsocks.exe` и `Shadowsocks.NetworkService.exe` должны лежать рядом.
 
-### Очистка рабочей папки после обновления поверх старой версии
+## Конфигурация и runtime-данные
 
-Проект рассчитан на ситуацию, когда новый архив распаковывается поверх старого checkout. Известные удалённые Settings- и native-crypto-файлы явно исключены из компиляции. Если Visual Studio всё ещё показывает ошибки из таких файлов, перезагрузите solution, удалите старые каталоги `bin`/`obj` и выполните rebuild.
+- Основной конфиг: `gui-config.json`.
+- Пользовательские PAC-правила: `user-rule.txt`.
+- GeoSite и Online PAC загружаются/кэшируются во время работы и не вшиваются в EXE.
+- В portable mode WinDivert хранится в локальном каталоге `runtime`; иначе — в `%LOCALAPPDATA%\Shadowsocks\runtime`.
 
-Не нужно возвращать `libsscrypto.dll` или чинить старые OpenSSL/mbedTLS/libsodium-wrapper'ы только ради компиляции оставшихся legacy-файлов: активная реализация находится в `Encryption\AEAD\AEADBclEncryptor.cs`.
+Проект явно исключает из build/publish устаревшие `ApplicationSettingsBase`, Privoxy, sysproxy и старые native crypto artifacts, чтобы они не вернулись при распаковке новой версии поверх старого checkout.
 
-## Криптография
+## PAC и HTTP forwarding
 
-AEAD-криптография реализована через `Encryption/AEAD/AEADBclEncryptor.cs` и `System.Security.Cryptography`; старая встроенная `libsscrypto.dll` больше не используется:
+Local PAC загружает настроенные GeoSite-источники через активное соединение Shadowsocks и кэширует их отдельно. Online PAC также загружается через Shadowsocks и отдаётся WinINet через локальный `/pac`, поэтому Windows не требуется прямой доступ к удалённому PAC-хосту.
 
-- `aes-128-gcm`, `aes-192-gcm`, `aes-256-gcm` используют `AesGcm`;
-- `chacha20-ietf-poly1305` использует `ChaCha20Poly1305`;
-- старое Shadowsocks-преобразование пароля через MD5 сохранено ради совместимости протокола;
-- session subkey выводится через HKDF-SHA1 с `ss-subkey`, как требует классический Shadowsocks AEAD.
+`ManagedHttpProxyService` обрабатывает HTTP/1.1 и HTTPS `CONNECT` в managed-коде. HTTPS остаётся байтовым tunnel, поэтому HTTP/2 внутри TLS работает без собственного HTTP/2 parser. FTP gateway не реализован.
 
-`xchacha20-ietf-poly1305` удалён. Старые локальные конфигурации с этим методом при загрузке переключаются на `chacha20-ietf-poly1305`; на удалённом сервере необходимо выставить тот же метод.
+## DNS
 
-## Конфигурация
+Контракт конфигурации/IPC уже содержит режимы `System`, `Direct`, `Proxy` и `CustomDoh`, но прозрачный DNS interception/routing **не реализован в 5.0.0**. Пока эти настройки нельзя считать механизмом принудительной DNS-маршрутизации.
 
-Настройки приложения хранятся в `gui-config.json`, включая состояние окна журнала.
+## Состояние UI
 
-`Shadowsocks.dll.config` больше не используется. Старый механизм `ApplicationSettingsBase`/`app.config` удалён.
+Интерфейс пока остаётся **смешанным WinForms/WPF**. Полный переход на Windows 11 WPF/Metro ещё не завершён.
 
-`Shadowsocks.pdb` для работы программы не обязателен. Во время тестирования его лучше оставлять, чтобы stack trace содержал имена исходных файлов и номера строк.
+## Разработка
 
-## Системный прокси
+Перед PR см. [CONTRIBUTING.md](CONTRIBUTING.md). История текущей ветки находится в [CHANGELOG.md](CHANGELOG.md), исходная история upstream сохранена в `CHANGES`.
 
-Старый механизм через `sysproxy.exe` / `sysproxy64.exe` удалён. Системный прокси теперь настраивается напрямую через WinINet.
+## Безопасность и приватность
 
-Выбранный режим сохраняется в `gui-config.json`:
-
-- Отключено: `enabled = false`
-- Global: `enabled = true`, `global = true`
-- PAC: `enabled = true`, `global = false`
-
-При запуске и после внутренних reload Shadowsocks заново применяет сохранённый режим и считывает фактическое состояние Windows. Галочки меню и состояние tray отражают именно фактически применённый режим.
-
-При полном выходе восстанавливается системный прокси, который был активен до запуска Shadowsocks. Выбранный режим Shadowsocks остаётся сохранённым и применяется при следующем запуске.
-
-## PAC
-
-Два источника PAC теперь независимы:
-
-- **Local PAC** использует один или несколько настраиваемых GeoSite-источников. По умолчанию используется [v2fly/domain-list-community](https://github.com/v2fly/domain-list-community), но через `PAC → GeoSite Sources...` его можно заменить или добавить сторонние базы. Источники скачиваются только при активном Local PAC через уже работающее Shadowsocks-соединение, кэшируются независимо в `geosite-cache` и объединяются по именам GeoSite-групп. Для каждого URL автоматически проверяется соседний `<URL>.sha256sum`; отсутствие или недоступность checksum не считается ошибкой, но найденная checksum обязана совпасть. Пользовательские правила находятся в `user-rule.txt`; сгенерированный `pac.txt` может заменяться после обновления GeoSite или списка источников.
-- **Online PAC** GeoSite не использует. Указанный удалённый PAC URL загружается через работающее Shadowsocks-соединение и сохраняется в `online-pac-cache.pac`. WinINet всегда получает локальный URL Shadowsocks `/pac`, поэтому блокировка или временная недоступность хоста PAC не ломает уже существующий кэш. При наличии серверных валидаторов используются `ETag`/`Last-Modified`.
-
-Пока первая загрузка PAC ещё не завершена, локальный PAC endpoint временно возвращает правило proxy-all, а не делает fallback в DIRECT.
-
-К Local PAC относятся параметры `geositeDirectGroups`, `geositeProxiedGroups` и `geositePreferDirect`.
-
-## Плагины и HTTP-прокси
-
-Исполняемый файл плагина задаётся в редакторе сервера; поддерживаются относительные и абсолютные пути.
-
-Запуск Privoxy синхронизирован с локальным HTTP-forwarder: обычный трафик не принимается до того, как Privoxy начнёт слушать порт. При reload активные forwarding handlers закрываются до остановки Privoxy.
-
-Upstream-документация по [плагинам, не соответствующим SIP003](https://github.com/shadowsocks/shadowsocks-windows/wiki/Working-with-non-SIP003-standard-Plugin).
-
-## UDP
-
-Если приложение не умеет напрямую использовать SOCKS5 UDP, может потребоваться SocksCap, ProxyCap или аналогичный инструмент.
-
-Отмена listener-операций при штатном stop/reload не считается ошибкой. Неожиданные socket failures по-прежнему записываются в журнал.
-
-## Локализация
-
-Классический WinForms-интерфейс использует `shadowsocks-csharp/Data/i18n.csv`. WPF-окна используют `shadowsocks-csharp/Localization/Strings*.resx`.
-
-При добавлении пользовательского текста его нужно сразу добавлять в соответствующий источник локализации, а не оставлять жёстко заданной английской строкой.
-
-## Диагностика
-
-Для runtime-логов используется NLog. Реальные `Win32Exception` записываются вместе с native error code, HRESULT и stack trace.
-
-`ERROR_PARTIAL_COPY (299)` игнорируется только в конкретном месте проверки чужого процесса, где такая cross-bitness ошибка ожидаема.
-
-При отчёте об ошибке прикладывайте полный WARN/ERROR и stack trace. `Shadowsocks.pdb` рядом с EXE делает диагностику заметно полезнее.
-
-## Встроенные native-компоненты
-
-| Компонент | Архитектура | Назначение |
-| --- | --- | --- |
-| `privoxy.exe` | x86 | Локальный HTTP-to-SOCKS bridge |
-
-Текущий порт не содержит `libsscrypto.dll` и не использует `sysproxy.exe`, `sysproxy64.exe`, Costura, `System.Windows.Forms.DataVisualization`, `System.Data.SqlClient` и `sni.dll`.
+Не публикуй в Issues пароли, адреса серверов, subscription URL, PAC secrets и полные приватные конфиги. Рекомендации по отчётам — в [SECURITY.md](SECURITY.md).
 
 ## Лицензия
 
-Shadowsocks for Windows распространяется по лицензии [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии.
+Shadowsocks for Windows распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии.

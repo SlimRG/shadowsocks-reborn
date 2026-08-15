@@ -123,7 +123,7 @@ namespace Shadowsocks.Controller.Service
             // Expand the environment variables from the new process itself
             if (environmentVariables != null)
             {
-                foreach (string key in environmentVariables.Keys)
+                foreach(string key in environmentVariables.Keys)
                 {
                     name = name.Replace($"%{key}%", environmentVariables[key]);
                 }

@@ -179,7 +179,7 @@ namespace Shadowsocks.Controller
             }
             catch (ObjectDisposedException)
             {
-                // Expected when the listener is stopped on .NET Framework / .NET 5-6.
+                // Expected when the listener socket is closed during shutdown.
             }
             catch (SocketException e) when (IsExpectedSocketShutdown(e))
             {
@@ -240,7 +240,7 @@ namespace Shadowsocks.Controller
                         return;
                     }
                 }
-            Shutdown:
+                Shutdown:
                 // no service found for this
                 if (conn.ProtocolType == ProtocolType.Tcp)
                 {

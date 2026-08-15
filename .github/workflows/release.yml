@@ -1,0 +1,64 @@
+﻿name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version label, for example v5.0.0
+        required: true
+        default: v5.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve version label
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            "label=${{ inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            "label=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Build release package
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.label }}
+        run: .\packaging\Build-Release.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Shadowsocks-${{ steps.version.outputs.label }}-win-x64
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/*.sha256
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Get-ChildItem .\artifacts\release\*.zip | Select-Object -First 1
+          $hash = Get-ChildItem .\artifacts\release\*.sha256 | Select-Object -First 1
+          gh release create $env:GITHUB_REF_NAME $zip.FullName $hash.FullName --title "Shadowsocks $env:GITHUB_REF_NAME" --generate-notes --verify-tag --draft

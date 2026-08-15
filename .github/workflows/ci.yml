@@ -1,0 +1,63 @@
+﻿name: CI
+
+on:
+  push:
+    branches: [main, v4]
+  pull_request:
+    branches: [main, v4]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: .NET info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore .\shadowsocks-windows.sln -p:Platform=x64
+
+      - name: Build
+        run: dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1 --no-restore
+
+      - name: Test
+        run: dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
+
+      - name: Publish
+        run: dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -o .\artifacts\publish --no-restore
+
+      - name: Validate publish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $publish = Join-Path $PWD 'artifacts\publish'
+          foreach ($name in @('Shadowsocks.exe', 'Shadowsocks.NetworkService.exe')) {
+            if (-not (Test-Path (Join-Path $publish $name))) {
+              throw "Missing required publish artifact: $name"
+            }
+          }
+          foreach ($name in @('Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'Shadowsocks.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll')) {
+            if (Test-Path (Join-Path $publish $name)) {
+              throw "Retired or invalid publish artifact found: $name"
+            }
+          }
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Shadowsocks-win-x64
+          path: artifacts/publish/
+          if-no-files-found: error

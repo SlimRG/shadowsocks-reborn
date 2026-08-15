@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using NLog;
 using Shadowsocks.Controller;
 using Shadowsocks.Controller.Service;
+using Shadowsocks.Controller.Traffic;
 
 namespace Shadowsocks.Model
 {
@@ -65,6 +66,14 @@ namespace Shadowsocks.Model
         public ForwardProxyConfig proxy;
         public HotkeyConfig hotkey;
 
+        // Traffic capture/routing. User Mode requires no elevation and can identify
+        // applications that connect to the managed local HTTP proxy. Admin Mode is
+        // implemented by the optional elevated WinDivert helper.
+        public TrafficCaptureMode trafficCaptureMode;
+        public List<ApplicationRouteRule> applicationRules;
+        public DnsPolicyConfig dnsPolicy;
+        public List<string> gameModeApplications;
+
         [JsonIgnore]
         public bool firstRunOnNewVersion;
 
@@ -114,6 +123,11 @@ namespace Shadowsocks.Model
             logViewer = new LogViewerConfig();
             proxy = new ForwardProxyConfig();
             hotkey = new HotkeyConfig();
+
+            trafficCaptureMode = TrafficCaptureMode.User;
+            applicationRules = new List<ApplicationRouteRule>();
+            dnsPolicy = new DnsPolicyConfig();
+            gameModeApplications = new List<string>();
 
             firstRunOnNewVersion = false;
 
@@ -201,6 +215,9 @@ namespace Shadowsocks.Model
         public static void Process(ref Configuration config)
         {
             NormalizeGeositeSources(config);
+            config.applicationRules ??= new List<ApplicationRouteRule>();
+            config.dnsPolicy ??= new DnsPolicyConfig();
+            config.gameModeApplications ??= new List<string>();
 
             // Mark the first run of a new version.
             var appVersion = new Version(UpdateChecker.Version);

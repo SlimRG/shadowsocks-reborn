@@ -1,6 +1,6 @@
-﻿using System.Reactive.Disposables;
-using ReactiveUI;
+﻿using ReactiveUI;
 using Shadowsocks.ViewModels;
+using System.Reactive.Disposables;
 
 namespace Shadowsocks.Views
 {

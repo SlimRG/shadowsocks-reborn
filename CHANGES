@@ -1,3 +1,10 @@
+﻿5.0.0.0 2026-08-15
+- Reborn fork: .NET 10 / Windows 10 19041+ / x64-only
+- Managed HTTP proxy replaces Privoxy; WinINet replaces sysproxy helpers
+- Admin Mode adds transparent TCP/UDP routing through WinDivert
+- Game Mode is automatic and temporarily disables WinDivert for configured applications
+- See CHANGELOG.md for the complete Reborn release notes
+
 4.4.1.0 2022-02-08
 - Add plain/none ciphers
 

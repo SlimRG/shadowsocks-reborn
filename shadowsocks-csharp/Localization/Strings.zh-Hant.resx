@@ -207,4 +207,64 @@
   <data name="saveButton_Content" xml:space="preserve">
     <value>儲存</value>
   </data>
+  <data name="trafficRoutingDescriptionTextBlock_Text" xml:space="preserve">
+    <value>選擇流量擷取方式並依應用程式設定路由規則。應用程式規則優先於系統 Proxy/PAC 的決定。</value>
+  </data>
+  <data name="trafficCaptureModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>流量擷取模式</value>
+  </data>
+  <data name="userModeRadioButton_Content" xml:space="preserve">
+    <value>使用者模式</value>
+  </data>
+  <data name="userModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>不需要系統管理員權限或驅動程式。僅過濾實際使用 Windows/本機 HTTP Proxy 的應用程式；不會擷取任意 TCP/UDP 流量。</value>
+  </data>
+  <data name="adminModeRadioButton_Content" xml:space="preserve">
+    <value>系統管理員模式</value>
+  </data>
+  <data name="adminModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>使用 WinDivert 進行可選的透明 TCP/UDP 擷取。啟用時會要求系統管理員權限，並按需下載 WinDivert。</value>
+  </data>
+  <data name="applicationRulesHeaderTextBlock_Text" xml:space="preserve">
+    <value>應用程式路由規則</value>
+  </data>
+  <data name="enabledColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>啟用</value>
+  </data>
+  <data name="applicationColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>應用程式 / 路徑樣式</value>
+  </data>
+  <data name="routeColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>路由</value>
+  </data>
+  <data name="addApplicationRuleButton_Content" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="removeApplicationRuleButton_Content" xml:space="preserve">
+    <value>移除</value>
+  </data>
+  <data name="gameModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>遊戲模式</value>
+  </data>
+  <data name="gameModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>每行一個程序名稱或路徑模式（支援萬用字元 * 和 ?）。符合的應用程式啟動時會自動停用 WinDivert 並使用使用者模式；應用程式結束後會自動恢復系統管理員模式。</value>
+  </data>
+  <data name="dnsPolicyPlannedTextBlock_Text" xml:space="preserve">
+    <value>DNS 路由策略已預留於設定與路由 API 中，但此版本刻意尚未啟用 DNS 擷取。</value>
+  </data>
+  <data name="saveTrafficRoutingButton_Content" xml:space="preserve">
+    <value>儲存</value>
+  </data>
+  <data name="cancelTrafficRoutingButton_Content" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="trafficRouteProxy" xml:space="preserve">
+    <value>Proxy</value>
+  </data>
+  <data name="trafficRouteDirect" xml:space="preserve">
+    <value>直接連線</value>
+  </data>
+  <data name="trafficRouteBlock" xml:space="preserve">
+    <value>封鎖</value>
+  </data>
 </root>

@@ -1,4 +1,15 @@
-* text=auto
+* text=auto eol=crlf
 
-# geosite database
+# Binary files
+*.ico binary
+*.png binary
+*.pdn binary
 *.dat binary
+*.dll binary
+*.exe binary
+*.sys binary
+*.zip binary
+*.gz binary
+
+# Unix scripts must keep a valid shebang
+*.sh text eol=lf
