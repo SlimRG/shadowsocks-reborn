@@ -52,3 +52,54 @@ if ($missing.Count -gt 0) {
 }
 
 Write-Host "Validated $($resxFiles.Count) .resx files: all linked resources exist."
+
+$expectedProjects = @(
+    'Shadowsocks.Engine\Shadowsocks.Engine.csproj',
+    'Shadowsocks.UI\Shadowsocks.UI.csproj',
+    'Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj',
+    'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
+)
+foreach ($relativeProject in $expectedProjects) {
+    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $relativeProject) -PathType Leaf)) {
+        throw "Expected project is missing: $relativeProject"
+    }
+}
+
+
+$solutionPath = Join-Path $repoRoot 'shadowsocks-reborn.sln'
+if (-not (Test-Path -LiteralPath $solutionPath -PathType Leaf)) {
+    throw 'Expected solution is missing: shadowsocks-reborn.sln'
+}
+
+[xml]$uiProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UI\Shadowsocks.UI.csproj') -Raw
+$uiAssemblyName = @($uiProject.Project.PropertyGroup.AssemblyName | Where-Object { $_ })[0]
+if ($uiAssemblyName -ne 'shadowsocks-reborn') {
+    throw "Shadowsocks.UI must build shadowsocks-reborn.exe; AssemblyName is '$uiAssemblyName'."
+}
+
+$engineProjectPath = Join-Path $repoRoot 'Shadowsocks.Engine\Shadowsocks.Engine.csproj'
+[xml]$engineProject = Get-Content -LiteralPath $engineProjectPath -Raw
+$useWpf = @($engineProject.Project.PropertyGroup.UseWPF | Where-Object { $_ })[0]
+$useWinForms = @($engineProject.Project.PropertyGroup.UseWindowsForms | Where-Object { $_ })[0]
+if ($useWpf -eq 'true' -or $useWinForms -eq 'true') {
+    throw 'Shadowsocks.Engine must not enable WPF or Windows Forms.'
+}
+
+$engineSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Engine') -Recurse -File -Filter '*.cs'
+$uiPatterns = @(
+    'System\.Windows\.Forms',
+    'System\.Windows(?:\.|;)',
+    'WPFLocalizeExtension',
+    'ReactiveUI\.WPF',
+    'Shadowsocks\.(?:View|Views|ViewModels)',
+    '\bProgram\.'
+)
+foreach ($pattern in $uiPatterns) {
+    $match = $engineSources | Select-String -Pattern $pattern | Select-Object -First 1
+    if ($null -ne $match) {
+        $relative = [System.IO.Path]::GetRelativePath($repoRoot, $match.Path)
+        throw "UI framework dependency leaked into Shadowsocks.Engine: ${relative}:$($match.LineNumber): $($match.Line.Trim())"
+    }
+}
+
+Write-Host 'Validated project layout: Engine has no WinForms/WPF references.'

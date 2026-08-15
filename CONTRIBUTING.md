@@ -17,9 +17,9 @@ The main application publish is framework-dependent and single-file. `Shadowsock
 Run from a clean or cleaned working tree:
 
 ```cmd
-dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
-dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
+dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
 For packaging/runtime changes also run:
@@ -68,8 +68,8 @@ For WPF/ReactiveUI changes, open every affected view at runtime.
 
 User-visible strings must be localizable:
 
-- WinForms/tray/menu: `shadowsocks-csharp/Data/i18n.csv`;
-- WPF: `shadowsocks-csharp/Localization/Strings*.resx`.
+- WinForms/tray/menu: `Shadowsocks.Engine/Data/i18n.csv`;
+- WPF: `Shadowsocks.UI/Localization/Strings*.resx`.
 
 Do not add a hard-coded UI message when it belongs in one of these localization sources.
 

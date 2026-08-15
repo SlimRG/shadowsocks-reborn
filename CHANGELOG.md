@@ -20,6 +20,7 @@ All notable changes in the Reborn fork are documented here. The original upstrea
 - Added explicit WinDivert capture confirmation after successful `WinDivertOpen`.
 - Changed Game Mode into an automatic compatibility state driven by configured process/path patterns; it is no longer a selectable traffic mode.
 - Added automatic Admin Mode restoration after the matching Game Mode application exits.
+- Fixed clean-first-run handling: an empty placeholder server no longer enters SIP003/capture exclusion logic or starts TCP/UDP proxy relays, preventing null-reference errors and repeated `No server configured` warnings.
 
 ### PAC and GeoSite
 
@@ -36,6 +37,10 @@ All notable changes in the Reborn fork are documented here. The original upstrea
 
 ### Packaging and repository
 
+- Renamed the solution to `shadowsocks-reborn.sln` and the main executable to `shadowsocks-reborn.exe`.
+- Split the codebase into `Shadowsocks.Engine`, `Shadowsocks.UI`, `Shadowsocks.NetworkService` and `Shadowsocks.UnitTests`.
+- Removed WinForms/WPF dependencies from `Shadowsocks.Engine`; user interaction, QR screen capture, hotkeys and UI localization now live behind the UI boundary.
+- Added `RuntimeEnvironment` and `IUserInteractionService` abstractions so a future WinUI 3 shell can reuse the engine without depending on the current WinForms/WPF presentation layer.
 - Added GitHub Actions CI and tagged draft-release packaging.
 - Added a PowerShell release builder that produces a ZIP and SHA-256 checksum.
 - Added repository preflight validation for linked `.resx` resources before CI/release builds.
@@ -47,4 +52,4 @@ All notable changes in the Reborn fork are documented here. The original upstrea
 
 - The UI is still mixed WinForms/WPF; the full Windows 11 WPF/Metro migration is not complete.
 - Transparent DNS routing is not implemented yet even though the configuration/IPC contract contains DNS policy modes.
-- Product releases currently contain both `Shadowsocks.exe` and `Shadowsocks.NetworkService.exe`.
+- Product releases currently contain both `shadowsocks-reborn.exe` and `Shadowsocks.NetworkService.exe`.

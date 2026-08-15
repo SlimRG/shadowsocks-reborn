@@ -1,6 +1,6 @@
-﻿# Shadowsocks Reborn for Windows
+﻿# shadowsocks-reborn for Windows
 
-<img src="shadowsocks-csharp/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
+<img src="Shadowsocks.UI/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
 
 **English** | [Русский](README.ru.md)
 
@@ -58,20 +58,29 @@ For running a release build:
 
 `Shadowsocks.NetworkService.exe` is published self-contained and does not require a separate .NET runtime. WinDivert is optional and is downloaded only when Admin Mode is enabled.
 
+## Solution layout
+
+- `Shadowsocks.Engine` — UI-independent engine and controller layer.
+- `Shadowsocks.UI` — current WinForms/WPF presentation layer; builds `shadowsocks-reborn.exe`.
+- `Shadowsocks.NetworkService` — elevated WinDivert helper.
+- `Shadowsocks.UnitTests` — tests.
+
+See `ARCHITECTURE.md` for the UI boundary used for the planned WinUI 3 migration.
+
 ## Build
 
 Use a .NET 10 SDK on Windows:
 
 ```cmd
-dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
-dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
+dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
 Publish the application with the supplied profile:
 
 ```cmd
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
+dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
 ```
 
 Or build the complete release package and SHA-256 file:
@@ -80,7 +89,7 @@ Or build the complete release package and SHA-256 file:
 .\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-The product publish contains the main framework-dependent single-file application plus the self-contained single-file elevated helper. The release archive must therefore keep `Shadowsocks.exe` and `Shadowsocks.NetworkService.exe` together.
+The product publish contains the main framework-dependent single-file application plus the self-contained single-file elevated helper. The release archive must therefore keep `shadowsocks-reborn.exe` and `Shadowsocks.NetworkService.exe` together.
 
 ## Configuration and runtime data
 
@@ -103,7 +112,7 @@ The configuration/IPC contract already contains `System`, `Direct`, `Proxy` and 
 
 ## UI status
 
-The UI is still a **mixed WinForms/WPF** application. Migration to a complete Windows 11 WPF/Metro interface is not finished.
+The current presentation layer is still **mixed WinForms/WPF**. `Shadowsocks.Engine` is now UI-framework-independent, so the shell can be migrated to **WinUI 3 / Windows App SDK** without moving the networking logic again.
 
 ## Development
 
@@ -115,4 +124,4 @@ Do not post passwords, server addresses, subscription URLs, PAC secrets or full 
 
 ## License
 
-Shadowsocks for Windows is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components retain their own licenses.
+`shadowsocks-reborn` is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components retain their own licenses.

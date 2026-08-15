@@ -47,7 +47,7 @@ jobs:
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Shadowsocks-${{ steps.version.outputs.label }}-win-x64
+          name: shadowsocks-reborn-${{ steps.version.outputs.label }}-win-x64
           path: |
             artifacts/release/*.zip
             artifacts/release/*.sha256
@@ -61,4 +61,4 @@ jobs:
         run: |
           $zip = Get-ChildItem .\artifacts\release\*.zip | Select-Object -First 1
           $hash = Get-ChildItem .\artifacts\release\*.sha256 | Select-Object -First 1
-          gh release create $env:GITHUB_REF_NAME $zip.FullName $hash.FullName --title "Shadowsocks $env:GITHUB_REF_NAME" --generate-notes --verify-tag --draft
+          gh release create $env:GITHUB_REF_NAME $zip.FullName $hash.FullName --title "shadowsocks-reborn $env:GITHUB_REF_NAME" --generate-notes --verify-tag --draft

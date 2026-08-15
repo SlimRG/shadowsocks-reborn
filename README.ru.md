@@ -1,6 +1,6 @@
-﻿# Shadowsocks Reborn для Windows
+﻿# shadowsocks-reborn для Windows
 
-<img src="shadowsocks-csharp/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
+<img src="Shadowsocks.UI/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
 
 [English](README.md) | **Русский**
 
@@ -58,20 +58,29 @@ curl.exe -4 --noproxy "*" https://example.com
 
 `Shadowsocks.NetworkService.exe` публикуется self-contained и отдельного .NET Runtime не требует. WinDivert опционален и загружается только при включении Admin Mode.
 
+## Структура solution
+
+- `Shadowsocks.Engine` — движок и controller layer без зависимостей WinForms/WPF.
+- `Shadowsocks.UI` — текущий переходный WinForms/WPF UI; собирает `shadowsocks-reborn.exe`.
+- `Shadowsocks.NetworkService` — elevated helper для WinDivert.
+- `Shadowsocks.UnitTests` — тесты.
+
+Граница UI описана в `ARCHITECTURE.md`; она подготовлена для следующего этапа миграции на WinUI 3.
+
 ## Сборка
 
 На Windows с .NET 10 SDK:
 
 ```cmd
-dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1
-dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
+dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
 Публикация:
 
 ```cmd
-dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
+dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
 ```
 
 Полная подготовка release ZIP и SHA-256:
@@ -80,7 +89,7 @@ dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Plat
 .\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-Продуктовая публикация содержит основной framework-dependent single-file EXE и отдельный self-contained single-file elevated helper. Поэтому в release-архиве `Shadowsocks.exe` и `Shadowsocks.NetworkService.exe` должны лежать рядом.
+Продуктовая публикация содержит основной framework-dependent single-file EXE и отдельный self-contained single-file elevated helper. Поэтому в release-архиве `shadowsocks-reborn.exe` и `Shadowsocks.NetworkService.exe` должны лежать рядом.
 
 ## Конфигурация и runtime-данные
 
@@ -103,7 +112,7 @@ Local PAC загружает настроенные GeoSite-источники �
 
 ## Состояние UI
 
-Интерфейс пока остаётся **смешанным WinForms/WPF**. Полный переход на Windows 11 WPF/Metro ещё не завершён.
+Текущий presentation layer пока остаётся **смешанным WinForms/WPF**. `Shadowsocks.Engine` уже не зависит от UI framework, поэтому shell можно переносить на **WinUI 3 / Windows App SDK** без повторного переноса сетевой логики.
 
 ## Разработка
 
@@ -115,4 +124,4 @@ Local PAC загружает настроенные GeoSite-источники �
 
 ## Лицензия
 
-Shadowsocks for Windows распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии.
+`shadowsocks-reborn` распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии.

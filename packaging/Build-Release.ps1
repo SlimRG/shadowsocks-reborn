@@ -12,9 +12,9 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $artifactsRoot = Join-Path $repoRoot 'artifacts'
 $publishDir = Join-Path $artifactsRoot 'publish'
 $releaseDir = Join-Path $artifactsRoot 'release'
-$solution = Join-Path $repoRoot 'shadowsocks-windows.sln'
-$project = Join-Path $repoRoot 'shadowsocks-csharp\shadowsocks-csharp.csproj'
-$testProject = Join-Path $repoRoot 'test\ShadowsocksTest.csproj'
+$solution = Join-Path $repoRoot 'shadowsocks-reborn.sln'
+$project = Join-Path $repoRoot 'Shadowsocks.UI\Shadowsocks.UI.csproj'
+$testProject = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
 
 $normalizedVersion = $Version.Trim() -replace '^[vV]', ''
 if ($normalizedVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
@@ -41,7 +41,7 @@ if ($requestedVersion.Major -ne $declaredVersion.Major -or
     throw "Release label '$Version' does not match project version '$declaredProjectVersion'. Update version metadata before tagging."
 }
 
-$updateCheckerPath = Join-Path $repoRoot 'shadowsocks-csharp\Controller\Service\UpdateChecker.cs'
+$updateCheckerPath = Join-Path $repoRoot 'Shadowsocks.Engine\Controller\Service\UpdateChecker.cs'
 $updateCheckerSource = Get-Content -LiteralPath $updateCheckerPath -Raw
 if ($updateCheckerSource -notmatch 'public const string Version = "(?<version>[0-9]+(?:\.[0-9]+){1,3})";') {
     throw 'Unable to read UpdateChecker.Version.'
@@ -53,7 +53,7 @@ if ($updateCheckerVersion.Major -ne $declaredVersion.Major -or
     throw "UpdateChecker.Version '$updateCheckerVersion' does not match project version '$declaredProjectVersion'."
 }
 
-$assemblyInfoPath = Join-Path $repoRoot 'shadowsocks-csharp\Properties\AssemblyInfo.cs'
+$assemblyInfoPath = Join-Path $repoRoot 'Shadowsocks.UI\Properties\AssemblyInfo.cs'
 $assemblyInfoSource = Get-Content -LiteralPath $assemblyInfoPath -Raw
 if ($assemblyInfoSource -notmatch 'AssemblyInformationalVersion\("(?<version>[^"]+)"\)') {
     throw 'Unable to read AssemblyInformationalVersion.'
@@ -108,14 +108,14 @@ try {
         '--no-restore'
     )
 
-    Assert-Exists (Join-Path $publishDir 'Shadowsocks.exe')
+    Assert-Exists (Join-Path $publishDir 'shadowsocks-reborn.exe')
     Assert-Exists (Join-Path $publishDir 'Shadowsocks.NetworkService.exe')
 
     $forbiddenNames = @(
         'Shadowsocks.NetworkService.dll',
         'Shadowsocks.NetworkService.deps.json',
         'Shadowsocks.NetworkService.runtimeconfig.json',
-        'Shadowsocks.pdb',
+        'shadowsocks-reborn.pdb',
         'privoxy.exe',
         'privoxy.exe.gz',
         'sysproxy.exe',
@@ -136,7 +136,7 @@ try {
     Copy-Item (Join-Path $repoRoot 'CHANGELOG.md') $publishDir -Force
 
     $safeVersion = $Version -replace '[^0-9A-Za-z._-]', '-'
-    $zipName = "Shadowsocks-$safeVersion-win-x64.zip"
+    $zipName = "shadowsocks-reborn-$safeVersion-win-x64.zip"
     $zipPath = Join-Path $releaseDir $zipName
     $hashPath = "$zipPath.sha256"
 

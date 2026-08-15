@@ -32,31 +32,31 @@ jobs:
         run: dotnet --info
 
       - name: Restore
-        run: dotnet restore .\shadowsocks-windows.sln -p:Platform=x64 -r win-x64
+        run: dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
 
       - name: Build
-        run: dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1 --no-restore
+        run: dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 
       - name: Test
-        run: dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build
+        run: dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 
       - name: Restore publish runtime
-        run: dotnet restore .\shadowsocks-csharp\shadowsocks-csharp.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
+        run: dotnet restore .\Shadowsocks.UI\Shadowsocks.UI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
 
       - name: Publish
-        run: dotnet publish .\shadowsocks-csharp\shadowsocks-csharp.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained -o .\artifacts\publish --no-restore
+        run: dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained -o .\artifacts\publish --no-restore
 
       - name: Validate publish
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $publish = Join-Path $PWD 'artifacts\publish'
-          foreach ($name in @('Shadowsocks.exe', 'Shadowsocks.NetworkService.exe')) {
+          foreach ($name in @('shadowsocks-reborn.exe', 'Shadowsocks.NetworkService.exe')) {
             if (-not (Test-Path (Join-Path $publish $name))) {
               throw "Missing required publish artifact: $name"
             }
           }
-          foreach ($name in @('Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'Shadowsocks.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll')) {
+          foreach ($name in @('Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'shadowsocks-reborn.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll')) {
             if (Test-Path (Join-Path $publish $name)) {
               throw "Retired or invalid publish artifact found: $name"
             }
@@ -65,6 +65,6 @@ jobs:
       - name: Upload publish artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Shadowsocks-win-x64
+          name: shadowsocks-reborn-win-x64
           path: artifacts/publish/
           if-no-files-found: error
