@@ -125,34 +125,59 @@ namespace Shadowsocks.Controller
             UserRuleFileWatcher.Renamed += UserRuleFileWatcher_Changed;
         }
 
-        private void PACFileWatcher_Changed(object sender, FileSystemEventArgs e)
+        private async void PACFileWatcher_Changed(object sender, FileSystemEventArgs e)
         {
-            if (PACFileChanged == null)
-                return;
-
-            logger.Info($"Detected: PAC file '{e.Name}' was {e.ChangeType.ToString().ToLower()}.");
-            Task.Factory.StartNew(() =>
+            if (PACFileChanged is null)
             {
-                ((FileSystemWatcher)sender).EnableRaisingEvents = false;
-                System.Threading.Thread.Sleep(10);
-                PACFileChanged(this, EventArgs.Empty);
-                ((FileSystemWatcher)sender).EnableRaisingEvents = true;
-            });
+                return;
+            }
+
+            logger.Info($"Detected: PAC file '{e.Name}' was {e.ChangeType.ToString().ToLowerInvariant()}.");
+            await DispatchWatcherChangeAsync(
+                (FileSystemWatcher)sender,
+                () => PACFileChanged?.Invoke(this, EventArgs.Empty)).ConfigureAwait(false);
         }
 
-        private void UserRuleFileWatcher_Changed(object sender, FileSystemEventArgs e)
+        private async void UserRuleFileWatcher_Changed(object sender, FileSystemEventArgs e)
         {
-            if (UserRuleFileChanged == null)
-                return;
-
-            logger.Info($"Detected: User Rule file '{e.Name}' was {e.ChangeType.ToString().ToLower()}.");
-            Task.Factory.StartNew(() =>
+            if (UserRuleFileChanged is null)
             {
-                ((FileSystemWatcher)sender).EnableRaisingEvents = false;
-                System.Threading.Thread.Sleep(10);
-                UserRuleFileChanged(this, EventArgs.Empty);
-                ((FileSystemWatcher)sender).EnableRaisingEvents = true;
-            });
+                return;
+            }
+
+            logger.Info($"Detected: User Rule file '{e.Name}' was {e.ChangeType.ToString().ToLowerInvariant()}.");
+            await DispatchWatcherChangeAsync(
+                (FileSystemWatcher)sender,
+                () => UserRuleFileChanged?.Invoke(this, EventArgs.Empty)).ConfigureAwait(false);
+        }
+
+        private static async Task DispatchWatcherChangeAsync(FileSystemWatcher watcher, Action callback)
+        {
+            try
+            {
+                watcher.EnableRaisingEvents = false;
+                await Task.Delay(10).ConfigureAwait(false);
+                callback();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected while the controller is shutting down.
+            }
+            catch (Exception exception)
+            {
+                logger.Warn(exception, "Unable to process PAC file-system watcher notification.");
+            }
+            finally
+            {
+                try
+                {
+                    watcher.EnableRaisingEvents = true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The watcher was disposed during shutdown.
+                }
+            }
         }
     }
 }

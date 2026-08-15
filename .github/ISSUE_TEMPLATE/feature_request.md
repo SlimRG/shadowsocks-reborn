@@ -1,23 +1,31 @@
----
+﻿---
 name: Feature request
-about: Suggest an improvement or new capability
+about: Suggest a focused improvement to Shadowsocks Reborn
 title: ""
-labels: ""
+labels: enhancement
 assignees: ""
 ---
 
 ## Problem
 
-Describe the problem or limitation the proposal addresses.
+What concrete limitation or use case should be addressed?
 
-## Proposed solution
+## Proposed behavior
 
-Describe the desired behavior.
+Describe the desired user-visible result.
 
-## Alternatives considered
+## Technical impact
 
-Describe other approaches you considered and why they are less suitable.
+If known, note any impact on:
 
-## Additional context
+- User Mode / Admin Mode / automatic Game Mode;
+- WinDivert or elevated helper behavior;
+- PAC / GeoSite / system proxy;
+- `gui-config.json` compatibility;
+- Shadowsocks protocol or SIP003 behavior;
+- x64 release packaging;
+- WinForms/WPF UI and localization.
 
-Add examples, screenshots, compatibility constraints, or other relevant information.
+## Alternatives
+
+Describe other approaches you considered.

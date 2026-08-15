@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -9,7 +9,7 @@ using Newtonsoft.Json;
 using NLog;
 using Shadowsocks.Model;
 
-namespace Shadowsocks.Controller
+namespace Shadowsocks.Controller.Service
 {
     /// <summary>
     /// Persistent cache for a user-supplied online PAC file.

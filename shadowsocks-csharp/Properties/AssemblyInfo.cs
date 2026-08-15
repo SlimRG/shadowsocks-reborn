@@ -5,18 +5,18 @@ using Shadowsocks.Controller;
 
 // This is a Windows-only desktop application. GenerateAssemblyInfo is disabled,
 // so the SDK cannot emit this platform annotation automatically.
-[assembly: SupportedOSPlatform("windows7.0")]
+[assembly: SupportedOSPlatform("windows10.0.19041.0")]
 
 
 // 有关程序集的常规信息通过下列属性集
 // 控制。更改这些属性值可修改
 // 与程序集关联的信息。
 [assembly: AssemblyTitle("Shadowsocks")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Shadowsocks for Windows reborn on .NET 10")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Shadowsocks community")]
 [assembly: AssemblyProduct("Shadowsocks")]
-[assembly: AssemblyCopyright("clowwindy & community 2020")]
+[assembly: AssemblyCopyright("clowwindy & community 2012-2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -39,4 +39,5 @@ using Shadowsocks.Controller;
 // 方法是按如下所示使用“*”:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion(UpdateChecker.Version)]
-// [assembly: AssemblyFileVersion("2.0.0")]
+[assembly: AssemblyFileVersion(UpdateChecker.Version)]
+[assembly: AssemblyInformationalVersion("5.0.0")]

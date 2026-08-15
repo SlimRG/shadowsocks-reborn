@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Version>5.0.0</Version>
+    <Authors>Shadowsocks community</Authors>
+    <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <AssemblyName>Shadowsocks.NetworkService</AssemblyName>
+    <RootNamespace>Shadowsocks.NetworkService</RootNamespace>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <NetworkServiceProductPublish Condition="'$(NetworkServiceProductPublish)' == ''">false</NetworkServiceProductPublish>
+  </PropertyGroup>
+
+  <!-- Product deployment is intentionally plain .NET 10 self-contained single-file.
+       No native compiler toolchain is used. The fixed project-local
+       PublishDir gives the parent project one deterministic output path. -->
+  <PropertyGroup Condition="'$(NetworkServiceProductPublish)' == 'true'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <UseAppHost>true</UseAppHost>
+    <DebugType>None</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <PublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\bin\ProductPublish\$(Configuration)\win-x64\'))</PublishDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(NetworkServiceProductPublish)' != 'true'">
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <Target Name="ValidateNetworkServicePublishMode" BeforeTargets="PrepareForPublish" Condition="'$(NetworkServiceProductPublish)' == 'true'">
+    <Message Importance="High"
+             Text="Shadowsocks.NetworkService product mode: SelfContained=$(SelfContained); PublishSingleFile=$(PublishSingleFile); IncludeNativeLibrariesForSelfExtract=$(IncludeNativeLibrariesForSelfExtract); RID=$(RuntimeIdentifier); PublishDir=$(PublishDir)" />
+    <Error Condition="'$(SelfContained)' != 'true'"
+           Text="Shadowsocks.NetworkService product publish must be self-contained." />
+    <Error Condition="'$(PublishSingleFile)' != 'true'"
+           Text="Shadowsocks.NetworkService product publish must be single-file." />
+    <Error Condition="'$(IncludeNativeLibrariesForSelfExtract)' != 'true'"
+           Text="Shadowsocks.NetworkService single-file publish must embed native runtime libraries." />
+  </Target>
+</Project>

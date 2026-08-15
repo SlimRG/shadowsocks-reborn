@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using NLog;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Encryption;
 using Shadowsocks.Model;
 

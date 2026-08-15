@@ -1,7 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Version>5.0.0</Version>
+    <Authors>Shadowsocks community</Authors>
+    <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <RootNamespace>Shadowsocks</RootNamespace>
     <AssemblyName>Shadowsocks</AssemblyName>
     <ApplicationIcon>shadowsocks.ico</ApplicationIcon>
@@ -9,8 +13,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <PlatformTarget>x86</PlatformTarget>
-    <Prefer32Bit>false</Prefer32Bit>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
@@ -89,6 +94,16 @@
     <Compile Remove="Encryption\AEAD\AEADMbedTLSEncryptor.cs;Encryption\AEAD\AEADOpenSSLEncryptor.cs;Encryption\AEAD\AEADSodiumEncryptor.cs" />
     <Compile Remove="Encryption\MbedTLS.cs;Encryption\OpenSSL.cs;Encryption\Sodium.cs" />
   </ItemGroup>
+  <!-- Privoxy was replaced by Controller\Service\ManagedHttpProxyService.cs.
+       Explicit removals keep stale files from an in-place archive upgrade out of
+       SDK-style wildcard compilation and publish output. -->
+  <ItemGroup>
+    <Compile Remove="Controller\Service\PrivoxyRunner.cs;Controller\Service\PortForwarder.cs" />
+    <None Remove="Data\privoxy.exe.gz;Data\privoxy_conf.txt" />
+    <Content Remove="Data\privoxy.exe.gz;Data\privoxy_conf.txt" />
+    <EmbeddedResource Remove="Data\privoxy.exe.gz;Data\privoxy_conf.txt" />
+  </ItemGroup>
+
   <!-- dlc.dat used to be an embedded build input. Keep a stale copy left by an
        in-place archive upgrade out of project items/publish output; Local PAC now
        downloads its runtime GeoSite cache on demand. -->
@@ -97,5 +112,71 @@
     <Content Remove="Data\dlc.dat" />
     <EmbeddedResource Remove="Data\dlc.dat" />
   </ItemGroup>
+
+  <!-- Shadowsocks.NetworkService intentionally is NOT a ProjectReference. The helper
+       is built explicitly so its framework-dependent development output cannot leak into
+       the main application's product publish. -->
+  <PropertyGroup>
+    <NetworkServiceProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj'))</NetworkServiceProject>
+    <NetworkServiceBuildDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\bin\x64\$(Configuration)\net10.0-windows10.0.19041.0\win-x64\'))</NetworkServiceBuildDir>
+    <NetworkServiceProductPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\bin\ProductPublish\$(Configuration)\win-x64\'))</NetworkServiceProductPublishDir>
+  </PropertyGroup>
+
+  <!-- Normal Build/Debug uses the complete framework-dependent helper output. -->
+  <Target Name="BuildNetworkServiceForDevelopment"
+          AfterTargets="Build"
+          Condition="'$(_IsPublishing)' != 'true'">
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Build"
+             BuildInParallel="false"
+             RemoveProperties="PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained"
+             Properties="Configuration=$(Configuration);Platform=x64;NetworkServiceProductPublish=false" />
+    <ItemGroup>
+      <NetworkServiceDevelopmentOutput Include="$(NetworkServiceBuildDir)Shadowsocks.NetworkService.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NetworkServiceDevelopmentOutput)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(NetworkServiceDevelopmentOutput)' != ''" />
+  </Target>
+
+  <!-- Product Publish always builds the elevated helper as a self-contained x64
+       single-file .NET 10 executable with no native compiler toolchain. -->
+  <Target Name="PublishNetworkServiceProduct" BeforeTargets="ComputeFilesToPublish">
+    <Message Importance="High" Text="Publishing Shadowsocks.NetworkService self-contained single-file helper to: $(NetworkServiceProductPublishDir)" />
+    <RemoveDir Directories="$(NetworkServiceProductPublishDir)" />
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Restore;Publish"
+             BuildInParallel="false"
+             RemoveProperties="PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained;RuntimeIdentifier;Platform;PlatformTarget"
+             Properties="Configuration=$(Configuration);Platform=x64;NetworkServiceProductPublish=true" />
+
+    <ItemGroup>
+      <NetworkServiceProductFiles Include="$(NetworkServiceProductPublishDir)**\*" />
+    </ItemGroup>
+    <Message Importance="High"
+             Text="NetworkService product output: @(NetworkServiceProductFiles->'%(FullPath)', ', ')" />
+    <Error Condition="!Exists('$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.exe')"
+           Text="Shadowsocks.NetworkService single-file publish did not produce $(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.exe. Files found: @(NetworkServiceProductFiles->'%(FullPath)', ', ')" />
+    <Error Condition="Exists('$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.dll') Or Exists('$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.deps.json') Or Exists('$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.runtimeconfig.json') Or Exists('$(NetworkServiceProductPublishDir)coreclr.dll') Or Exists('$(NetworkServiceProductPublishDir)clrjit.dll') Or Exists('$(NetworkServiceProductPublishDir)hostfxr.dll') Or Exists('$(NetworkServiceProductPublishDir)hostpolicy.dll')"
+           Text="Shadowsocks.NetworkService product publish is not a one-file deployment. Sidecar runtime files were produced in $(NetworkServiceProductPublishDir). Files found: @(NetworkServiceProductFiles->'%(FullPath)', ', ')" />
+  </Target>
+
+  <!-- Copy the verified helper after the main SDK has populated the publish directory.
+       Any stale helper files from an older publish are removed first. -->
+  <Target Name="CopyNetworkServiceProductToPublish"
+          AfterTargets="CopyFilesToPublishDirectory"
+          DependsOnTargets="PublishNetworkServiceProduct">
+    <ItemGroup>
+      <StaleNetworkServiceProductFiles Include="$(PublishDir)Shadowsocks.NetworkService.*" />
+    </ItemGroup>
+    <Delete Files="@(StaleNetworkServiceProductFiles)"
+            Condition="'@(StaleNetworkServiceProductFiles)' != ''" />
+    <Copy SourceFiles="$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.exe"
+          DestinationFiles="$(PublishDir)Shadowsocks.NetworkService.exe"
+          OverwriteReadOnlyFiles="true" />
+    <Message Importance="High"
+             Text="Published verified single-file NetworkService helper: $(PublishDir)Shadowsocks.NetworkService.exe" />
+  </Target>
 
 </Project>

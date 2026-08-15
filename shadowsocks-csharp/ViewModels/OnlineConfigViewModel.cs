@@ -28,7 +28,7 @@ namespace Shadowsocks.ViewModels
             SelectedSource = "";
             Address = "";
 
-            // TODO in v5: if http:// show warning as materialDesign:HintAssist.HelperText
+            // TODO: if http:// show warning as materialDesign:HintAssist.HelperText
             AddressRule = this.ValidationRule(
                 viewModel => viewModel.Address,
                 address => address.StartsWith("http://"),
@@ -66,7 +66,7 @@ namespace Shadowsocks.ViewModels
                 Address = "";
             }, canAdd);
 
-            // TODO in v5: use MaterialDesignThemes snackbar messages
+            // TODO: use MaterialDesignThemes snackbar messages
             this.WhenAnyObservable(x => x.Update)
                 .Subscribe(x =>
                 {

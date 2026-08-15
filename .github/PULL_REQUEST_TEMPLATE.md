@@ -1,18 +1,20 @@
-## Checklist
+﻿## Summary
 
-- [ ] I searched for similar issues and pull requests.
-- [ ] I built the solution with the .NET 10 SDK.
-- [ ] I ran the relevant tests.
-- [ ] I updated translations when user-visible text changed.
-- [ ] I updated documentation when requirements, configuration, or behavior changed.
+Describe what changed and why.
 
-## Change type
+## Validation
 
-- [ ] Bug fix
-- [ ] Improvement/refactoring
-- [ ] New feature
-- [ ] Documentation
+- [ ] Built the solution with .NET 10 for x64.
+- [ ] Ran relevant tests.
+- [ ] Ran `packaging/Build-Release.ps1` when build/publish/runtime packaging changed.
+- [ ] Runtime-tested the changed path.
+- [ ] Tested PAC/Global persistence if system-proxy code changed.
+- [ ] Tested Admin Mode and automatic Game Mode if WinDivert/routing code changed.
+- [ ] Opened affected WPF/WinForms views.
+- [ ] Added/updated localization for user-visible strings.
+- [ ] Updated README/CHANGELOG when behavior or requirements changed.
+- [ ] Confirmed no passwords, server addresses, tokens or private configs are included.
 
-## Description
+## Notes
 
-Describe the purpose of the change, the affected behavior, and any compatibility considerations. Include reproduction steps or test evidence when relevant.
+Include exact commands, runtime scenarios, screenshots and known limitations when relevant.

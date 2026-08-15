@@ -284,4 +284,64 @@
   <data name="restoreDefaultButton_Content" xml:space="preserve">
     <value>По умолчанию</value>
   </data>
+  <data name="trafficRoutingDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Выберите способ перехвата трафика и задайте правила маршрутизации по приложениям. Правила приложений имеют приоритет над решением системного прокси/PAC.</value>
+  </data>
+  <data name="trafficCaptureModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>Режим перехвата трафика</value>
+  </data>
+  <data name="userModeRadioButton_Content" xml:space="preserve">
+    <value>Пользовательский режим</value>
+  </data>
+  <data name="userModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Без прав администратора и драйвера. Фильтруются приложения, которые действительно используют системный/локальный HTTP-прокси; произвольный TCP/UDP-трафик не перехватывается.</value>
+  </data>
+  <data name="adminModeRadioButton_Content" xml:space="preserve">
+    <value>Режим администратора</value>
+  </data>
+  <data name="adminModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Опциональный прозрачный перехват TCP/UDP через WinDivert. При включении запрашиваются права администратора, WinDivert загружается по требованию.</value>
+  </data>
+  <data name="applicationRulesHeaderTextBlock_Text" xml:space="preserve">
+    <value>Правила маршрутизации приложений</value>
+  </data>
+  <data name="enabledColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Вкл.</value>
+  </data>
+  <data name="applicationColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Приложение / шаблон пути</value>
+  </data>
+  <data name="routeColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Маршрут</value>
+  </data>
+  <data name="addApplicationRuleButton_Content" xml:space="preserve">
+    <value>Добавить</value>
+  </data>
+  <data name="removeApplicationRuleButton_Content" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
+  <data name="gameModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>Игровой режим</value>
+  </data>
+  <data name="gameModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Одно имя процесса или шаблон пути на строку (поддерживаются * и ?). Когда подходящее приложение запускается, WinDivert автоматически отключается и используется пользовательский режим. После выхода приложения режим администратора восстанавливается автоматически.</value>
+  </data>
+  <data name="dnsPolicyPlannedTextBlock_Text" xml:space="preserve">
+    <value>Политика DNS уже заложена в конфигурацию и API маршрутизации, но перехват DNS в этой версии намеренно ещё не включён.</value>
+  </data>
+  <data name="saveTrafficRoutingButton_Content" xml:space="preserve">
+    <value>Сохранить</value>
+  </data>
+  <data name="cancelTrafficRoutingButton_Content" xml:space="preserve">
+    <value>Отмена</value>
+  </data>
+  <data name="trafficRouteProxy" xml:space="preserve">
+    <value>Через прокси</value>
+  </data>
+  <data name="trafficRouteDirect" xml:space="preserve">
+    <value>Напрямую</value>
+  </data>
+  <data name="trafficRouteBlock" xml:space="preserve">
+    <value>Блокировать</value>
+  </data>
 </root>

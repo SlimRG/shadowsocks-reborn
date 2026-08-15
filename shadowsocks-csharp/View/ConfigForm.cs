@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -127,6 +127,12 @@ namespace Shadowsocks.View
 
         private void Controller_ConfigChanged(object sender, EventArgs e)
         {
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)LoadCurrentConfiguration);
+                return;
+            }
+
             LoadCurrentConfiguration();
         }
 

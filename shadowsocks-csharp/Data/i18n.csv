@@ -144,12 +144,11 @@ Failed to open registry key: {0},Не удалось открыть раздел
 Import from URL: {0} ?,импортировать из адреса: {0} ?,从URL导入: {0} ?,從URL匯入: {0} ?,{0}：このURLからインポートしますか？,,
 Successfully imported from {0},Успешно импортировано из {0},导入成功：{0},導入成功：{0},{0}：インポートしました。,,
 Failed to import. Please check if the link is valid.,Не удалось импортировать. Проверьте корректность ссылки.,导入失败，请检查链接是否有效。,導入失敗，請檢查鏈接是否有效。,インポートに失敗しました。リンクの有効性を確認してください。,,
-Warning: importing {0} from a legacy ss:// link. Support for legacy ss:// links will be dropped in version 5. Make sure to update your ss:// links.,Предупреждение: выполняется импорт {0} из устаревшей ссылки ss://. Поддержка таких ссылок будет удалена в версии 5. Обновите ссылки ss://.,警告: 正在从旧版 ss:// 链接导入 {0}。对旧版 ss:// 链接的支持将于 v5 移除，请及时更新你的链接。,,,,
+Warning: importing {0} from a legacy ss:// link. Legacy ss:// links may be removed in a future release. Please update your ss:// links.,Предупреждение: выполняется импорт {0} из устаревшей ссылки ss://. Поддержка таких ссылок может быть удалена в одной из будущих версий. Обновите ссылки ss://.,警告: 正在从旧版 ss:// 链接导入 {0}。旧版 ss:// 链接可能会在未来版本中移除，请及时更新你的链接。,,,,
 System Proxy On:,Системный прокси:,系统代理已启用：,系統 Proxy 已啟用：,システム プロキシが有効：,시스템 프록시 활성화됨: ,Proxy système activé:
 Running: Port {0},Запущен на порту {0},正在运行：端口 {0},正在執行：連接埠號碼 {0},実行中：ポート {0},실행 중: 포트 {0}번,En cours d'exécution: port {0}
 "Unexpected error, shadowsocks will exit. Please report to","Непредвиденная ошибка, пожалуйста сообщите на",非预期错误，Shadowsocks将退出。请提交此错误到,非預期錯誤，Shadowsocks 將結束。請報告此錯誤至,予想外のエラーが発生したため、Shadowsocks を終了します。詳しくは下記までお問い合わせ下さい：,알 수 없는 오류로 Shadowsocks가 종료될 것입니다. 오류를 여기로 제보해주세요:,Shadowsocks va quitter en présence d/érreur inattendue. Veuillez signaler à
-"Unsupported operating system, use Windows Vista at least.","Операционная система не поддерживается, минимальные системные требования: Windows Vista или выше.",不支持的操作系统版本，最低需求为Windows Vista。,不支援的作業系統版本，最低需求為 Windows Vista。,お使いの OS はサポートされていません。Windows Vista 以降の OS で実行して下さい。,지원하지 않는 운영체제입니다. 최소 Windows Vista가 필요합니다.,"Système d'exploitation incompatible, veuillez utiliser Windows Vista ou ultérieure."
-"Unsupported .NET Framework, please update to {0} or later.","Версия .NET Framework не поддерживается, минимальные системные требования: {0} или выше.",当前 .NET Framework 版本过低，请升级至{0}或更新版本。,目前 .NET Framework 版本過低，最低需求為{0}。,お使いの .NET Framework はサポートされていません。{0} 以降のバンジョーをインストールして下さい。,지원하지 않는 .NET 프레임워크입니다. {0} 또는 상위 버전으로 업데이트해주세요.,".NET Framework incompatible, veuillez mettre à jour vers {0} ou ultérieure."
+"Unsupported operating system. Windows 10 version 2004 (build 19041) or newer is required.","Операционная система не поддерживается. Требуется Windows 10 версии 2004 (сборка 19041) или новее.",需要 Windows 10 版本 2004（内部版本 19041）或更高版本。,需要 Windows 10 版本 2004（組建 19041）或更新版本。,Windows 10 バージョン 2004（ビルド 19041）以降が必要です.,Windows 10 버전 2004(빌드 19041) 이상이 필요합니다.,"Windows 10 version 2004 (build 19041) ou une version ultérieure est requis."
 Proxy request failed,Не удалось выполнить запрос,代理请求失败,Proxy 要求失敗,プロキシリクエストが失敗しました。,프록시 요청에 실패했습니다.,Échec de la demande de proxy
 Proxy handshake failed,Не удалось выполнить хэндшейк,代理握手失败,Proxy 交握失敗,プロキシ ハンドシェイクに失敗しました。,프록시 핸드쉐이크에 실패했습니다.,Échec de la prise de contact par proxy
 Register hotkey failed,Не удалось применить настройки горячих клавиш,注册快捷键失败,註冊快速鍵失敗,ホットキーの登錄に失敗しました。,단축키 등록에 실패했습니다.,Échec de l'enregistrement du raccourci clavier
@@ -168,3 +167,11 @@ Whether to discard unconfigured servers,Внесенные изменения б
 ,,,,タイムアウト値のフォーマットが無効なため、オートセーブできません。変更を破棄しますか,,
 "Error occured when process proxy setting, do you want reset current setting and retry?",Произошла ошибка при обработке настроек. Хотите сбросить текущие настройки и попробовать снова?,处理代理设置时发生错误，是否重置当前代理设置并重试？,,プロキシ設定の処理にエラーが発生しました、現在のプロキシ設定をリセットし、再試行してもいいですか,프록시 설정을 처리하는데에 오류가 발생했습니다. 현재 설정을 폐기하고 다시 시도하시겠습니까?,Une erreur s'est produite lors du processus de configuration du proxy. Voulez-vous réinitialiser le paramètre actuel et réessayer?
 "Unrecoverable proxy setting error occured, see log for detail","Произошла серьезная ошибка, подробности можно узнать в журналах",发生不可恢复的代理设置错误，查看日志以取得详情,,プロキシ設定に回復不能なエラーが発生しました、ログで詳細をご確認ください,복구 불가능한 프록시 설정 오류가 발생했습니다. 자세한 정보는 로그를 참조하세요.,"Une erreur de paramètre de proxy irrécupérable s'est produite, consultez le journal pour plus de détails"
+Traffic Mode,Режим трафика,流量模式,流量模式,トラフィックモード,트래픽 모드,Mode trafic
+User Mode,Пользовательский режим,用户模式,使用者模式,ユーザーモード,사용자 모드,Mode utilisateur
+Admin Mode,Режим администратора,管理员模式,系統管理員模式,管理者モード,관리자 모드,Mode administrateur
+Traffic Routing...,Маршрутизация трафика...,流量路由...,流量路由...,トラフィックルーティング...,트래픽 라우팅...,Routage du trafic...
+Traffic Routing,Маршрутизация трафика,流量路由,流量路由,トラフィックルーティング,트래픽 라우팅,Routage du trafic
+WinDivert: active,WinDivert: активен,WinDivert：已启用,WinDivert：已啟用,WinDivert: 有効,WinDivert: 활성,WinDivert : actif
+WinDivert: paused (game running),WinDivert: приостановлен (игра запущена),WinDivert：已暂停（游戏运行中）,WinDivert：已暫停（遊戲執行中）,WinDivert: 一時停止（ゲーム実行中）,WinDivert: 일시 중지됨 (게임 실행 중),WinDivert : suspendu (jeu en cours)
+WinDivert: inactive,WinDivert: неактивен,WinDivert：未启用,WinDivert：未啟用,WinDivert: 無効,WinDivert: 비활성,WinDivert : inactif

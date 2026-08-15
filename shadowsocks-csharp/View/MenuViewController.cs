@@ -4,12 +4,14 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using System.Windows.Threading;
 using NLog;
 using Shadowsocks.Controller;
 using Shadowsocks.Controller.Service;
+using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Localization;
 using Shadowsocks.Model;
 using Shadowsocks.Properties;
@@ -21,6 +23,8 @@ namespace Shadowsocks.View
     public class MenuViewController
     {
         private readonly Logger logger = LogManager.GetCurrentClassLogger();
+        private readonly Dispatcher _uiDispatcher;
+        private int _configurationRefreshPending;
 
         private ShadowsocksController controller;
         public UpdateChecker updateChecker;
@@ -41,6 +45,10 @@ namespace Shadowsocks.View
         private ToolStripMenuItem ServersItem;
         private ToolStripMenuItem globalModeItem;
         private ToolStripMenuItem PACModeItem;
+        private ToolStripMenuItem userTrafficModeItem;
+        private ToolStripMenuItem adminTrafficModeItem;
+        private ToolStripMenuItem trafficCaptureStatusItem;
+        private ToolStripMenuItem trafficRoutingItem;
         private ToolStripMenuItem localPACItem;
         private ToolStripMenuItem onlinePACItem;
         private ToolStripMenuItem editLocalPACItem;
@@ -67,6 +75,7 @@ namespace Shadowsocks.View
         private System.Windows.Window forwardProxyWindow;
         private System.Windows.Window onlineConfigWindow;
         private System.Windows.Window geositeSourcesWindow;
+        private System.Windows.Window trafficRoutingWindow;
 
         // color definition for icon color transformation
         private readonly Color colorMaskBlue = Color.FromArgb(255, 25, 125, 191);
@@ -77,6 +86,7 @@ namespace Shadowsocks.View
         public MenuViewController(ShadowsocksController controller)
         {
             this.controller = controller;
+            _uiDispatcher = Dispatcher.CurrentDispatcher;
 
             LoadMenu();
 
@@ -101,6 +111,7 @@ namespace Shadowsocks.View
             _notifyIcon.MouseDoubleClick += notifyIcon1_DoubleClick;
             _notifyIcon.BalloonTipClosed += _notifyIcon_BalloonTipClosed;
             controller.TrafficChanged += controller_TrafficChanged;
+            controller.TrafficModeChanged += controller_TrafficModeChanged;
 
             updateChecker = new UpdateChecker();
             updateChecker.CheckUpdateCompleted += updateChecker_CheckUpdateCompleted;
@@ -264,6 +275,14 @@ namespace Shadowsocks.View
                     PACModeItem = CreateMenuItem("PAC", PACModeItem_Click),
                     globalModeItem = CreateMenuItem("Global", GlobalModeItem_Click)
                 }),
+                CreateMenuGroup("Traffic Mode", new ToolStripItem[] {
+                    userTrafficModeItem = CreateMenuItem("User Mode", UserTrafficModeItem_Click),
+                    adminTrafficModeItem = CreateMenuItem("Admin Mode", AdminTrafficModeItem_Click),
+                    new ToolStripSeparator(),
+                    trafficCaptureStatusItem = new ToolStripMenuItem(I18N.GetString("WinDivert: inactive")) { Enabled = false },
+                    new ToolStripSeparator(),
+                    trafficRoutingItem = CreateMenuItem("Traffic Routing...", TrafficRoutingItem_Click)
+                }),
                 ServersItem = CreateMenuGroup("Servers", new ToolStripItem[] {
                     SeparatorItem = new ToolStripSeparator(),
                     ConfigItem = CreateMenuItem("Edit Servers...", Config_Click),
@@ -346,8 +365,27 @@ namespace Shadowsocks.View
 
         private void controller_ConfigChanged(object sender, EventArgs e)
         {
-            LoadCurrentConfiguration();
-            UpdateTrayIconAndNotifyText();
+            QueueConfigurationRefresh();
+        }
+
+        private void controller_TrafficModeChanged(object sender, EventArgs e)
+        {
+            QueueConfigurationRefresh();
+        }
+
+        private void QueueConfigurationRefresh()
+        {
+            if (Interlocked.Exchange(ref _configurationRefreshPending, 1) != 0)
+            {
+                return;
+            }
+
+            _uiDispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                Interlocked.Exchange(ref _configurationRefreshPending, 0);
+                LoadCurrentConfiguration();
+                UpdateTrayIconAndNotifyText();
+            }));
         }
 
         private void LoadCurrentConfiguration()
@@ -364,6 +402,15 @@ namespace Shadowsocks.View
             localPACItem.Checked = !onlinePACItem.Checked;
             secureLocalPacUrlToggleItem.Checked = config.secureLocalPac;
             regenerateLocalPacOnUpdateItem.Checked = config.regeneratePacOnUpdate;
+            TrafficRuntimeMode runtimeMode = controller.GetTrafficRuntimeMode();
+            userTrafficModeItem.Checked = config.trafficCaptureMode == TrafficCaptureMode.User;
+            adminTrafficModeItem.Checked = config.trafficCaptureMode == TrafficCaptureMode.Admin;
+            trafficCaptureStatusItem.Text = runtimeMode switch
+            {
+                TrafficRuntimeMode.Admin => I18N.GetString("WinDivert: active"),
+                TrafficRuntimeMode.Game => I18N.GetString("WinDivert: paused (game running)"),
+                _ => I18N.GetString("WinDivert: inactive"),
+            };
             UpdatePACItemsEnabledStatus();
             UpdateUpdateMenu();
         }
@@ -566,6 +613,46 @@ namespace Shadowsocks.View
             geositeSourcesWindow?.Close();
         }
 
+        private void TrafficRoutingItem_Click(object sender, EventArgs e)
+        {
+            if (trafficRoutingWindow == null)
+            {
+                trafficRoutingWindow = new System.Windows.Window()
+                {
+                    Title = I18N.GetString("Traffic Routing"),
+                    Height = 690,
+                    Width = 760,
+                    MinHeight = 600,
+                    MinWidth = 660,
+                    Content = new TrafficRoutingView()
+                };
+                trafficRoutingWindow.Closed += TrafficRoutingWindow_Closed;
+                ElementHost.EnableModelessKeyboardInterop(trafficRoutingWindow);
+                trafficRoutingWindow.Show();
+            }
+            trafficRoutingWindow.Activate();
+        }
+
+        private void TrafficRoutingWindow_Closed(object sender, EventArgs e)
+        {
+            trafficRoutingWindow = null;
+        }
+
+        public void CloseTrafficRoutingWindow()
+        {
+            trafficRoutingWindow?.Close();
+        }
+
+        private async void UserTrafficModeItem_Click(object sender, EventArgs e)
+        {
+            await controller.SetTrafficCaptureModeAsync(TrafficCaptureMode.User);
+        }
+
+        private async void AdminTrafficModeItem_Click(object sender, EventArgs e)
+        {
+            await controller.SetTrafficCaptureModeAsync(TrafficCaptureMode.Admin);
+        }
+
         private void hotKeyItem_Click(object sender, EventArgs e)
         {
             if (hotkeysWindow == null)
@@ -675,7 +762,7 @@ namespace Shadowsocks.View
         private void UpdateServersMenu()
         {
             var items = ServersItem.DropDownItems;
-            while (items[0] != SeparatorItem)
+            while (items.Count > 0 && items[0] != SeparatorItem)
             {
                 items.RemoveAt(0);
             }
@@ -1021,7 +1108,7 @@ namespace Shadowsocks.View
 
         private void AboutItem_Click(object sender, EventArgs e)
         {
-            Process.Start(new ProcessStartInfo("https://github.com/shadowsocks/shadowsocks-windows") { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(UpdateChecker.RepositoryUrl) { UseShellExecute = true });
         }
 
         #endregion
