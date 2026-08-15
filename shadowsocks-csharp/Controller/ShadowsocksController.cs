@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -6,13 +6,17 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Windows.Forms;
 using NLog;
 using Shadowsocks.Controller.Service;
 using Shadowsocks.Controller.Strategy;
+using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Model;
+using Shadowsocks.Util;
 using WPFLocalizeExtension.Engine;
 
 namespace Shadowsocks.Controller
@@ -34,7 +38,10 @@ namespace Shadowsocks.Controller
         private PACServer _pacServer;
         private Configuration _config;
         private StrategyManager _strategyManager;
-        private PrivoxyRunner privoxyRunner;
+        private readonly TrafficPolicyEngine _trafficPolicyEngine;
+        private readonly AdminCaptureManager _adminCaptureManager;
+        private readonly GameModeManager _gameModeManager;
+        private ManagedHttpProxyService _managedHttpProxy;
         private readonly ConcurrentDictionary<Server, Sip003Plugin> _pluginsByServer;
 
         private long _inboundCounter = 0;
@@ -71,6 +78,7 @@ namespace Shadowsocks.Controller
         public event EventHandler VerboseLoggingStatusChanged;
         public event EventHandler ShowPluginOutputChanged;
         public event EventHandler TrafficChanged;
+        public event EventHandler TrafficModeChanged;
 
         // when user clicked Edit PAC, and PAC file has already created
         public event EventHandler<PathEventArgs> PACFileReadyToOpen;
@@ -93,6 +101,10 @@ namespace Shadowsocks.Controller
             _config = Configuration.Load();
             Configuration.Process(ref _config);
             _strategyManager = new StrategyManager(this);
+            _trafficPolicyEngine = new TrafficPolicyEngine(_config);
+            _adminCaptureManager = new AdminCaptureManager();
+            _gameModeManager = new GameModeManager(_adminCaptureManager);
+            _gameModeManager.StatusChanged += (_, _) => TrafficModeChanged?.Invoke(this, EventArgs.Empty);
             _pluginsByServer = new ConcurrentDictionary<Server, Sip003Plugin>();
             StartTrafficStatistics(61);
 
@@ -110,6 +122,7 @@ namespace Shadowsocks.Controller
 
         public void Start(bool systemWakeUp = false)
         {
+            stopped = false;
             if (_config.firstRunOnNewVersion && !systemWakeUp)
             {
                 ProgramUpdated.Invoke(this, new UpdatedEventArgs()
@@ -145,15 +158,19 @@ namespace Shadowsocks.Controller
                 return;
             }
             stopped = true;
+            try
+            {
+                _gameModeManager.StopAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+            }
             if (_listener != null)
             {
                 _listener.Stop();
             }
             StopPlugins();
-            if (privoxyRunner != null)
-            {
-                privoxyRunner.Stop();
-            }
             if (_config.enabled)
             {
                 SystemProxy.Update(_config, true, null);
@@ -187,8 +204,6 @@ namespace Shadowsocks.Controller
                 httpClient.DefaultRequestHeaders.Add("User-Agent", _config.userAgentString);
             }
 
-            privoxyRunner = privoxyRunner ?? new PrivoxyRunner();
-
             if (_pacDaemon == null)
             {
                 _pacDaemon = new PACDaemon(_config);
@@ -214,18 +229,14 @@ namespace Shadowsocks.Controller
             _listener?.Stop();
             StopPlugins();
 
-            // don't put PrivoxyRunner.Start() before pacServer.Stop()
-            // or bind will fail when switching bind address from 0.0.0.0 to 127.0.0.1
-            // though UseShellExecute is set to true now
-            // http://stackoverflow.com/questions/10235093/socket-doesnt-close-after-application-exits-if-a-launched-process-is-open
-            privoxyRunner.Stop();
             try
             {
                 var strategy = GetCurrentStrategy();
                 strategy?.ReloadServers();
 
                 StartPlugin();
-                privoxyRunner.Start(_config);
+                _trafficPolicyEngine.UpdateConfiguration(_config);
+                _managedHttpProxy = new ManagedHttpProxyService(_trafficPolicyEngine, _config);
 
                 TCPRelay tcpRelay = new TCPRelay(this, _config);
                 tcpRelay.OnInbound += UpdateInboundCounter;
@@ -238,10 +249,11 @@ namespace Shadowsocks.Controller
                     tcpRelay,
                     udpRelay,
                     _pacServer,
-                    new PortForwarder(privoxyRunner.RunningPort)
+                    _managedHttpProxy
                 };
                 _listener = new Listener(services);
                 _listener.Start(_config);
+                _ = ApplyTrafficCaptureAsync(_config);
             }
             catch (Exception e)
             {
@@ -321,6 +333,158 @@ namespace Shadowsocks.Controller
             SaveConfig(_config);
 
             ShareOverLANStatusChanged?.Invoke(this, new EventArgs());
+        }
+
+        #endregion
+
+
+        #region Traffic routing
+
+        public TrafficRuntimeMode GetTrafficRuntimeMode() => _gameModeManager.RuntimeMode;
+
+        public async Task<bool> SetTrafficCaptureModeAsync(TrafficCaptureMode mode)
+        {
+            TrafficCaptureMode previousMode = _config.trafficCaptureMode;
+            _config.trafficCaptureMode = mode;
+            _trafficPolicyEngine.UpdateConfiguration(_config);
+
+            try
+            {
+                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                Configuration.Save(_config);
+                TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+                ConfigChanged?.Invoke(this, EventArgs.Empty);
+                return true;
+            }
+            catch (AdminElevationCanceledException exception)
+            {
+                logger.Info(exception, "Administrator elevation for Admin Mode was cancelled.");
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+                ReportError(exception);
+            }
+
+            _config.trafficCaptureMode = previousMode == TrafficCaptureMode.Admin
+                ? TrafficCaptureMode.User
+                : previousMode;
+            if (_config.trafficCaptureMode == TrafficCaptureMode.Admin)
+            {
+                _config.trafficCaptureMode = TrafficCaptureMode.User;
+            }
+            Configuration.Save(_config);
+            try
+            {
+                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+            }
+            TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+            ConfigChanged?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+
+        public async Task<bool> SaveTrafficRoutingAsync(
+            TrafficCaptureMode captureMode,
+            IEnumerable<ApplicationRouteRule> applicationRules,
+            IEnumerable<string> gameModeApplications)
+        {
+            _config.applicationRules = (applicationRules ?? [])
+                .Where(rule => rule is not null && !string.IsNullOrWhiteSpace(rule.application))
+                .Select(rule => new ApplicationRouteRule
+                {
+                    enabled = rule.enabled,
+                    application = rule.application.Trim(),
+                    action = rule.action,
+                })
+                .ToList();
+            _config.gameModeApplications = (gameModeApplications ?? [])
+                .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
+                .Select(pattern => pattern.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _trafficPolicyEngine.UpdateConfiguration(_config);
+
+            TrafficCaptureMode previousMode = _config.trafficCaptureMode;
+            _config.trafficCaptureMode = captureMode;
+            try
+            {
+                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                Configuration.Save(_config);
+                TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+                ConfigChanged?.Invoke(this, EventArgs.Empty);
+                return true;
+            }
+            catch (AdminElevationCanceledException exception)
+            {
+                logger.Info(exception, "Administrator elevation for Admin Mode was cancelled.");
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+                ReportError(exception);
+            }
+
+            _config.trafficCaptureMode = captureMode == TrafficCaptureMode.Admin
+                ? TrafficCaptureMode.User
+                : previousMode;
+            Configuration.Save(_config);
+            try
+            {
+                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+            }
+            TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+            ConfigChanged?.Invoke(this, EventArgs.Empty);
+            return false;
+        }
+
+        private async Task ApplyTrafficCaptureAsync(Configuration configurationAtStart)
+        {
+            try
+            {
+                await _gameModeManager.ApplyConfigurationAsync(
+                    configurationAtStart,
+                    GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+            }
+            catch (AdminElevationCanceledException exception)
+            {
+                logger.Info(exception, "Administrator elevation for Admin Mode was cancelled.");
+                if (ReferenceEquals(_config, configurationAtStart) && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
+                {
+                    _config.trafficCaptureMode = TrafficCaptureMode.User;
+                    Configuration.Save(_config);
+                    TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+                    ConfigChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger.LogUsefulException(exception);
+                if (ReferenceEquals(_config, configurationAtStart) && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
+                {
+                    _config.trafficCaptureMode = TrafficCaptureMode.User;
+                    Configuration.Save(_config);
+                }
+                TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+                ReportError(exception);
+            }
+        }
+
+        private int[] GetCaptureExclusionProcessIds()
+        {
+            return _pluginsByServer.Values
+                .Select(plugin => plugin.ProcessId)
+                .Where(processId => processId > 0)
+                .Append(Environment.ProcessId)
+                .Distinct()
+                .ToArray();
         }
 
         #endregion
@@ -552,7 +716,7 @@ namespace Shadowsocks.Controller
                 {
                     _config.configs.Add(server);
                     if (server.warnLegacyUrl)
-                        MessageBox.Show(I18N.GetString("Warning: importing {0} from a legacy ss:// link. Support for legacy ss:// links will be dropped in version 5. Make sure to update your ss:// links.", server.ToString()));
+                        MessageBox.Show(I18N.GetString("Warning: importing {0} from a legacy ss:// link. Legacy ss:// links may be removed in a future release. Please update your ss:// links.", server.ToString()));
                 }
                 _config.index = _config.configs.Count - 1;
                 SaveConfig(_config);

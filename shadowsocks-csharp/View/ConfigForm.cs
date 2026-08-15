@@ -1,11 +1,11 @@
+﻿using Shadowsocks.Controller;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using Shadowsocks.Controller;
-using Shadowsocks.Model;
-using Shadowsocks.Properties;
 
 namespace Shadowsocks.View
 {
@@ -127,6 +127,12 @@ namespace Shadowsocks.View
 
         private void Controller_ConfigChanged(object sender, EventArgs e)
         {
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)LoadCurrentConfiguration);
+                return;
+            }
+
             LoadCurrentConfiguration();
         }
 

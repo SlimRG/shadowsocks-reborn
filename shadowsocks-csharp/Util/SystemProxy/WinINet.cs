@@ -463,8 +463,8 @@ namespace Shadowsocks.Util.SystemProxy
         }
 
         // INTERNET_PER_CONN_OPTION.Value is a native union of DWORD, pointer and FILETIME.
-        // FILETIME keeps the union 8 bytes wide even in our x86 process; omitting it would
-        // shrink INTERNET_PER_CONN_OPTION from 12 to 8 bytes and corrupt option arrays.
+        // FILETIME keeps the native union explicitly 8 bytes wide; omitting it can
+        // corrupt INTERNET_PER_CONN_OPTION arrays when marshalled by WinINet.
         [StructLayout(LayoutKind.Explicit, Size = 8)]
         private struct InternetPerConnectionOptionValue
         {

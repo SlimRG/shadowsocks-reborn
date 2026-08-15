@@ -198,4 +198,64 @@
   <data name="saveButton_Content" xml:space="preserve">
     <value>Enregistrer</value>
   </data>
+  <data name="trafficRoutingDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Choisissez le mode de capture du trafic et ajoutez des règles de routage par application. Les règles d’application sont prioritaires sur la décision du proxy système/PAC.</value>
+  </data>
+  <data name="trafficCaptureModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>Mode de capture du trafic</value>
+  </data>
+  <data name="userModeRadioButton_Content" xml:space="preserve">
+    <value>Mode utilisateur</value>
+  </data>
+  <data name="userModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Sans droits administrateur ni pilote. Filtre les applications qui utilisent réellement le proxy HTTP Windows/local ; le trafic TCP/UDP arbitraire n’est pas capturé.</value>
+  </data>
+  <data name="adminModeRadioButton_Content" xml:space="preserve">
+    <value>Mode administrateur</value>
+  </data>
+  <data name="adminModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Capture transparente TCP/UDP facultative avec WinDivert. Son activation demande les droits administrateur et télécharge WinDivert à la demande.</value>
+  </data>
+  <data name="applicationRulesHeaderTextBlock_Text" xml:space="preserve">
+    <value>Règles de routage des applications</value>
+  </data>
+  <data name="enabledColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Activé</value>
+  </data>
+  <data name="applicationColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Application / motif de chemin</value>
+  </data>
+  <data name="routeColumnHeaderTextBlock_Text" xml:space="preserve">
+    <value>Route</value>
+  </data>
+  <data name="addApplicationRuleButton_Content" xml:space="preserve">
+    <value>Ajouter</value>
+  </data>
+  <data name="removeApplicationRuleButton_Content" xml:space="preserve">
+    <value>Supprimer</value>
+  </data>
+  <data name="gameModeHeaderTextBlock_Text" xml:space="preserve">
+    <value>Mode jeu</value>
+  </data>
+  <data name="gameModeDescriptionTextBlock_Text" xml:space="preserve">
+    <value>Un nom de processus ou un modèle de chemin par ligne (jokers * et ? pris en charge). Lorsqu’une application correspondante démarre, WinDivert est automatiquement désactivé et le mode utilisateur est utilisé. Le mode administrateur est rétabli automatiquement après la fermeture de l’application.</value>
+  </data>
+  <data name="dnsPolicyPlannedTextBlock_Text" xml:space="preserve">
+    <value>La politique de routage DNS est prévue dans la configuration et l’API de routage, mais l’interception DNS n’est volontairement pas activée dans cette version.</value>
+  </data>
+  <data name="saveTrafficRoutingButton_Content" xml:space="preserve">
+    <value>Enregistrer</value>
+  </data>
+  <data name="cancelTrafficRoutingButton_Content" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="trafficRouteProxy" xml:space="preserve">
+    <value>Proxy</value>
+  </data>
+  <data name="trafficRouteDirect" xml:space="preserve">
+    <value>Direct</value>
+  </data>
+  <data name="trafficRouteBlock" xml:space="preserve">
+    <value>Bloquer</value>
+  </data>
 </root>

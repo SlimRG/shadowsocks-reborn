@@ -18,8 +18,9 @@ namespace Shadowsocks.Controller
         private readonly Logger logger;
         private readonly HttpClient httpClient;
 
-        // https://developer.github.com/v3/repos/releases/
-        private const string UpdateURL = "https://api.github.com/repos/shadowsocks/shadowsocks-windows/releases";
+        public const string RepositoryUrl = "https://github.com/SlimRG/shadowsocks-reborn";
+        public const string IssuesUrl = RepositoryUrl + "/issues";
+        private const string UpdateUrl = "https://api.github.com/repos/SlimRG/shadowsocks-reborn/releases";
 
         private Configuration _config;
         private Window versionUpdatePromptWindow;
@@ -30,7 +31,7 @@ namespace Shadowsocks.Controller
 
         public event EventHandler CheckUpdateCompleted;
 
-        public const string Version = "4.4.1.0";
+        public const string Version = "5.0.0.0";
         private readonly Version _version;
 
         public UpdateChecker()
@@ -54,21 +55,35 @@ namespace Shadowsocks.Controller
             // update _config so we would know if the user checked or unchecked pre-release checks
             _config = Program.MainController.GetCurrentConfiguration();
             // start
-            logger.Info($"Checking for version update.");
+            logger.Info("Checking for version update.");
             try
             {
                 // list releases via API
-                var releasesListJsonString = await httpClient.GetStringAsync(UpdateURL);
+                var releasesListJsonString = await httpClient.GetStringAsync(UpdateUrl);
                 // parse
                 var releasesJArray = JArray.Parse(releasesListJsonString);
                 foreach (var releaseObject in releasesJArray)
                 {
-                    var releaseTagName = (string)releaseObject["tag_name"];
-                    var releaseVersion = new Version(releaseTagName);
-                    if (releaseTagName == _config.skippedUpdateVersion) // finished checking
+                    string releaseTagName = (string)releaseObject["tag_name"];
+                    if (string.IsNullOrWhiteSpace(releaseTagName))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(releaseTagName, _config.skippedUpdateVersion, StringComparison.OrdinalIgnoreCase))
+                    {
                         break;
-                    if (releaseVersion.CompareTo(_version) > 0 &&
-                        (!(bool)releaseObject["prerelease"] || _config.checkPreRelease && (bool)releaseObject["prerelease"])) // selected
+                    }
+
+                    if (!TryParseReleaseVersion(releaseTagName, out Version releaseVersion))
+                    {
+                        logger.Warn($"Ignoring GitHub release with unsupported tag '{releaseTagName}'.");
+                        continue;
+                    }
+
+                    bool isPrerelease = (bool?)releaseObject["prerelease"] == true;
+                    if (releaseVersion.CompareTo(_version) > 0
+                        && (!isPrerelease || _config.checkPreRelease))
                     {
                         logger.Info($"Found new version {releaseTagName}.");
                         _releaseObject = releaseObject;
@@ -77,13 +92,49 @@ namespace Shadowsocks.Controller
                         return;
                     }
                 }
-                logger.Info($"No new versions found.");
-                CheckUpdateCompleted?.Invoke(this, new EventArgs());
+                logger.Info("No new versions found.");
+                CheckUpdateCompleted?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception e)
             {
                 logger.LogUsefulException(e);
             }
+        }
+
+        private static bool TryParseReleaseVersion(string tagName, out Version version)
+        {
+            version = null;
+            if (string.IsNullOrWhiteSpace(tagName))
+            {
+                return false;
+            }
+
+            string normalized = tagName.Trim();
+            if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.Substring(1);
+            }
+
+            int suffixIndex = normalized.IndexOfAny(new[] { '-', '+' });
+            if (suffixIndex >= 0)
+            {
+                normalized = normalized.Substring(0, suffixIndex);
+            }
+
+            string[] parts = normalized.Split('.');
+            if (parts.Length is < 2 or > 4)
+            {
+                return false;
+            }
+
+            normalized = parts.Length switch
+            {
+                2 => normalized + ".0.0",
+                3 => normalized + ".0",
+                _ => normalized,
+            };
+
+            return Version.TryParse(normalized, out version);
         }
 
         /// <summary>

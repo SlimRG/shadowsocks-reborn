@@ -21,8 +21,8 @@ namespace Shadowsocks
 
         public static ShadowsocksController MainController { get; private set; }
         public static MenuViewController MenuController { get; private set; }
-        public static CommandLineOption Options { get; private set; }
-        public static string[] Args { get; private set; }
+        public static CommandLineOption Options { get; private set; } = new();
+        public static string[] Args { get; private set; } = [];
 
         // https://github.com/dotnet/runtime/issues/13051#issuecomment-510267727
         public static readonly string ExecutablePath = Process.GetCurrentProcess().MainModule?.FileName
@@ -71,11 +71,13 @@ namespace Shadowsocks
             #endregion
 
             #region Compatibility check
-            // Check the OS because the client uses dual-mode sockets.
-            if (!Utils.IsWinVistaOrHigher())
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
             {
-                MessageBox.Show(I18N.GetString("Unsupported operating system, use Windows Vista at least."),
-                "Shadowsocks Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    I18N.GetString("Unsupported operating system. Windows 10 version 2004 (build 19041) or newer is required."),
+                    "Shadowsocks Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 return;
             }
 
@@ -101,12 +103,6 @@ namespace Shadowsocks
             // https://stackoverflow.com/questions/14668640/wpf-localize-extension-translate-window-at-run-time
             LocalizeDictionary.Instance.Culture = Thread.CurrentThread.CurrentCulture;
 
-#if DEBUG
-            // truncate privoxy log file while debugging
-            string privoxyLogFilename = Utils.GetTempPath("privoxy.log");
-            if (File.Exists(privoxyLogFilename))
-                using (new FileStream(privoxyLogFilename, FileMode.Truncate)) { }
-#endif
             MainController = new ShadowsocksController();
             MenuController = new MenuViewController(MainController);
 
@@ -142,7 +138,7 @@ namespace Shadowsocks
                 string errMsg = e.ExceptionObject.ToString();
                 logger.Error(errMsg);
                 MessageBox.Show(
-                    $"{I18N.GetString("Unexpected error, shadowsocks will exit. Please report to")} https://github.com/shadowsocks/shadowsocks-windows/issues {Environment.NewLine}{errMsg}",
+                    $"{I18N.GetString("Unexpected error, shadowsocks will exit. Please report to")} {UpdateChecker.IssuesUrl} {Environment.NewLine}{errMsg}",
                     "Shadowsocks non-UI Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
             }
@@ -155,7 +151,7 @@ namespace Shadowsocks
                 string errorMsg = $"Exception Detail: {Environment.NewLine}{e.Exception}";
                 logger.Error(errorMsg);
                 MessageBox.Show(
-                    $"{I18N.GetString("Unexpected error, shadowsocks will exit. Please report to")} https://github.com/shadowsocks/shadowsocks-windows/issues {Environment.NewLine}{errorMsg}",
+                    $"{I18N.GetString("Unexpected error, shadowsocks will exit. Please report to")} {UpdateChecker.IssuesUrl} {Environment.NewLine}{errorMsg}",
                     "Shadowsocks UI Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
             }
@@ -169,9 +165,9 @@ namespace Shadowsocks
                     logger.Info("os wake up");
                     if (MainController != null)
                     {
-                        Task.Factory.StartNew(() =>
+                        _ = Task.Run(async () =>
                         {
-                            Thread.Sleep(10 * 1000);
+                            await Task.Delay(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
                             try
                             {
                                 MainController.Start(true);

@@ -29,7 +29,7 @@ namespace Shadowsocks.Controller.Hotkeys
             return dynMethod == null ? null : Delegate.CreateDelegate(typeof(HotKeys.HotKeyCallBackHandler), Instance, dynMethod);
         }
 
-        #region Singleton 
+        #region Singleton
 
         private static HotkeyCallbacks Instance { get; set; }
 

@@ -1,27 +1,26 @@
----
+﻿---
 name: Bug 报告（中文）
-about: 反馈可复现的客户端问题
+about: 反馈可复现的 Shadowsocks Reborn 客户端问题
 title: ""
-labels: "bug report"
+labels: bug
 assignees: ""
 ---
 
-<!--
-Shadowsocks 是开源非营利项目，不提供代理托管服务。如服务由第三方提供，请先联系服务提供商。
-提交前请搜索现有 Issue，并阅读 upstream Troubleshooting 文档。
-日志、配置和截图中请删除密码、服务器地址、订阅地址等敏感信息。
--->
+<!-- 提交前请搜索现有 Issue，并删除密码、服务器地址、订阅 URL、PAC secret 和 token。 -->
 
-## 问题描述
+## 问题
 
-请简要、清晰地描述问题。
+请描述实际结果和预期结果。
 
 ## 环境
 
-- Shadowsocks 客户端版本：
-- Windows 版本：
-- .NET Runtime/SDK 版本：
-- 构建架构：x86
+- Shadowsocks Reborn 版本/commit：
+- Windows 版本/build：
+- 安装方式：release ZIP / 源码构建
+- .NET 10 Desktop Runtime 版本：
+- 流量模式：User / Admin
+- 系统代理模式：Disabled / PAC / Global
+- Portable mode：是 / 否
 
 ## 复现步骤
 
@@ -29,17 +28,18 @@ Shadowsocks 是开源非营利项目，不提供代理托管服务。如服务�
 2.
 3.
 
-## 期望结果
+## Admin Mode
 
-请描述预期行为。
+<!-- 如果问题与 Admin Mode 无关，请删除本节。 -->
 
-## 实际结果
+- UAC 是否成功：是 / 否
+- 菜单中的 WinDivert 状态：active / paused / inactive
+- 日志中是否有 `WinDivert capture confirmed`：是 / 否
+- 是否正在运行 Game Mode 列表中的应用：是 / 否
 
-请描述实际行为。
+## 日志
 
-## 配置和日志
-
-请先移除所有敏感信息。
+请粘贴完整且已脱敏的 WARN/ERROR 和 stack trace。
 
 ```text
 在此粘贴日志

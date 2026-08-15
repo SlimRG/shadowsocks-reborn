@@ -137,7 +137,7 @@ namespace Shadowsocks.Proxy
 
         private void HttpRequestSendCallback(IAsyncResult ar)
         {
-            var state = (HttpState)ar.AsyncState;
+            var state = (HttpState) ar.AsyncState;
             try
             {
                 _remote.EndSend(ar);
@@ -169,7 +169,7 @@ namespace Shadowsocks.Proxy
 
         private void OnException(Exception ex, object state)
         {
-            var st = (FakeAsyncResult)state;
+            var st = (FakeAsyncResult) state;
 
             st.innerState.ex = ex;
         }

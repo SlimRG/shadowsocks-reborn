@@ -1,15 +1,17 @@
-﻿using System;
-using System.Drawing;
+﻿using NLog;
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
-using NLog;
 using Shadowsocks.Controller;
 using Shadowsocks.Model;
+using System.Drawing;
 using ZXing;
-using ZXing.Common;
 using ZXing.QrCode;
+using ZXing.Common;
 using ZXing.Windows.Compatibility;
 
 namespace Shadowsocks.Util
@@ -233,9 +235,8 @@ namespace Shadowsocks.Util
 
         public static RegistryKey OpenRegKey(string name, bool writable, RegistryHive hive = RegistryHive.CurrentUser)
         {
-            // we are building x86 binary for both x86 and x64, which will
-            // cause problem when opening registry key
-            // detect operating system instead of CPU
+            // The client is x64-only. Select the registry view from the OS so this helper
+            // remains explicit and safe on supported 64-bit Windows systems.
             if (string.IsNullOrEmpty(name)) throw new ArgumentException(nameof(name));
             try
             {
@@ -254,11 +255,6 @@ namespace Shadowsocks.Util
                 logger.LogUsefulException(e);
                 return null;
             }
-        }
-
-        public static bool IsWinVistaOrHigher()
-        {
-            return Environment.OSVersion.Version.Major > 5;
         }
 
         public static string ScanQRCodeFromScreen()
@@ -303,33 +299,5 @@ namespace Shadowsocks.Util
             return null;
         }
 
-        // See: https://msdn.microsoft.com/en-us/library/hh925568(v=vs.110).aspx
-        public static bool IsSupportedRuntimeVersion()
-        {
-            /*
-             * +-----------------------------------------------------------------+----------------------------+
-             * | Version                                                         | Value of the Release DWORD |
-             * +-----------------------------------------------------------------+----------------------------+
-             * | .NET Framework 4.6.2 installed on Windows 10 Anniversary Update | 394802                     |
-             * | .NET Framework 4.6.2 installed on all other Windows OS versions | 394806                     |
-             * +-----------------------------------------------------------------+----------------------------+
-             */
-            const int minSupportedRelease = 394802;
-
-            const string subkey = @"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full\";
-            using (var ndpKey = OpenRegKey(subkey, false, RegistryHive.LocalMachine))
-            {
-                if (ndpKey?.GetValue("Release") != null)
-                {
-                    var releaseKey = (int)ndpKey.GetValue("Release");
-
-                    if (releaseKey >= minSupportedRelease)
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
     }
 }
