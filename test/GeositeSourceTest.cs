@@ -1,8 +1,7 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Shadowsocks.Controller;
+﻿using System.Collections.Generic;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Controller.Service;
 using Shadowsocks.Model;
-using System.Collections.Generic;
 
 namespace Shadowsocks.Test
 {

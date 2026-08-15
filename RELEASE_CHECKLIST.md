@@ -6,6 +6,7 @@ Use this checklist for a public `shadowsocks-reborn` release.
 
 - [ ] Working tree contains only intentional release changes.
 - [ ] `UpdateChecker.Version`, project `<Version>` values, `AssemblyInformationalVersion` and `CHANGELOG.md` agree. The current release pipeline accepts stable `vMAJOR.MINOR.PATCH` tags.
+- [ ] `.\packaging\Validate-Repository.ps1` succeeds; every `ResXFileRef` target is present in the checkout.
 - [ ] `dotnet restore .\shadowsocks-windows.sln -p:Platform=x64` succeeds.
 - [ ] `dotnet build .\shadowsocks-windows.sln -c Release -p:Platform=x64 -m:1 --no-restore` succeeds.
 - [ ] `dotnet test .\test\ShadowsocksTest.csproj -c Release -p:Platform=x64 --no-build` succeeds.

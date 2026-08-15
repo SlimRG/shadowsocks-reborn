@@ -1,7 +1,7 @@
-﻿using Shadowsocks.Model;
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Http;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller.Service
 {

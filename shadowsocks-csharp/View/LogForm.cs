@@ -1,16 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Windows.Forms;
-using System.Collections.Generic;
 using System.Linq;
-
-using Shadowsocks.Controller;
-using Shadowsocks.Properties;
-using Shadowsocks.Model;
-using Shadowsocks.Util;
 using System.Text;
+using System.Windows.Forms;
 using NLog;
+using Shadowsocks.Controller;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.View
 {
@@ -50,7 +49,7 @@ namespace Shadowsocks.View
             {
                 this.filename = nLogConfig.GetLogFileName();
             }
-            catch(Exception)
+            catch (Exception)
             {
                 // failed to get the file name
             }

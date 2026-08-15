@@ -1,10 +1,6 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Shadowsocks.Controller;
-using System.Threading;
-using System.Collections.Generic;
 using Shadowsocks.Model;
-using System.Diagnostics;
 
 namespace Shadowsocks.Test
 {

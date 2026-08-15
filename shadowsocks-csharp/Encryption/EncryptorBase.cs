@@ -92,6 +92,6 @@
 
         public abstract void Dispose();
 
-        public int AddrBufLength { get; set; } = - 1;
+        public int AddrBufLength { get; set; } = -1;
     }
 }

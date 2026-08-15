@@ -1,11 +1,4 @@
-﻿using ReactiveUI;
-using ReactiveUI.Validation.Extensions;
-using ReactiveUI.Validation.Helpers;
-using Shadowsocks.Controller;
-using Shadowsocks.Localization;
-using Shadowsocks.Model;
-using Shadowsocks.View;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -13,6 +6,13 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Text;
 using System.Windows;
+using ReactiveUI;
+using ReactiveUI.Validation.Extensions;
+using ReactiveUI.Validation.Helpers;
+using Shadowsocks.Controller;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.View;
 
 namespace Shadowsocks.ViewModels
 {

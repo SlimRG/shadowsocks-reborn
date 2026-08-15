@@ -1,12 +1,12 @@
-﻿using Microsoft.VisualBasic.FileIO;
-using NLog;
-using Shadowsocks.Properties;
-using Shadowsocks.Util;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows.Forms;
+using Microsoft.VisualBasic.FileIO;
+using NLog;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
 
 namespace Shadowsocks.Controller
 {

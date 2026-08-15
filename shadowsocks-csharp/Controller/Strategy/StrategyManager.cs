@@ -1,7 +1,4 @@
-﻿using Shadowsocks.Controller;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace Shadowsocks.Controller.Strategy
 {

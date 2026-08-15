@@ -1,13 +1,4 @@
-﻿using NLog;
-using Shadowsocks.Controller;
-using Shadowsocks.Controller.Service;
-using Shadowsocks.Controller.Traffic;
-using Shadowsocks.Localization;
-using Shadowsocks.Model;
-using Shadowsocks.Properties;
-using Shadowsocks.Util;
-using Shadowsocks.Views;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -17,9 +8,15 @@ using System.Threading;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using System.Windows.Threading;
-using ZXing;
-using ZXing.Common;
-using ZXing.QrCode;
+using NLog;
+using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
+using Shadowsocks.Controller.Traffic;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
+using Shadowsocks.Util;
+using Shadowsocks.Views;
 
 namespace Shadowsocks.View
 {

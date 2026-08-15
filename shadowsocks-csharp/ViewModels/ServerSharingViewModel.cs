@@ -1,13 +1,12 @@
-﻿using ReactiveUI;
-using Shadowsocks.Model;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using System.Reactive;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using ReactiveUI;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.ViewModels
 {

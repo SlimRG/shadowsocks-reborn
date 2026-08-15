@@ -1,8 +1,8 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Reactive;
+using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using Shadowsocks.Controller;
 using Shadowsocks.Localization;
-using System.Reactive;
 
 namespace Shadowsocks.ViewModels
 {

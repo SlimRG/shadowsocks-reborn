@@ -1,11 +1,11 @@
-﻿using NLog;
-using Shadowsocks.Controller.Service;
-using Shadowsocks.Model;
-using Shadowsocks.Properties;
-using System;
+﻿using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using NLog;
+using Shadowsocks.Controller.Service;
+using Shadowsocks.Model;
+using Shadowsocks.Properties;
 
 namespace Shadowsocks.Controller
 {

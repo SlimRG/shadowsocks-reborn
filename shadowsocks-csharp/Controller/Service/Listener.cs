@@ -240,7 +240,7 @@ namespace Shadowsocks.Controller
                         return;
                     }
                 }
-                Shutdown:
+            Shutdown:
                 // no service found for this
                 if (conn.ProtocolType == ProtocolType.Tcp)
                 {

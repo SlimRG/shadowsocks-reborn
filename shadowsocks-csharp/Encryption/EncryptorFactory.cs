@@ -11,7 +11,7 @@ namespace Shadowsocks.Encryption
     {
         private static Dictionary<string, Type> _registeredEncryptors = new Dictionary<string, Type>();
 
-        private static readonly Type[] ConstructorTypes = {typeof(string), typeof(string)};
+        private static readonly Type[] ConstructorTypes = { typeof(string), typeof(string) };
 
         static EncryptorFactory()
         {
@@ -41,7 +41,7 @@ namespace Shadowsocks.Encryption
 
             ConstructorInfo c = t.GetConstructor(ConstructorTypes);
             if (c == null) throw new System.Exception("Invalid ctor");
-            IEncryptor result = (IEncryptor) c.Invoke(new object[] {method, password});
+            IEncryptor result = (IEncryptor)c.Invoke(new object[] { method, password });
             return result;
         }
 
