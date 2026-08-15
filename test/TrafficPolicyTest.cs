@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Model;
+using System.Collections.Generic;
 
 namespace Shadowsocks.Test
 {

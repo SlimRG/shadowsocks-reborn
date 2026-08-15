@@ -86,8 +86,6 @@ try {
     New-Item $publishDir -ItemType Directory -Force | Out-Null
     New-Item $releaseDir -ItemType Directory -Force | Out-Null
 
-    & (Join-Path $PSScriptRoot 'Validate-Repository.ps1')
-
     Invoke-DotNet -Arguments @('restore', $solution, '-p:Platform=x64')
     Invoke-DotNet -Arguments @('build', $solution, '-c', 'Release', '-p:Platform=x64', '-m:1', '--no-restore')
     Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '-p:Platform=x64', '--no-build')

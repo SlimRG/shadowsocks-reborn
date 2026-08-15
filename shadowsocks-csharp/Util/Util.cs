@@ -1,15 +1,17 @@
-﻿using System;
-using System.Drawing;
+﻿using NLog;
+using System;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Microsoft.Win32;
-using NLog;
 using Shadowsocks.Controller;
 using Shadowsocks.Model;
+using System.Drawing;
 using ZXing;
-using ZXing.Common;
 using ZXing.QrCode;
+using ZXing.Common;
 using ZXing.Windows.Compatibility;
 
 namespace Shadowsocks.Util

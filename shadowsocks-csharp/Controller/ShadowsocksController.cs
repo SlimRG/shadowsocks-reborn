@@ -6,14 +6,17 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Windows.Forms;
 using NLog;
 using Shadowsocks.Controller.Service;
 using Shadowsocks.Controller.Strategy;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Model;
+using Shadowsocks.Util;
 using WPFLocalizeExtension.Engine;
 
 namespace Shadowsocks.Controller

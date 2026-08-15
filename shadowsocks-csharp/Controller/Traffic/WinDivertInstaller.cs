@@ -1,13 +1,13 @@
-﻿using System;
+﻿using NLog;
+using Shadowsocks.Controller.Service;
+using Shadowsocks.Model;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using NLog;
-using Shadowsocks.Controller.Service;
-using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller.Traffic
 {

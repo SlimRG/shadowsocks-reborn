@@ -1,7 +1,7 @@
-﻿using System.Reactive.Disposables;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using Shadowsocks.ViewModels;
+using System.Reactive.Disposables;
 
 namespace Shadowsocks.Views
 {

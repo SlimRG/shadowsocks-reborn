@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Shadowsocks.Controller;
+using Shadowsocks.Controller.Traffic;
+using Shadowsocks.Localization;
+using Shadowsocks.Model;
+using Shadowsocks.View;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using Shadowsocks.Controller;
-using Shadowsocks.Controller.Traffic;
-using Shadowsocks.Localization;
-using Shadowsocks.Model;
-using Shadowsocks.View;
 
 namespace Shadowsocks.Views
 {

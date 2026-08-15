@@ -1,8 +1,9 @@
-﻿using System;
+﻿using NLog;
+using Shadowsocks.Model;
+using System;
 using System.Collections.Generic;
 using System.Net;
-using NLog;
-using Shadowsocks.Model;
+using System.Text;
 
 namespace Shadowsocks.Controller.Strategy
 {
@@ -111,7 +112,7 @@ namespace Shadowsocks.Controller.Strategy
                 // 100 * failure - 2 * latency - 0.5 * (lastread - lastwrite)
                 status.score =
                     100 * 1000 * Math.Min(5 * 60, (now - status.lastFailure).TotalSeconds)
-                    - 2 * 5 * (Math.Min(2000, status.latency.TotalMilliseconds) / (1 + (now - status.lastTimeDetectLatency).TotalSeconds / 30 / 10) +
+                    -2 * 5 * (Math.Min(2000, status.latency.TotalMilliseconds) / (1 + (now - status.lastTimeDetectLatency).TotalSeconds / 30 / 10) +
                     -0.5 * 200 * Math.Min(5, (status.lastRead - status.lastWrite).TotalSeconds));
                 logger.Debug(String.Format("server: {0} latency:{1} score: {2}", status.server.ToString(), status.latency, status.score));
             }

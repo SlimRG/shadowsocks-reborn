@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
+using Shadowsocks.Controller;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Controller.Traffic.Applications;
 using Shadowsocks.Model;

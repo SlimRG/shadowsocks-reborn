@@ -1,8 +1,8 @@
-﻿using System;
+﻿using NLog;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
-using NLog;
 
 namespace Shadowsocks.Controller
 {

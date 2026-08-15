@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using NLog;
 using Shadowsocks.Controller.Hotkeys;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller
 {

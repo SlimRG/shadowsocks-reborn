@@ -1,7 +1,8 @@
-﻿using System.Reflection;
+﻿using Shadowsocks.Controller;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using Shadowsocks.Controller;
 
 // This is a Windows-only desktop application. GenerateAssemblyInfo is disabled,
 // so the SDK cannot emit this platform annotation automatically.
