@@ -6,14 +6,75 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+function Get-XmlChildText {
+    param(
+        [Parameter(Mandatory)][System.Xml.XmlNode]$Node,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $child = $Node.SelectSingleNode("./*[local-name()='$Name']")
+    if ($null -eq $child) {
+        return $null
+    }
+
+    return [string]$child.InnerText
+}
+
+function Get-XmlAttributeText {
+    param(
+        [Parameter(Mandatory)][System.Xml.XmlElement]$Node,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    if (-not $Node.HasAttribute($Name)) {
+        return $null
+    }
+
+    return [string]$Node.GetAttribute($Name)
+}
+
+function Get-ProjectPropertyValues {
+    param(
+        [Parameter(Mandatory)][xml]$Project,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    return @(
+        $Project.SelectNodes("/Project/PropertyGroup/*[local-name()='$Name']") |
+            ForEach-Object { [string]$_.InnerText } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
+}
+
+function Get-ProjectPropertyValue {
+    param(
+        [Parameter(Mandatory)][xml]$Project,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    $values = @(Get-ProjectPropertyValues -Project $Project -Name $Name)
+    if ($values.Count -eq 0) {
+        return $null
+    }
+
+    return $values[0]
+}
+
+function Get-ProjectItems {
+    param(
+        [Parameter(Mandatory)][xml]$Project,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    return @($Project.SelectNodes("/Project/ItemGroup/*[local-name()='$Name']"))
+}
+
 function Get-ProjectReferences {
     param([Parameter(Mandatory)][xml]$Project)
 
     return @(
-        $Project.Project.ItemGroup |
-            ForEach-Object { $_.ProjectReference } |
-            Where-Object { $null -ne $_ } |
-            ForEach-Object { $_.Include } |
+        Get-ProjectItems -Project $Project -Name 'ProjectReference' |
+            ForEach-Object { Get-XmlAttributeText -Node $_ -Name 'Include' } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
 }
@@ -105,22 +166,20 @@ $legacyDesktopPackages = @(
 )
 foreach ($projectFile in $allProjectFiles) {
     [xml]$projectXml = Get-Content -LiteralPath $projectFile.FullName -Raw
-    $projectSdk = [string]$projectXml.Project.Sdk
+    $projectSdk = Get-XmlAttributeText -Node $projectXml.Project -Name 'Sdk'
     if ($projectSdk -eq 'Microsoft.NET.Sdk.WindowsDesktop') {
         throw "Phase 9 forbids Microsoft.NET.Sdk.WindowsDesktop: $($projectFile.FullName)"
     }
 
-    foreach ($propertyGroup in @($projectXml.Project.PropertyGroup)) {
-        if ([string]$propertyGroup.UseWPF -eq 'true' -or [string]$propertyGroup.UseWindowsForms -eq 'true') {
-            throw "Phase 9 forbids UseWPF/UseWindowsForms: $($projectFile.FullName)"
-        }
+    $useWpf = Get-ProjectPropertyValue -Project $projectXml -Name 'UseWPF'
+    $useWindowsForms = Get-ProjectPropertyValue -Project $projectXml -Name 'UseWindowsForms'
+    if ($useWpf -eq 'true' -or $useWindowsForms -eq 'true') {
+        throw "Phase 9 forbids UseWPF/UseWindowsForms: $($projectFile.FullName)"
     }
 
     $packageNames = @(
-        $projectXml.Project.ItemGroup |
-            ForEach-Object { $_.PackageReference } |
-            Where-Object { $null -ne $_ } |
-            ForEach-Object { [string]$_.Include } |
+        Get-ProjectItems -Project $projectXml -Name 'PackageReference' |
+            ForEach-Object { Get-XmlAttributeText -Node $_ -Name 'Include' } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
     foreach ($packageName in $legacyDesktopPackages) {
@@ -256,32 +315,29 @@ if ([string]::IsNullOrWhiteSpace($winUiProjectBlock) -or $winUiProjectBlock -not
 }
 [xml]$coreProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Shadowsocks.Core.csproj') -Raw
 
-$coreEmbeddedResources = @(
-    $coreProject.Project.ItemGroup |
-        ForEach-Object { $_.EmbeddedResource } |
-        Where-Object { $null -ne $_ }
+$coreEmbeddedResources = @(Get-ProjectItems -Project $coreProject -Name 'EmbeddedResource')
+$appSettingsResource = @(
+    $coreEmbeddedResources |
+        Where-Object { (Get-XmlChildText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.Core.appsettings.json' }
 )
-$appSettingsResource = @($coreEmbeddedResources | Where-Object { $_.LogicalName -eq 'Shadowsocks.Core.appsettings.json' })
-if ($appSettingsResource.Count -ne 1 -or $appSettingsResource[0].Include -ne '..\appsettings.json') {
+if ($appSettingsResource.Count -ne 1 -or (Get-XmlAttributeText -Node $appSettingsResource[0] -Name 'Include') -ne '..\appsettings.json') {
     throw 'Shadowsocks.Core must embed the root appsettings.json as Shadowsocks.Core.appsettings.json.'
 }
-if (@($coreEmbeddedResources | Where-Object { $_.Include -match 'NLog\.config' }).Count -ne 0) {
+if (@($coreEmbeddedResources | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Include') -match 'NLog\.config' }).Count -ne 0) {
     throw 'Shadowsocks.Core must not embed NLog.config.'
 }
 
-$coreTargetFramework = @($coreProject.Project.PropertyGroup.TargetFramework | Where-Object { $_ })[0]
+$coreTargetFramework = Get-ProjectPropertyValue -Project $coreProject -Name 'TargetFramework'
 if ($coreTargetFramework -ne 'net10.0') {
     throw "Shadowsocks.Core must target plain net10.0; TargetFramework is '$coreTargetFramework'."
 }
-if (@($coreProject.Project.PropertyGroup.RuntimeIdentifier | Where-Object { $_ }).Count -ne 0 -or
-    @($coreProject.Project.PropertyGroup.EnableWindowsTargeting | Where-Object { $_ }).Count -ne 0) {
+if (@(Get-ProjectPropertyValues -Project $coreProject -Name 'RuntimeIdentifier').Count -ne 0 -or
+    @(Get-ProjectPropertyValues -Project $coreProject -Name 'EnableWindowsTargeting').Count -ne 0) {
     throw 'Shadowsocks.Core must not declare a Windows RuntimeIdentifier or EnableWindowsTargeting.'
 }
 $corePackages = @(
-    $coreProject.Project.ItemGroup |
-        ForEach-Object { $_.PackageReference } |
-        Where-Object { $null -ne $_ } |
-        ForEach-Object { $_.Include } |
+    Get-ProjectItems -Project $coreProject -Name 'PackageReference' |
+        ForEach-Object { Get-XmlAttributeText -Node $_ -Name 'Include' } |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 )
 foreach ($forbiddenPackage in @('System.Management', 'System.Drawing.Common')) {
@@ -314,11 +370,11 @@ foreach ($pattern in $coreForbiddenPatterns) {
 }
 
 [xml]$windowsProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Shadowsocks.Windows.csproj') -Raw
-$windowsRuntimeIdentifiers = @($windowsProject.Project.PropertyGroup.RuntimeIdentifier | Where-Object { $_ })
+$windowsRuntimeIdentifiers = @(Get-ProjectPropertyValues -Project $windowsProject -Name 'RuntimeIdentifier')
 if ($windowsRuntimeIdentifiers.Count -ne 0) {
     throw 'Shadowsocks.Windows is a class library and must not declare RuntimeIdentifier; the final executable owns the RID.'
 }
-$windowsAppendRid = @($windowsProject.Project.PropertyGroup.AppendRuntimeIdentifierToOutputPath | Where-Object { $_ })[0]
+$windowsAppendRid = Get-ProjectPropertyValue -Project $windowsProject -Name 'AppendRuntimeIdentifierToOutputPath'
 if ($windowsAppendRid -ne 'false') {
     throw "Shadowsocks.Windows must keep AppendRuntimeIdentifierToOutputPath=false so all ProjectReference consumers use a stable library output path; found '$windowsAppendRid'."
 }
@@ -349,15 +405,15 @@ foreach ($pattern in $windowsUiPatterns) {
 }
 
 [xml]$winUiProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Shadowsocks.WinUI.csproj') -Raw
-$winUiAllowUnsafeBlocks = @($winUiProject.Project.PropertyGroup.AllowUnsafeBlocks | Where-Object { $_ })[0]
+$winUiAllowUnsafeBlocks = Get-ProjectPropertyValue -Project $winUiProject -Name 'AllowUnsafeBlocks'
 if ($winUiAllowUnsafeBlocks -ne 'true') {
     throw 'Shadowsocks.WinUI must enable AllowUnsafeBlocks because LibraryImport source generation and the AppInstance redirect wait path emit unsafe code.'
 }
-$winUiRuntimeIdentifiers = @($winUiProject.Project.PropertyGroup.RuntimeIdentifiers | Where-Object { $_ })[0]
+$winUiRuntimeIdentifiers = Get-ProjectPropertyValue -Project $winUiProject -Name 'RuntimeIdentifiers'
 if ($winUiRuntimeIdentifiers -ne 'win-x64') {
     throw "Shadowsocks.WinUI must declare RuntimeIdentifiers=win-x64 (plural) for current WinUI/MSBuild RID negotiation; found '$winUiRuntimeIdentifiers'."
 }
-if (@($winUiProject.Project.PropertyGroup.RuntimeIdentifier | Where-Object { $_ }).Count -ne 0) {
+if (@(Get-ProjectPropertyValues -Project $winUiProject -Name 'RuntimeIdentifier').Count -ne 0) {
     throw 'Shadowsocks.WinUI must not declare singular RuntimeIdentifier in the project file; the publish command/profile may still select -r win-x64.'
 }
 $winUiXamlFiles = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI') -File -Filter '*.xaml')
@@ -369,19 +425,15 @@ $winUiAppXaml = Get-Content -LiteralPath $winUiAppXamlPath -Raw
 if ($winUiAppXaml -notmatch 'XamlControlsResources') {
     throw 'Shadowsocks.WinUI App.xaml must own XamlControlsResources so Fluent control resources load through the normal WinUI application lifecycle.'
 }
-$applicationDefinition = @(
-    $winUiProject.Project.ItemGroup |
-        ForEach-Object { $_.ApplicationDefinition } |
-        Where-Object { $null -ne $_ }
-)
-if ($applicationDefinition.Count -ne 1 -or $applicationDefinition[0].Include -ne 'App.xaml') {
+$applicationDefinition = @(Get-ProjectItems -Project $winUiProject -Name 'ApplicationDefinition')
+if ($applicationDefinition.Count -ne 1 -or (Get-XmlAttributeText -Node $applicationDefinition[0] -Name 'Include') -ne 'App.xaml') {
     throw 'Shadowsocks.WinUI must compile App.xaml explicitly as the single ApplicationDefinition.'
 }
-$winUiDefineConstants = @($winUiProject.Project.PropertyGroup.DefineConstants | Where-Object { $_ })[0]
+$winUiDefineConstants = Get-ProjectPropertyValue -Project $winUiProject -Name 'DefineConstants'
 if ($winUiDefineConstants -notmatch 'DISABLE_XAML_GENERATED_MAIN') {
     throw 'Shadowsocks.WinUI must define DISABLE_XAML_GENERATED_MAIN so Program.Main can perform AppInstance redirection before starting WinUI.'
 }
-$winUiDefaultPages = @($winUiProject.Project.PropertyGroup.EnableDefaultPageItems | Where-Object { $_ })[0]
+$winUiDefaultPages = Get-ProjectPropertyValue -Project $winUiProject -Name 'EnableDefaultPageItems'
 if ($winUiDefaultPages -ne 'false') {
     throw 'Shadowsocks.WinUI must keep EnableDefaultPageItems=false; MainWindow and feature pages remain code-only.'
 }
@@ -439,7 +491,7 @@ if ($winUiReferences.Count -ne 3) {
 if ($winUiReferences -contains '..\Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj') {
     throw 'Shadowsocks.WinUI must not ProjectReference the executable NetworkService because self-contained WinUI publish would fail with NETSDK1150.'
 }
-$networkServiceProjectProperty = @($winUiProject.Project.PropertyGroup.NetworkServiceProject | Where-Object { $_ })[0]
+$networkServiceProjectProperty = Get-ProjectPropertyValue -Project $winUiProject -Name 'NetworkServiceProject'
 if ([string]::IsNullOrWhiteSpace($networkServiceProjectProperty)) {
     throw 'Shadowsocks.WinUI must keep an explicit NetworkServiceProject path for separate helper build/publish.'
 }
@@ -462,9 +514,8 @@ if ($networkServicePublishMsBuild.Count -ne 2 -or
     throw 'Shadowsocks.WinUI helper publish must run Restore and Publish as separate MSBuild evaluations.'
 }
 $embeddedNetworkService = @(
-    $winUiProject.Project.ItemGroup |
-        ForEach-Object { $_.EmbeddedResource } |
-        Where-Object { $null -ne $_ -and $_.LogicalName -eq 'Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe' }
+    Get-ProjectItems -Project $winUiProject -Name 'EmbeddedResource' |
+        Where-Object { (Get-XmlChildText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe' }
 )[0]
 if ($null -eq $embeddedNetworkService) {
     throw 'Phase 10 must embed the product NetworkService executable as Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe.'
@@ -473,17 +524,17 @@ $finalSingleFileTarget = @($winUiProject.Project.Target | Where-Object { $_.Name
 if ($null -eq $finalSingleFileTarget) {
     throw 'Phase 10 requires a publish-time validator that enforces a single Shadowsocks.exe output.'
 }
-$winUiTargetFramework = @($winUiProject.Project.PropertyGroup.TargetFramework | Where-Object { $_ })[0]
+$winUiTargetFramework = Get-ProjectPropertyValue -Project $winUiProject -Name 'TargetFramework'
 if ($winUiTargetFramework -ne 'net10.0-windows10.0.26100.0') {
     throw "Shadowsocks.WinUI must compile against the current Windows 11 SDK TFM while retaining Windows 10 as the minimum OS; TargetFramework is '$winUiTargetFramework'."
 }
-$winUiMinimumOs = @($winUiProject.Project.PropertyGroup.SupportedOSPlatformVersion | Where-Object { $_ })[0]
+$winUiMinimumOs = Get-ProjectPropertyValue -Project $winUiProject -Name 'SupportedOSPlatformVersion'
 if ($winUiMinimumOs -ne '10.0.19041.0') {
     throw "Shadowsocks.WinUI must keep Windows 10 build 19041 as the supported minimum; SupportedOSPlatformVersion is '$winUiMinimumOs'."
 }
-$winUiUseWinUI = @($winUiProject.Project.PropertyGroup.UseWinUI | Where-Object { $_ })[0]
-$winUiPackageType = @($winUiProject.Project.PropertyGroup.WindowsPackageType | Where-Object { $_ })[0]
-$winUiAssemblyName = @($winUiProject.Project.PropertyGroup.AssemblyName | Where-Object { $_ })[0]
+$winUiUseWinUI = Get-ProjectPropertyValue -Project $winUiProject -Name 'UseWinUI'
+$winUiPackageType = Get-ProjectPropertyValue -Project $winUiProject -Name 'WindowsPackageType'
+$winUiAssemblyName = Get-ProjectPropertyValue -Project $winUiProject -Name 'AssemblyName'
 if ($winUiUseWinUI -ne 'true' -or $winUiPackageType -ne 'None') {
     throw 'Shadowsocks.WinUI must be an unpackaged WinUI 3 project (UseWinUI=true, WindowsPackageType=None).'
 }
@@ -491,10 +542,8 @@ if ($winUiAssemblyName -ne 'Shadowsocks') {
     throw "Phase-10 product shell must publish Shadowsocks.exe; AssemblyName is '$winUiAssemblyName'."
 }
 $winUiPackages = @(
-    $winUiProject.Project.ItemGroup |
-        ForEach-Object { $_.PackageReference } |
-        Where-Object { $null -ne $_ } |
-        ForEach-Object { "$($_.Include)|$($_.Version)" }
+    Get-ProjectItems -Project $winUiProject -Name 'PackageReference' |
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
 )
 if ($winUiPackages -notcontains 'Microsoft.WindowsAppSDK|2.4.0') {
     throw 'Shadowsocks.WinUI must reference Microsoft.WindowsAppSDK 2.4.0, the current stable Windows App SDK release.'
@@ -510,10 +559,8 @@ if ($winUiPackages | Where-Object { $_ -like 'WinUIEx|*' }) {
 }
 
 $windowsPackages = @(
-    $windowsProject.Project.ItemGroup |
-        ForEach-Object { $_.PackageReference } |
-        Where-Object { $null -ne $_ } |
-        ForEach-Object { "$($_.Include)|$($_.Version)" }
+    Get-ProjectItems -Project $windowsProject -Name 'PackageReference' |
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
 )
 if ($windowsPackages | Where-Object { $_ -like 'Microsoft.WindowsAppSDK*|*' -or $_ -like 'WinUIEx|*' }) {
     throw 'Shadowsocks.Windows must remain UI-framework agnostic so UnitTests and future frontends do not inherit Windows App SDK runtime requirements.'
@@ -521,10 +568,8 @@ if ($windowsPackages | Where-Object { $_ -like 'Microsoft.WindowsAppSDK*|*' -or 
 
 [xml]$windowsWinUiProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj') -Raw
 $windowsWinUiPackages = @(
-    $windowsWinUiProject.Project.ItemGroup |
-        ForEach-Object { $_.PackageReference } |
-        Where-Object { $null -ne $_ } |
-        ForEach-Object { "$($_.Include)|$($_.Version)" }
+    Get-ProjectItems -Project $windowsWinUiProject -Name 'PackageReference' |
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
 )
 if ($windowsWinUiPackages -notcontains 'Microsoft.WindowsAppSDK.WinUI|2.3.6') {
     throw 'Shadowsocks.Windows.WinUI must reference Microsoft.WindowsAppSDK.WinUI 2.3.6.'
@@ -537,10 +582,8 @@ if ($windowsWinUiPackages -notcontains 'System.Drawing.Common|10.0.10') {
 }
 [xml]$unitTestsProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj') -Raw
 $unitTestPackages = @(
-    $unitTestsProject.Project.ItemGroup |
-        ForEach-Object { $_.PackageReference } |
-        Where-Object { $null -ne $_ } |
-        ForEach-Object { "{0}|{1}" -f $_.Include, $_.Version }
+    Get-ProjectItems -Project $unitTestsProject -Name 'PackageReference' |
+        ForEach-Object { "{0}|{1}" -f (Get-XmlAttributeText -Node $_ -Name 'Include'), (Get-XmlAttributeText -Node $_ -Name 'Version') }
 )
 if ($unitTestPackages -notcontains 'Microsoft.NET.Test.Sdk|18.9.0') {
     throw 'Shadowsocks.UnitTests must reference Microsoft.NET.Test.Sdk 18.9.0.'
@@ -1018,7 +1061,7 @@ if (-not (Test-Path -LiteralPath $directoryBuildPropsPath -PathType Leaf)) {
     throw 'Directory.Build.props is required to pin the .NET 10 analyzer baseline.'
 }
 [xml]$directoryBuildProps = Get-Content -LiteralPath $directoryBuildPropsPath -Raw
-$analysisLevel = @($directoryBuildProps.Project.PropertyGroup.AnalysisLevel | Where-Object { $_ })[0]
+$analysisLevel = Get-ProjectPropertyValue -Project $directoryBuildProps -Name 'AnalysisLevel'
 if ($analysisLevel -ne '10.0') {
     throw "Directory.Build.props must pin AnalysisLevel to 10.0; found '$analysisLevel'."
 }
@@ -1035,7 +1078,7 @@ $rasSource = Get-Content -LiteralPath $rasPath -Raw
 if ($rasSource -match '\[DllImport\(' -or $rasSource -notmatch '\[LibraryImport\(') {
     throw 'Ras interop must use source-generated LibraryImport instead of DllImport.'
 }
-$allowUnsafeBlocks = @($windowsProject.Project.PropertyGroup.AllowUnsafeBlocks | Where-Object { $_ })[0]
+$allowUnsafeBlocks = Get-ProjectPropertyValue -Project $windowsProject -Name 'AllowUnsafeBlocks'
 if ($allowUnsafeBlocks -ne 'true') {
     throw 'Shadowsocks.Windows must enable AllowUnsafeBlocks for source-generated RAS interop.'
 }
@@ -1255,13 +1298,16 @@ if ($buildReleaseText -match 'Shadowsocks\.UI' -or $ciText -match 'Shadowsocks\.
 }
 
 [xml]$winUiPublishProfile = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Properties\PublishProfiles\FolderProfile.pubxml') -Raw
-$publishProperties = $winUiPublishProfile.Project.PropertyGroup
 foreach ($requiredPublishProperty in @('WindowsAppSDKSelfContained', 'SelfContained', 'EnableMsixTooling', 'IncludeAllContentForSelfExtract', 'PublishSingleFile')) {
-    if (@($publishProperties.$requiredPublishProperty | Where-Object { $_ })[0] -ne 'true') {
+    if ((Get-ProjectPropertyValue -Project $winUiPublishProfile -Name $requiredPublishProperty) -ne 'true') {
         throw "WinUI FolderProfile must keep $requiredPublishProperty=true for portable single-file publishing."
     }
 }
-if (@($winUiProject.Project.ItemGroup.None | Where-Object { $_.Update -eq 'shadowsocks.ico' -and $_.CopyToPublishDirectory -ne 'Never' }).Count -ne 0) {
+$icoItems = @(Get-ProjectItems -Project $winUiProject -Name 'None')
+if (@($icoItems | Where-Object {
+        (Get-XmlAttributeText -Node $_ -Name 'Update') -eq 'shadowsocks.ico' -and
+        (Get-XmlChildText -Node $_ -Name 'CopyToPublishDirectory') -ne 'Never'
+    }).Count -ne 0) {
     throw 'shadowsocks.ico is compiled into the application and must not be emitted as a publish sidecar.'
 }
 

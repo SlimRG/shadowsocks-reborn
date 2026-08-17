@@ -13,6 +13,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ### Fixed
 
+- Fixed `Validate-Repository.ps1` under `Set-StrictMode -Version Latest`: optional MSBuild XML properties such as `UseWPF`/`UseWindowsForms` are now read through strict-safe XPath helpers instead of dynamic property access.
 - Replaced the legacy second-launch Win32 MessageBox with a localized Fluent WinUI `ContentDialog` owned by the already-running instance; the existing window is restored/foregrounded first, with an InfoBar fallback if another modal dialog is active.
 - Added Pass-3 regression validation for tray localization/focus, ss:// server-list refresh, logging event synchronization and the pure WinUI projection graph.
 - Removed the legacy Windows.UI.Core hotkey-state projection from the WinUI frontend; modifier detection now uses Win32 GetKeyState so .NET 10 no longer requires conflicting UWP XAML projections.
