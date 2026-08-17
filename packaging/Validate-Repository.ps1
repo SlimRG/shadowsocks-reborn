@@ -839,8 +839,12 @@ foreach ($pacPageParityToken in @(
         throw "PAC / GeoSite page state-machine parity token is missing: $pacPageParityToken"
     }
 }
-if ($winUiWindowSource -notmatch 'CreateNavigationItem\(_localization\["Game Mode"\], GamesTag, Symbol\.Play\)') {
+$gameModeNavigationPattern = 'CreateNavigationItem\s*\(\s*_localization\["Game Mode"\]\s*,\s*GamesTag\s*,\s*Symbol\.Play(?:\s*,|\s*\))'
+if ($winUiWindowSource -notmatch $gameModeNavigationPattern) {
     throw 'Phase-7 navigation must label and localize the automatic compatibility page as Game Mode, not Games.'
+}
+if ($winUiWindowSource -match 'CreateNavigationItem\s*\(\s*_localization\["Games"\]\s*,\s*GamesTag') {
+    throw 'Phase-7 navigation must not regress the automatic compatibility page label from Game Mode back to Games.'
 }
 
 $phase7MainWindow = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\MainWindow.cs') -Raw
@@ -1439,7 +1443,7 @@ if ($configurationSource -match 'File\.WriteAllText\([^\r\n]*gui-config\.json' -
 }
 
 $winUiProgramStorageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Program.cs') -Raw
-if ($winUiProgramStorageSource -notmatch 'RuntimeEnvironment\.Initialize' -or
+if ($winUiProgramStorageSource -notmatch 'AppRuntimeEnvironment\.Initialize' -or
     $winUiProgramStorageSource -notmatch 'AppStoragePaths\.Initialize\(executablePath\)' -or
     $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment();', [System.StringComparison]::Ordinal) -lt 0 -or
     $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment();', [System.StringComparison]::Ordinal) -gt

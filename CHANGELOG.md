@@ -1,6 +1,4 @@
-﻿- Fixed repository validation under PowerShell StrictMode when a project has zero or one ProjectReference; collection-returning helpers are now explicitly materialized before `.Count` checks.
-
-# Changelog
+﻿# Changelog
 
 Fork-specific changes are tracked here. Historical upstream Shadowsocks for Windows changes remain in `CHANGES`.
 
@@ -15,6 +13,9 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ### Fixed
 
+- Fixed Phase-7 repository validation after NavigationView tooltips were added: the Game Mode assertion now validates the localized navigation contract without depending on the old three-argument `CreateNavigationItem` signature.
+- Fixed the storage bootstrap validator to recognize the explicit `AppRuntimeEnvironment.Initialize` alias introduced to avoid the `System.Runtime.InteropServices.RuntimeEnvironment` ambiguity.
+- Fixed repository validation under PowerShell StrictMode when a project has zero or one ProjectReference; collection-returning helpers are now explicitly materialized before `.Count` checks.
 - Fixed repository validation of MSBuild item metadata so attribute-form `LogicalName`/`Version` values are recognized for embedded `appsettings.json`, embedded NetworkService, and package references under PowerShell StrictMode.
 - Fixed `Validate-Repository.ps1` under `Set-StrictMode -Version Latest`: optional MSBuild XML properties such as `UseWPF`/`UseWindowsForms` are now read through strict-safe XPath helpers instead of dynamic property access.
 - Replaced the legacy second-launch Win32 MessageBox with a localized Fluent WinUI `ContentDialog` owned by the already-running instance; the existing window is restored/foregrounded first, with an InfoBar fallback if another modal dialog is active.
