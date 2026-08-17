@@ -12,6 +12,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 - Added explicit LocalAppData/Clean Mode folder actions to Settings and disabled Start with Windows in Clean Mode at UI, tray, and backend levels.
 
 ### Fixed
+- Made the tray localization release check reuse the already validated embedded catalog instead of re-importing `i18n.csv`, avoiding a redundant PowerShell/StrictMode failure on valid translations such as `System Proxy`.
 
 - Fixed Phase-7 repository validation after NavigationView tooltips were added: the Game Mode assertion now validates the localized navigation contract without depending on the old three-argument `CreateNavigationItem` signature.
 - Fixed the storage bootstrap validator to recognize the explicit `AppRuntimeEnvironment.Initialize` alias introduced to avoid the `System.Runtime.InteropServices.RuntimeEnvironment` ambiguity.
@@ -33,7 +34,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 - Added localized WinUI tooltips and matching accessibility help text across navigation, server management, traffic, Game Mode, PAC/GeoSite, online configuration, hotkeys, sharing, logs, settings and update controls.
 - Completed all six non-English localization columns (`ru-RU`, `zh-CN`, `zh-TW`, `ja`, `ko`, `fr`) for every active embedded UI key and added release validation that rejects missing translations or placeholder mismatches.
 - Moved `Verbose Logging` and `Show Plugin Output` to the Logs page, and `Check for Updates at Startup` to About & updates.
-- Updated the stable dependency graph to Windows App SDK 2.4.0, Microsoft.WindowsAppSDK.WinUI 2.3.6, NLog 6.1.4, Fody 6.9.3, Google.Protobuf 3.35.1, Newtonsoft.Json 13.0.4, System.Drawing.Common 10.0.10, Microsoft.NET.Test.Sdk 18.9.0 and Windows SDK BuildTools 10.0.28000.2526; WinUIEx 2.9.2, ZXing.Net 0.16.11, MSTest 4.3.3 and System.Management 10.0.10 remain current stable versions.
+- Updated the pinned dependency graph to Windows App SDK 2.4.0, Microsoft.WindowsAppSDK.WinUI 2.3.6, NLog 6.2.0, Fody 6.9.3, Google.Protobuf 3.35.1, Newtonsoft.Json 13.0.4, System.Drawing.Common 10.0.11, Microsoft.NET.Test.Sdk 18.9.0, Windows SDK BuildTools 10.0.28000.2526, WinUIEx 2.9.3, ZXing.Net 0.16.11, MSTest 4.3.3 and System.Management 10.0.11.
 - Updated NLog file archiving to the NLog 6 `ArchiveSuffixFormat` configuration.
 - Start with Windows now uses a SHA-256-verified copy at `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; legacy Run entries are migrated and the copy is refreshed when a newer product EXE is launched manually.
 - Game Mode keeps manual rules and adds optional discovery suggestions from Steam, Epic Games, GOG and Xbox installations.

@@ -609,11 +609,11 @@ $windowsWinUiPackages = @(
 if ($windowsWinUiPackages -notcontains 'Microsoft.WindowsAppSDK.WinUI|2.3.6') {
     throw 'Shadowsocks.Windows.WinUI must reference Microsoft.WindowsAppSDK.WinUI 2.3.6.'
 }
-if ($windowsWinUiPackages -notcontains 'WinUIEx|2.9.2') {
-    throw 'Shadowsocks.Windows.WinUI must reference WinUIEx 2.9.2 for the notification-area adapter.'
+if ($windowsWinUiPackages -notcontains 'WinUIEx|2.9.3') {
+    throw 'Shadowsocks.Windows.WinUI must reference WinUIEx 2.9.3 for the notification-area adapter.'
 }
-if ($windowsWinUiPackages -notcontains 'System.Drawing.Common|10.0.10') {
-    throw 'Shadowsocks.Windows.WinUI must reference System.Drawing.Common 10.0.10 for tray artwork and screen capture.'
+if ($windowsWinUiPackages -notcontains 'System.Drawing.Common|10.0.11') {
+    throw 'Shadowsocks.Windows.WinUI must reference System.Drawing.Common 10.0.11 for tray artwork and screen capture.'
 }
 [xml]$unitTestsProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj') -Raw
 $unitTestPackages = @(
@@ -1281,9 +1281,12 @@ if ([regex]::Matches($logsPageSource, 'UnsubscribeTraffic\(\);').Count -ne 1) {
     throw 'LogsPage must unsubscribe from traffic exactly once on unload.'
 }
 
-# Every literal tray command must have a Russian translation in the embedded catalog.
-$i18nRows = Import-Csv -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Data\i18n.csv')
-$requiredRussianTrayKeys = @(
+# Every tray command must exist in the catalog that was already validated above.
+# Do not re-import i18n.csv here: the Phase-8 localization block has already
+# guaranteed that every normalized key is unique and that all six translated
+# locale columns (including ru-RU) are non-empty. Re-parsing the same CSV here
+# is redundant and has historically made this StrictMode validator brittle.
+$requiredTranslatedTrayKeys = @(
     'System Proxy', 'Disable', 'PAC', 'Global', 'Traffic Mode', 'User Mode', 'Admin Mode',
     'Traffic Routing', 'Servers', 'Share Server Config',
     'Local PAC', 'Online PAC', 'Edit Local PAC File',
@@ -1293,10 +1296,9 @@ $requiredRussianTrayKeys = @(
     'Allow other devices to connect', 'Hotkeys', 'Help', 'Logs', 'Updates',
     'Check for Updates', 'Include prerelease versions', 'About', 'Quit', 'More than 20 servers (total: {0})'
 )
-foreach ($trayKey in $requiredRussianTrayKeys) {
-    $row = @($i18nRows | Where-Object { $_.en -eq $trayKey })
-    if ($row.Count -ne 1 -or [string]::IsNullOrWhiteSpace($row[0].'ru-RU')) {
-        throw "Embedded Russian tray translation is missing for: $trayKey"
+foreach ($trayKey in $requiredTranslatedTrayKeys) {
+    if (-not $i18nKeys.Contains($trayKey)) {
+        throw "Tray localization key is missing from the fully translated embedded catalog: $trayKey"
     }
 }
 $localizationSource = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'Shadowsocks.Core\Localization\CsvLocalizationService.cs'))

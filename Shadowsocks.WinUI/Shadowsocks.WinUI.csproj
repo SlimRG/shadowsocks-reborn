@@ -108,7 +108,7 @@
     <!-- Keep the direct WinUI component on the latest stable servicing package compatible
          with the Windows App SDK 2.4.0 dependency graph. -->
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.6" />
-    <PackageReference Include="NLog" Version="6.1.4" />
+    <PackageReference Include="NLog" Version="6.2.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 

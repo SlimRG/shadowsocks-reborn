@@ -26,7 +26,7 @@
     <PackageReference Include="Caseless.Fody" Version="1.9.1" PrivateAssets="all" />
     <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="NLog" Version="6.1.4" />
-    <PackageReference Include="System.Management" Version="10.0.10" />
+    <PackageReference Include="NLog" Version="6.2.0" />
+    <PackageReference Include="System.Management" Version="10.0.11" />
   </ItemGroup>
 </Project>
