@@ -7,6 +7,7 @@ Use this checklist for every `shadowsocks-reborn` 5.x release.
 - [ ] Release version matches `Shadowsocks.WinUI.csproj`, `Shadowsocks.NetworkService.csproj` and `ApplicationInfo.Version`.
 - [ ] `CHANGELOG.md` describes user-visible changes and known limitations.
 - [ ] `packaging\Validate-Repository.ps1` passes.
+- [ ] Validator confirms the root `appsettings.json` is embedded in `Shadowsocks.Core` as `Shadowsocks.Core.appsettings.json`.
 - [ ] No WinForms/WPF project, package, namespace or build flag has returned.
 - [ ] No credentials, private subscriptions, PAC secrets, tokens or generated user state are committed.
 

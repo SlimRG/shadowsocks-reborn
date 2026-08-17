@@ -20,6 +20,23 @@ function Get-XmlChildText {
     return [string]$child.InnerText
 }
 
+function Get-XmlMetadataText {
+    param(
+        [Parameter(Mandatory)][System.Xml.XmlElement]$Node,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    # MSBuild item metadata may be written either as an XML attribute
+    # (for example Version="1.2.3" or LogicalName="...") or as a
+    # child element (<Version>1.2.3</Version>).  Accept both canonical
+    # representations so repository validation is independent of formatting.
+    if ($Node.HasAttribute($Name)) {
+        return [string]$Node.GetAttribute($Name)
+    }
+
+    return Get-XmlChildText -Node $Node -Name $Name
+}
+
 function Get-XmlAttributeText {
     param(
         [Parameter(Mandatory)][System.Xml.XmlElement]$Node,
@@ -40,7 +57,7 @@ function Get-ProjectPropertyValues {
     )
 
     return @(
-        $Project.SelectNodes("/Project/PropertyGroup/*[local-name()='$Name']") |
+        $Project.SelectNodes("/*[local-name()='Project']/*[local-name()='PropertyGroup']/*[local-name()='$Name']") |
             ForEach-Object { [string]$_.InnerText } |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     )
@@ -66,7 +83,13 @@ function Get-ProjectItems {
         [Parameter(Mandatory)][string]$Name
     )
 
-    return @($Project.SelectNodes("/Project/ItemGroup/*[local-name()='$Name']"))
+    return @($Project.SelectNodes("/*[local-name()='Project']/*[local-name()='ItemGroup']/*[local-name()='$Name']"))
+}
+
+function Get-ProjectTargets {
+    param([Parameter(Mandatory)][xml]$Project)
+
+    return @($Project.SelectNodes("/*[local-name()='Project']/*[local-name()='Target']"))
 }
 
 function Get-ProjectReferences {
@@ -166,7 +189,7 @@ $legacyDesktopPackages = @(
 )
 foreach ($projectFile in $allProjectFiles) {
     [xml]$projectXml = Get-Content -LiteralPath $projectFile.FullName -Raw
-    $projectSdk = Get-XmlAttributeText -Node $projectXml.Project -Name 'Sdk'
+    $projectSdk = Get-XmlAttributeText -Node $projectXml.DocumentElement -Name 'Sdk'
     if ($projectSdk -eq 'Microsoft.NET.Sdk.WindowsDesktop') {
         throw "Phase 9 forbids Microsoft.NET.Sdk.WindowsDesktop: $($projectFile.FullName)"
     }
@@ -285,8 +308,13 @@ if (-not (Test-Path -LiteralPath $nuGetConfigPath -PathType Leaf)) {
 }
 [xml]$nuGetConfig = Get-Content -LiteralPath $nuGetConfigPath -Raw
 $restoreSettings = @{}
-foreach ($addNode in $nuGetConfig.configuration.packageRestore.add) {
-    $restoreSettings[$addNode.key] = $addNode.value
+$restoreSettingNodes = @($nuGetConfig.SelectNodes("/*[local-name()='configuration']/*[local-name()='packageRestore']/*[local-name()='add']"))
+foreach ($addNode in $restoreSettingNodes) {
+    $key = Get-XmlAttributeText -Node $addNode -Name 'key'
+    $value = Get-XmlAttributeText -Node $addNode -Name 'value'
+    if (-not [string]::IsNullOrWhiteSpace($key)) {
+        $restoreSettings[$key] = $value
+    }
 }
 if ($restoreSettings['enabled'] -ne 'True' -or $restoreSettings['automatic'] -ne 'True') {
     throw 'NuGet.Config must enable packageRestore/enabled and packageRestore/automatic for Visual Studio clean-build restore.'
@@ -303,8 +331,10 @@ if ($solutionProjectLines.Count -ne 6 -or @($solutionProjectLines | Where-Object
     throw 'All six C# projects in shadowsocks-reborn.sln must use the SDK-style CPS project type GUID.'
 }
 
-$packageSources = @($nuGetConfig.configuration.packageSources.add)
-if ($packageSources.Count -ne 1 -or $packageSources[0].key -ne 'nuget.org' -or $packageSources[0].value -ne 'https://api.nuget.org/v3/index.json') {
+$packageSources = @($nuGetConfig.SelectNodes("/*[local-name()='configuration']/*[local-name()='packageSources']/*[local-name()='add']"))
+if ($packageSources.Count -ne 1 -or
+    (Get-XmlAttributeText -Node $packageSources[0] -Name 'key') -ne 'nuget.org' -or
+    (Get-XmlAttributeText -Node $packageSources[0] -Name 'value') -ne 'https://api.nuget.org/v3/index.json') {
     throw 'NuGet.Config must use the deterministic nuget.org v3 source for repository package restore.'
 }
 $networkServiceGuid = '{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}'
@@ -318,11 +348,12 @@ if ([string]::IsNullOrWhiteSpace($winUiProjectBlock) -or $winUiProjectBlock -not
 $coreEmbeddedResources = @(Get-ProjectItems -Project $coreProject -Name 'EmbeddedResource')
 $appSettingsResource = @(
     $coreEmbeddedResources |
-        Where-Object { (Get-XmlChildText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.Core.appsettings.json' }
+        Where-Object { (Get-XmlMetadataText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.Core.appsettings.json' }
 )
 if ($appSettingsResource.Count -ne 1 -or (Get-XmlAttributeText -Node $appSettingsResource[0] -Name 'Include') -ne '..\appsettings.json') {
     throw 'Shadowsocks.Core must embed the root appsettings.json as Shadowsocks.Core.appsettings.json.'
 }
+Write-Host 'Validated embedded appsettings.json resource metadata.'
 if (@($coreEmbeddedResources | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Include') -match 'NLog\.config' }).Count -ne 0) {
     throw 'Shadowsocks.Core must not embed NLog.config.'
 }
@@ -461,21 +492,22 @@ if ($winUiAppSourceForStartup -notmatch 'public App\(\)' -or
     $winUiProgram -notmatch 'App\.ConfigureStartupContext\(') {
     throw 'Shadowsocks.WinUI App.xaml requires a parameterless App constructor; AppInstance/activation state must be supplied through ConfigureStartupContext before Application.Start creates App.'
 }
-$winUiXamlReferenceTarget = @($winUiProject.Project.Target | Where-Object { $_.Name -eq 'PrepareWinUIXamlProjectReferences' })[0]
+$winUiXamlReferenceTarget = @(Get-ProjectTargets -Project $winUiProject | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Name') -eq 'PrepareWinUIXamlProjectReferences' })[0]
+$winUiXamlReferenceBeforeTargets = if ($null -eq $winUiXamlReferenceTarget) { $null } else { Get-XmlAttributeText -Node $winUiXamlReferenceTarget -Name 'BeforeTargets' }
 if ($null -eq $winUiXamlReferenceTarget -or
-    $winUiXamlReferenceTarget.BeforeTargets -notmatch 'DesignTimeMarkupCompilation' -or
-    $winUiXamlReferenceTarget.BeforeTargets -notmatch 'MarkupCompilePass1' -or
-    $winUiXamlReferenceTarget.BeforeTargets -notmatch 'XamlPreCompile') {
+    $winUiXamlReferenceBeforeTargets -notmatch 'DesignTimeMarkupCompilation' -or
+    $winUiXamlReferenceBeforeTargets -notmatch 'MarkupCompilePass1' -or
+    $winUiXamlReferenceBeforeTargets -notmatch 'XamlPreCompile') {
     throw 'Shadowsocks.WinUI must materialize Core/Windows ProjectReference outputs before WinUI XAML design-time/compile passes to avoid WMC1006.'
 }
-$winUiXamlReferenceMsBuild = @($winUiXamlReferenceTarget.MSBuild)
+$winUiXamlReferenceMsBuild = @($winUiXamlReferenceTarget.SelectNodes("./*[local-name()='MSBuild']"))
 if ($winUiXamlReferenceMsBuild.Count -ne 6 -or
-    $winUiXamlReferenceMsBuild[0].Targets -ne 'Restore' -or
-    $winUiXamlReferenceMsBuild[1].Targets -ne 'Restore' -or
-    $winUiXamlReferenceMsBuild[2].Targets -ne 'Restore' -or
-    $winUiXamlReferenceMsBuild[3].Targets -ne 'Build' -or
-    $winUiXamlReferenceMsBuild[4].Targets -ne 'Build' -or
-    $winUiXamlReferenceMsBuild[5].Targets -ne 'Build') {
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[0] -Name 'Targets') -ne 'Restore' -or
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[1] -Name 'Targets') -ne 'Restore' -or
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[2] -Name 'Targets') -ne 'Restore' -or
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[3] -Name 'Targets') -ne 'Build' -or
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[4] -Name 'Targets') -ne 'Build' -or
+    (Get-XmlAttributeText -Node $winUiXamlReferenceMsBuild[5] -Name 'Targets') -ne 'Build') {
     throw 'WinUI XAML prerequisite handling must keep Restore and Build as separate MSBuild evaluations for Core, Windows, and Windows.WinUI.'
 }
 
@@ -495,32 +527,32 @@ $networkServiceProjectProperty = Get-ProjectPropertyValue -Project $winUiProject
 if ([string]::IsNullOrWhiteSpace($networkServiceProjectProperty)) {
     throw 'Shadowsocks.WinUI must keep an explicit NetworkServiceProject path for separate helper build/publish.'
 }
-$networkServiceBuildTarget = @($winUiProject.Project.Target | Where-Object { $_.Name -eq 'BuildNetworkServiceForWinUIBootstrap' })[0]
-$networkServicePublishTarget = @($winUiProject.Project.Target | Where-Object { $_.Name -eq 'PrepareEmbeddedNetworkService' })[0]
+$networkServiceBuildTarget = @(Get-ProjectTargets -Project $winUiProject | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Name') -eq 'BuildNetworkServiceForWinUIBootstrap' })[0]
+$networkServicePublishTarget = @(Get-ProjectTargets -Project $winUiProject | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Name') -eq 'PrepareEmbeddedNetworkService' })[0]
 if ($null -eq $networkServiceBuildTarget -or $null -eq $networkServicePublishTarget) {
     throw 'Shadowsocks.WinUI must build/publish NetworkService through explicit MSBuild targets, not ProjectReference.'
 }
 
-$networkServiceBuildMsBuild = @($networkServiceBuildTarget.MSBuild)
+$networkServiceBuildMsBuild = @($networkServiceBuildTarget.SelectNodes("./*[local-name()='MSBuild']"))
 if ($networkServiceBuildMsBuild.Count -ne 2 -or
-    $networkServiceBuildMsBuild[0].Targets -ne 'Restore' -or
-    $networkServiceBuildMsBuild[1].Targets -ne 'Build') {
+    (Get-XmlAttributeText -Node $networkServiceBuildMsBuild[0] -Name 'Targets') -ne 'Restore' -or
+    (Get-XmlAttributeText -Node $networkServiceBuildMsBuild[1] -Name 'Targets') -ne 'Build') {
     throw 'Shadowsocks.WinUI development helper build must run Restore and Build as separate MSBuild evaluations.'
 }
-$networkServicePublishMsBuild = @($networkServicePublishTarget.MSBuild)
+$networkServicePublishMsBuild = @($networkServicePublishTarget.SelectNodes("./*[local-name()='MSBuild']"))
 if ($networkServicePublishMsBuild.Count -ne 2 -or
-    $networkServicePublishMsBuild[0].Targets -ne 'Restore' -or
-    $networkServicePublishMsBuild[1].Targets -ne 'Publish') {
+    (Get-XmlAttributeText -Node $networkServicePublishMsBuild[0] -Name 'Targets') -ne 'Restore' -or
+    (Get-XmlAttributeText -Node $networkServicePublishMsBuild[1] -Name 'Targets') -ne 'Publish') {
     throw 'Shadowsocks.WinUI helper publish must run Restore and Publish as separate MSBuild evaluations.'
 }
 $embeddedNetworkService = @(
     Get-ProjectItems -Project $winUiProject -Name 'EmbeddedResource' |
-        Where-Object { (Get-XmlChildText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe' }
+        Where-Object { (Get-XmlMetadataText -Node $_ -Name 'LogicalName') -eq 'Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe' }
 )[0]
 if ($null -eq $embeddedNetworkService) {
     throw 'Phase 10 must embed the product NetworkService executable as Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe.'
 }
-$finalSingleFileTarget = @($winUiProject.Project.Target | Where-Object { $_.Name -eq 'ValidateFinalSingleFileLayout' })[0]
+$finalSingleFileTarget = @(Get-ProjectTargets -Project $winUiProject | Where-Object { (Get-XmlAttributeText -Node $_ -Name 'Name') -eq 'ValidateFinalSingleFileLayout' })[0]
 if ($null -eq $finalSingleFileTarget) {
     throw 'Phase 10 requires a publish-time validator that enforces a single Shadowsocks.exe output.'
 }
@@ -543,7 +575,7 @@ if ($winUiAssemblyName -ne 'Shadowsocks') {
 }
 $winUiPackages = @(
     Get-ProjectItems -Project $winUiProject -Name 'PackageReference' |
-        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlMetadataText -Node $_ -Name 'Version')" }
 )
 if ($winUiPackages -notcontains 'Microsoft.WindowsAppSDK|2.4.0') {
     throw 'Shadowsocks.WinUI must reference Microsoft.WindowsAppSDK 2.4.0, the current stable Windows App SDK release.'
@@ -560,7 +592,7 @@ if ($winUiPackages | Where-Object { $_ -like 'WinUIEx|*' }) {
 
 $windowsPackages = @(
     Get-ProjectItems -Project $windowsProject -Name 'PackageReference' |
-        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlMetadataText -Node $_ -Name 'Version')" }
 )
 if ($windowsPackages | Where-Object { $_ -like 'Microsoft.WindowsAppSDK*|*' -or $_ -like 'WinUIEx|*' }) {
     throw 'Shadowsocks.Windows must remain UI-framework agnostic so UnitTests and future frontends do not inherit Windows App SDK runtime requirements.'
@@ -569,7 +601,7 @@ if ($windowsPackages | Where-Object { $_ -like 'Microsoft.WindowsAppSDK*|*' -or 
 [xml]$windowsWinUiProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj') -Raw
 $windowsWinUiPackages = @(
     Get-ProjectItems -Project $windowsWinUiProject -Name 'PackageReference' |
-        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlAttributeText -Node $_ -Name 'Version')" }
+        ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlMetadataText -Node $_ -Name 'Version')" }
 )
 if ($windowsWinUiPackages -notcontains 'Microsoft.WindowsAppSDK.WinUI|2.3.6') {
     throw 'Shadowsocks.Windows.WinUI must reference Microsoft.WindowsAppSDK.WinUI 2.3.6.'
@@ -583,7 +615,7 @@ if ($windowsWinUiPackages -notcontains 'System.Drawing.Common|10.0.10') {
 [xml]$unitTestsProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj') -Raw
 $unitTestPackages = @(
     Get-ProjectItems -Project $unitTestsProject -Name 'PackageReference' |
-        ForEach-Object { "{0}|{1}" -f (Get-XmlAttributeText -Node $_ -Name 'Include'), (Get-XmlAttributeText -Node $_ -Name 'Version') }
+        ForEach-Object { "{0}|{1}" -f (Get-XmlAttributeText -Node $_ -Name 'Include'), (Get-XmlMetadataText -Node $_ -Name 'Version') }
 )
 if ($unitTestPackages -notcontains 'Microsoft.NET.Test.Sdk|18.9.0') {
     throw 'Shadowsocks.UnitTests must reference Microsoft.NET.Test.Sdk 18.9.0.'
@@ -1306,7 +1338,7 @@ foreach ($requiredPublishProperty in @('WindowsAppSDKSelfContained', 'SelfContai
 $icoItems = @(Get-ProjectItems -Project $winUiProject -Name 'None')
 if (@($icoItems | Where-Object {
         (Get-XmlAttributeText -Node $_ -Name 'Update') -eq 'shadowsocks.ico' -and
-        (Get-XmlChildText -Node $_ -Name 'CopyToPublishDirectory') -ne 'Never'
+        (Get-XmlMetadataText -Node $_ -Name 'CopyToPublishDirectory') -ne 'Never'
     }).Count -ne 0) {
     throw 'shadowsocks.ico is compiled into the application and must not be emitted as a publish sidecar.'
 }
