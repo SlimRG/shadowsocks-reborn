@@ -1,98 +1,77 @@
 ﻿# Contributing
 
-Keep changes focused and easy to review. Avoid mixing unrelated protocol, UI, packaging and routing changes in one pull request.
+`shadowsocks-reborn` targets .NET 10, WinUI 3, Windows 10 build 19041+ and x64 only.
 
-## Development baseline
+## Required validation
 
-- Windows 10 2004 (build 19041) or newer.
-- .NET 10 SDK.
-- x64 only.
-- Target framework: `net10.0-windows10.0.19041.0`.
-- Mixed WinForms/WPF desktop application.
+Before submitting changes, run on Windows:
 
-The main application publish is framework-dependent and single-file. `Shadowsocks.NetworkService` is published separately as a self-contained x64 single-file helper.
+```powershell
+.\packaging\Validate-Repository.ps1
 
-## Build and test
-
-Run from a clean or cleaned working tree:
-
-```cmd
 dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
-For packaging/runtime changes also run:
+For deployment/storage changes, also run:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version dev
+.\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-A successful compile is not enough for runtime-sensitive code. Exercise the path you changed.
+## Architecture rules
 
-## Compatibility rules
+- Put platform-neutral protocol/configuration logic in `Shadowsocks.Core`.
+- Put Windows API integration in `Shadowsocks.Windows`.
+- Put WinUI-specific shell/tray integration in `Shadowsocks.Windows.WinUI` or `Shadowsocks.WinUI`.
+- Do not reintroduce WinForms or WPF.
+- Keep `Shadowsocks.NetworkService` as an isolated elevated helper; do not turn it into a normal executable `ProjectReference` of the product.
+- User/Admin are the only selectable traffic modes. Game Mode remains automatic.
+- Pages interact through controller/services; keep persistence and Windows Registry integration behind dedicated services (simple shell actions such as opening the current data folder are fine).
 
-- Preserve existing Shadowsocks v4 protocol/configuration behavior unless the change explicitly requires otherwise.
-- Keep settings in `gui-config.json`; do not reintroduce `ApplicationSettingsBase`, `app.config` or `Shadowsocks.dll.config`.
-- Keep system-proxy integration in-process; do not reintroduce `sysproxy.exe` / `sysproxy64.exe`.
-- Do not reintroduce Privoxy. HTTP/CONNECT forwarding belongs in `ManagedHttpProxyService`.
-- Keep supported AEAD methods on `System.Security.Cryptography` unless there is a concrete compatibility reason to add a native backend.
-- Keep classic Shadowsocks AEAD wire compatibility: MD5 password derivation and HKDF-SHA1 with `ss-subkey` are protocol requirements.
-- Keep WinDivert optional. User Mode must start and operate without WinDivert files present.
-- Game Mode is automatic compatibility behavior, not a third selectable traffic mode.
-- Do not claim DNS policy enforcement until transparent DNS routing is actually implemented.
-- Do not claim the Windows 11 WPF/Metro migration is complete while WinForms surfaces remain.
+See [ARCHITECTURE.md](ARCHITECTURE.md).
 
-## Runtime checks
+## Storage rules
 
-For system-proxy changes, test Disabled/PAC/Global switching, persistence, restart and restoration on full exit.
+Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 
-For PAC changes, test Local PAC, Online PAC cache reuse, first-download failure and update/reload behavior.
+- Persistent configuration goes through `ISettingsStore` / `JsonFileSettingsStore` under the active storage root.
+- Persistent mutable files go below `%LOCALAPPDATA%\Shadowsocks`.
+- All application-owned writable files go below the active storage root: LocalAppData in normal mode, the Clean Mode Temp session in Clean Mode.
+- Start with Windows uses `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe` in normal mode and must remain unavailable in Clean Mode.
+- Product code must not write configuration, PAC/cache/log/helper/localization files beside the release EXE.
+- Executable-directory reads are only for legacy migration or explicit development compatibility.
 
-For managed HTTP proxy changes, test normal HTTP, HTTPS `CONNECT`, repeated reloads and process-based `Proxy` / `Direct` / `Block` rules.
+## WinUI and localization
 
-For Admin Mode changes, test:
+- Use native WinUI/Fluent controls and existing shell patterns; see [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md).
+- Preserve behavior already recorded in [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) unless intentionally redesigning it.
+- User-visible strings use `ILocalizationService` / the CSV localization path.
+- Keep stable enum/configuration values separate from localized display text.
+- Preserve the seven-column localization schema: `en,ru-RU,zh-CN,zh-TW,ja,ko,fr`.
+- New user-visible keys require at least English and Russian text; other missing translations may fall back to English.
 
-- UAC accept and cancel;
-- WinDivert first download and cached startup;
-- TCP and UDP routing;
-- Shadowsocks/plugin process exclusions;
-- `Proxy`, `Direct` and `Block` application rules;
-- automatic Game Mode entry when a configured process starts;
-- WinDivert teardown while Game Mode is active;
-- automatic Admin Mode restoration after the application exits.
+## Product publish
 
-For WPF/ReactiveUI changes, open every affected view at runtime.
+Release packaging is one-file:
 
-## Localization
-
-User-visible strings must be localizable:
-
-- WinForms/tray/menu: `Shadowsocks.Engine/Data/i18n.csv`;
-- WPF: `Shadowsocks.UI/Localization/Strings*.resx`.
-
-Do not add a hard-coded UI message when it belongs in one of these localization sources.
-
-## Code style
-
-The repository uses `.editorconfig` as the baseline. Keep UTF-8 BOM and CRLF for Windows source/text files; shell scripts remain LF.
-
-Before opening a PR:
-
-```cmd
-git diff --check
+```text
+Release/
+└── Shadowsocks.exe
 ```
 
-Also remove stale `bin`/`obj` directories when changing target frameworks, publish settings or WPF dependencies.
+Publish with the supplied profile/script. Do not add helper EXEs, DLLs, runtime JSON, PDBs or icons to the release directory. NetworkService is embedded into `Shadowsocks.exe` and materialized only when Admin Mode requires it.
 
 ## Pull requests
 
-Include:
+Changes to networking, storage, startup, Admin capture or deployment should state:
 
-- what changed and why;
-- exact build/test commands used;
-- runtime scenarios tested;
-- screenshots for visible UI changes;
-- documentation/localization updates when behavior changed.
+- user-visible behavior changed;
+- User/Admin/Game Mode paths tested;
+- configuration migration/rollback impact;
+- LocalAppData/Clean-Mode/Temp path impact;
+- exact build/test/publish commands used;
+- known limitations or follow-up work.
 
-Never include passwords, server addresses, subscription URLs, PAC secrets or private configuration data in logs or screenshots.
+Never commit or post passwords, server addresses, private subscription URLs, PAC secrets, tokens or generated private user configuration.

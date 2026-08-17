@@ -17,6 +17,30 @@ namespace Shadowsocks.UnitTests
             Assert.IsFalse(configuration.HasConfiguredServer);
         }
 
+
+        [TestMethod]
+        [DataRow("System", "System")]
+        [DataRow("light", "Light")]
+        [DataRow(" DARK ", "Dark")]
+        [DataRow("unexpected", "System")]
+        public void UiThemeIsNormalized(string input, string expected)
+        {
+            Configuration configuration = new();
+            configuration.uiTheme = input;
+
+            Configuration.Process(ref configuration);
+
+            Assert.AreEqual(expected, configuration.uiTheme);
+        }
+
+        [TestMethod]
+        public void UpdateCheckAtStartupIsEnabledByDefault()
+        {
+            Configuration configuration = new();
+
+            Assert.IsTrue(configuration.autoCheckUpdate);
+        }
+
         [TestMethod]
         public void RealServerIsConfigured()
         {

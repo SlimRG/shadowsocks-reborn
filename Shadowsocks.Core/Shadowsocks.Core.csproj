@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Version>5.0.0</Version>
+    <Authors>Shadowsocks community</Authors>
+    <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RootNamespace>Shadowsocks</RootNamespace>
+    <AssemblyName>Shadowsocks.Core</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Caseless.Fody" Version="1.9.1" PrivateAssets="all" />
+    <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="NLog" Version="6.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\abp.js" LogicalName="Shadowsocks.Core.Data.abp.js" />
+    <EmbeddedResource Include="Data\i18n.csv" LogicalName="Shadowsocks.Core.Data.i18n.csv" />
+    <EmbeddedResource Include="..\appsettings.json" Link="appsettings.json" LogicalName="Shadowsocks.Core.appsettings.json" />
+    <EmbeddedResource Include="Data\user-rule.txt" LogicalName="Shadowsocks.Core.Data.user-rule.txt" />
+  </ItemGroup>
+</Project>

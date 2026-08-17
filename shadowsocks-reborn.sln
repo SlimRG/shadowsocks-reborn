@@ -1,15 +1,25 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.8.12023.21 stable
+VisualStudioVersion = 18.9.12105.275 stable
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shadowsocks.Engine", "Shadowsocks.Engine\Shadowsocks.Engine.csproj", "{D6C11926-7668-49E2-B48C-160E37A6212A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.Core", "Shadowsocks.Core\Shadowsocks.Core.csproj", "{D6C11926-7668-49E2-B48C-160E37A6212A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shadowsocks.UI", "Shadowsocks.UI\Shadowsocks.UI.csproj", "{8C02D2F7-7CDB-4D55-9F25-CD03EF4AA062}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.Windows", "Shadowsocks.Windows\Shadowsocks.Windows.csproj", "{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shadowsocks.NetworkService", "Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj", "{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.NetworkService", "Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj", "{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shadowsocks.UnitTests", "Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj", "{45913187-0685-4903-B250-DCEF0479CD86}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.UnitTests", "Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj", "{45913187-0685-4903-B250-DCEF0479CD86}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.Windows.WinUI", "Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj", "{A7A5E847-81CB-4B15-AB89-D590B957A924}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Shadowsocks.WinUI", "Shadowsocks.WinUI\Shadowsocks.WinUI.csproj", "{DF853470-8C61-4ED5-A2D0-BB8310EFF8C3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D6C11926-7668-49E2-B48C-160E37A6212A} = {D6C11926-7668-49E2-B48C-160E37A6212A}
+		{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28} = {3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}
+		{A7A5E847-81CB-4B15-AB89-D590B957A924} = {A7A5E847-81CB-4B15-AB89-D590B957A924}
+		{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9} = {A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,10 +31,10 @@ Global
 		{D6C11926-7668-49E2-B48C-160E37A6212A}.Debug|x64.Build.0 = Debug|x64
 		{D6C11926-7668-49E2-B48C-160E37A6212A}.Release|x64.ActiveCfg = Release|x64
 		{D6C11926-7668-49E2-B48C-160E37A6212A}.Release|x64.Build.0 = Release|x64
-		{8C02D2F7-7CDB-4D55-9F25-CD03EF4AA062}.Debug|x64.ActiveCfg = Debug|x64
-		{8C02D2F7-7CDB-4D55-9F25-CD03EF4AA062}.Debug|x64.Build.0 = Debug|x64
-		{8C02D2F7-7CDB-4D55-9F25-CD03EF4AA062}.Release|x64.ActiveCfg = Release|x64
-		{8C02D2F7-7CDB-4D55-9F25-CD03EF4AA062}.Release|x64.Build.0 = Release|x64
+		{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}.Debug|x64.ActiveCfg = Debug|x64
+		{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}.Debug|x64.Build.0 = Debug|x64
+		{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}.Release|x64.ActiveCfg = Release|x64
+		{3B1DBF3B-AE1D-41A7-A836-3D27F54C6E28}.Release|x64.Build.0 = Release|x64
 		{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}.Debug|x64.ActiveCfg = Debug|x64
 		{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}.Debug|x64.Build.0 = Debug|x64
 		{A36C6BB9-24CA-46A0-9FA7-EB960386E1B9}.Release|x64.ActiveCfg = Release|x64
@@ -33,6 +43,14 @@ Global
 		{45913187-0685-4903-B250-DCEF0479CD86}.Debug|x64.Build.0 = Debug|x64
 		{45913187-0685-4903-B250-DCEF0479CD86}.Release|x64.ActiveCfg = Release|x64
 		{45913187-0685-4903-B250-DCEF0479CD86}.Release|x64.Build.0 = Release|x64
+		{A7A5E847-81CB-4B15-AB89-D590B957A924}.Debug|x64.ActiveCfg = Debug|x64
+		{A7A5E847-81CB-4B15-AB89-D590B957A924}.Debug|x64.Build.0 = Debug|x64
+		{A7A5E847-81CB-4B15-AB89-D590B957A924}.Release|x64.ActiveCfg = Release|x64
+		{A7A5E847-81CB-4B15-AB89-D590B957A924}.Release|x64.Build.0 = Release|x64
+		{DF853470-8C61-4ED5-A2D0-BB8310EFF8C3}.Debug|x64.ActiveCfg = Debug|x64
+		{DF853470-8C61-4ED5-A2D0-BB8310EFF8C3}.Debug|x64.Build.0 = Debug|x64
+		{DF853470-8C61-4ED5-A2D0-BB8310EFF8C3}.Release|x64.ActiveCfg = Release|x64
+		{DF853470-8C61-4ED5-A2D0-BB8310EFF8C3}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

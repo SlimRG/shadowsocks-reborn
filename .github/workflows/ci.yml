@@ -31,6 +31,12 @@ jobs:
       - name: .NET info
         run: dotnet --info
 
+      - name: Restore Core standalone
+        run: dotnet restore .\Shadowsocks.Core\Shadowsocks.Core.csproj
+
+      - name: Build Core standalone
+        run: dotnet build .\Shadowsocks.Core\Shadowsocks.Core.csproj -c Release --no-restore
+
       - name: Restore
         run: dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
 
@@ -41,24 +47,26 @@ jobs:
         run: dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 
       - name: Restore publish runtime
-        run: dotnet restore .\Shadowsocks.UI\Shadowsocks.UI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
+        run: dotnet restore .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
 
       - name: Publish
-        run: dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained -o .\artifacts\publish --no-restore
+        run: dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --self-contained true -o .\artifacts\publish --no-restore
 
       - name: Validate publish
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $publish = Join-Path $PWD 'artifacts\publish'
-          foreach ($name in @('shadowsocks-reborn.exe', 'Shadowsocks.NetworkService.exe')) {
-            if (-not (Test-Path (Join-Path $publish $name))) {
-              throw "Missing required publish artifact: $name"
-            }
+          if (-not (Test-Path (Join-Path $publish 'Shadowsocks.exe'))) {
+            throw "Missing required publish artifact: Shadowsocks.exe"
           }
-          foreach ($name in @('Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'shadowsocks-reborn.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll')) {
+          $entries = @(Get-ChildItem -LiteralPath $publish -Force)
+          if ($entries.Count -ne 1 -or $entries[0].PSIsContainer -or $entries[0].Name -ne 'Shadowsocks.exe') {
+            throw "Final product publish must contain exactly Shadowsocks.exe. Found: $($entries.Name -join ', ')"
+          }
+          foreach ($name in @('Shadowsocks.NetworkService.exe', 'Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'Shadowsocks.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll', 'gui-config.json')) {
             if (Test-Path (Join-Path $publish $name)) {
-              throw "Retired or invalid publish artifact found: $name"
+              throw "Forbidden publish sidecar found: $name"
             }
           }
 

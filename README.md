@@ -1,126 +1,149 @@
 ﻿# shadowsocks-reborn for Windows
 
-<img src="Shadowsocks.UI/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
+<img src="docs/assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
 
 **English** | [Русский](README.ru.md)
 
-`shadowsocks-reborn` is a Windows-focused continuation of the classic Shadowsocks for Windows v4 client. The current codebase targets **.NET 10**, **Windows 10 2004 (build 19041) or newer**, and **x64 only** while preserving the classic Shadowsocks protocol/configuration model.
+`shadowsocks-reborn` is a Windows-focused continuation of the classic Shadowsocks for Windows v4 client. The 5.x line targets **.NET 10**, **WinUI 3 / Windows App SDK**, **x64**, and Windows 10 build 19041 or newer.
 
-> Current release line: **5.0**. This fork is not the upstream `shadowsocks/shadowsocks-windows` repository.
+> This is an independent fork, not the upstream `shadowsocks/shadowsocks-windows` repository.
 
 ## Highlights
 
-- .NET 10 desktop application targeting `net10.0-windows10.0.19041.0`.
-- x64-only application, tests and elevated network helper.
-- BCL AEAD crypto through `System.Security.Cryptography`; retired native crypto wrappers are no longer used.
-- In-process WinINet system-proxy integration; `sysproxy.exe` is removed.
-- Managed HTTP/1.1 and HTTPS `CONNECT` proxy; Privoxy is removed.
-- Local PAC with configurable GeoSite sources and cached Online PAC.
-- Application-aware `Proxy`, `Direct` and `Block` routing.
-- Optional transparent TCP/UDP capture in Admin Mode through WinDivert.
-- Automatic Game Mode that temporarily tears down WinDivert while configured applications are running.
-- SIP003 plugins, classic Shadowsocks UDP relay, QR import/export, hotkeys and localized WinForms/WPF UI.
+- Native WinUI 3 desktop interface; WinForms and WPF are no longer part of the product UI.
+- Unpackaged, self-contained, win-x64, single-file distribution.
+- Release layout contains exactly `Shadowsocks.exe`.
+- File-backed per-user configuration under `%LOCALAPPDATA%\Shadowsocks`; the product directory is not used as mutable storage.
+- Settings, caches, PAC data, logs and startup copy under `%LOCALAPPDATA%\Shadowsocks` in normal mode.
+- Rufus-style Clean Mode (`...p.exe`) redirects all writable application state to a disposable `%TEMP%\Shadowsocks\Clean\...` session.
+- Managed HTTP/1.1 proxy and HTTPS `CONNECT`; Privoxy/sysproxy are retired.
+- Per-application `Proxy`, `Direct` and `Block` routing.
+- Transparent TCP/UDP capture in Admin Mode through WinDivert.
+- Automatic Game Mode that suspends Admin capture while configured applications are running.
+- Game discovery suggestions for Steam, Epic Games, GOG and Xbox libraries; manual rules remain available.
+- SIP003 plugins, UDP relay, QR import/export, hotkeys and a single embedded CSV localization catalog.
 
 ## Traffic modes
 
-The tray exposes only two selectable traffic modes:
+Only two modes are selectable:
 
-- **User Mode** — no elevation and no driver. Application rules apply to traffic that reaches the Windows/local HTTP proxy. Applications that bypass the system proxy and arbitrary UDP/QUIC sockets are not transparently captured.
-- **Admin Mode** — requests UAC, downloads the official x64 WinDivert runtime on demand and starts the elevated `Shadowsocks.NetworkService.exe` broker. TCP/UDP traffic is classified by application and routed as `Proxy`, `Direct` or `Block`.
+- **User Mode** — no elevation and no NetworkService extraction. Routing applies to traffic that reaches the local/system proxy.
+- **Admin Mode** — requests UAC, materializes the embedded `Shadowsocks.NetworkService.exe` under the active storage root, validates it, launches it elevated, and enables transparent TCP/UDP capture through WinDivert.
 
-**Game Mode is not a third traffic mode.** It is an automatic compatibility state. When Admin Mode is selected and a configured process/path pattern starts, the WinDivert capture child is stopped and the WinDivert driver service is removed. When the matching application exits, Admin Mode is restored automatically.
+**Game Mode is an automatic compatibility state, not a third traffic mode.** When Admin Mode is selected and a configured game/application starts, WinDivert capture is suspended. Admin capture is restored automatically after the application exits.
 
-The menu reports the runtime state as `WinDivert: active`, `paused (game running)` or `inactive`.
-
-## WinDivert verification
-
-A successful Admin Mode startup is logged only after the elevated capture child has completed `WinDivertOpen`. Look for a message similar to:
-
-```text
-WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
-```
-
-For a functional A/B test, add a `Block` rule for `curl.exe`, disable the Windows system proxy for the test, then compare a direct request in User Mode and Admin Mode:
-
-```cmd
-curl.exe -4 --noproxy "*" https://example.com
-```
-
-The request should bypass application routing in User Mode and be blocked in Admin Mode.
+The Traffic page exposes configured/runtime mode, NetworkService state, WinDivert state, TCP/UDP capture state and redirect ports.
 
 ## Requirements
 
-For running a release build:
+- Windows 10 2004 / build 19041 or newer, or Windows 11;
+- x64 Windows;
+- .NET 10 SDK only when building from source.
 
-- Windows 10 version 2004 / build 19041 or newer, or Windows 11;
-- x64 OS;
-- .NET 10 Desktop Runtime x64 for the main application.
-
-`Shadowsocks.NetworkService.exe` is published self-contained and does not require a separate .NET runtime. WinDivert is optional and is downloaded only when Admin Mode is enabled.
+The published product is self-contained and does not require a separately installed .NET runtime.
 
 ## Solution layout
 
-- `Shadowsocks.Engine` — UI-independent engine and controller layer.
-- `Shadowsocks.UI` — current WinForms/WPF presentation layer; builds `shadowsocks-reborn.exe`.
-- `Shadowsocks.NetworkService` — elevated WinDivert helper.
-- `Shadowsocks.UnitTests` — tests.
+- `Shadowsocks.Core` — protocol, encryption, configuration model, PAC/GeoSite logic, routing models, localization and storage abstractions.
+- `Shadowsocks.Windows` — file-storage bootstrap, WinINet/system proxy, startup, UAC/Admin capture, WinDivert runtime, hotkeys and other Windows integration.
+- `Shadowsocks.Windows.WinUI` — WinUI-specific Windows shell/tray integration.
+- `Shadowsocks.WinUI` — WinUI 3 application shell and product publish project (`Shadowsocks.exe`).
+- `Shadowsocks.NetworkService` — isolated elevated WinDivert helper embedded into release builds.
+- `Shadowsocks.UnitTests` — Core/Windows tests without presentation dependencies.
 
-See `ARCHITECTURE.md` for the UI boundary used for the planned WinUI 3 migration.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for project boundaries and runtime flow.
 
 ## Build
 
 Use a .NET 10 SDK on Windows:
 
-```cmd
+```powershell
 dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
-Publish the application with the supplied profile:
+Publish the product:
 
-```cmd
-dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
+```powershell
+dotnet restore .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
+dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --self-contained true --no-restore
 ```
 
-Or build the complete release package and SHA-256 file:
+Or build the release ZIP and SHA-256 file:
 
 ```powershell
 .\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-The product publish contains the main framework-dependent single-file application plus the self-contained single-file elevated helper. The release archive must therefore keep `shadowsocks-reborn.exe` and `Shadowsocks.NetworkService.exe` together.
+The final publish directory and release ZIP must contain exactly:
 
-## Configuration and runtime data
+```text
+Shadowsocks.exe
+```
 
-- Main settings: `gui-config.json`.
-- Custom PAC rules: `user-rule.txt`.
-- Local GeoSite and Online PAC data are cached at runtime and are not embedded in the executable.
-- In portable mode, optional WinDivert files are stored below the local `runtime` directory; otherwise they are stored below `%LOCALAPPDATA%\Shadowsocks\runtime`.
+DLLs, PDBs, runtime JSON files, icons and `Shadowsocks.NetworkService.exe` sidecars are rejected by release validation.
 
-The repository intentionally excludes retired `ApplicationSettingsBase`, Privoxy, sysproxy and native crypto artifacts from compilation/publish so an old in-place checkout cannot silently reintroduce them.
+## Storage and startup
 
-## PAC and HTTP forwarding
+Normal mode stores all persistent application-owned state under:
 
-Local PAC downloads configured GeoSite sources through the active Shadowsocks connection and keeps per-source caches. Online PAC is also downloaded through Shadowsocks and served to WinINet from the local `/pac` endpoint so Windows does not need direct access to the remote PAC host.
+```text
+%LOCALAPPDATA%\Shadowsocks
+```
 
-`ManagedHttpProxyService` handles HTTP/1.1 and HTTPS `CONNECT` directly in managed code. HTTPS remains a byte tunnel, so HTTP/2 negotiated inside TLS works without an HTTP/2 parser in the local proxy. FTP gatewaying is not implemented.
+The configuration backend is `%LOCALAPPDATA%\Shadowsocks\settings.json` with an atomic `settings.backup.json`. Old `HKCU\Software\Shadowsocks Reborn\Settings` values are ignored. Localization uses only the `i18n.csv` embedded inside `Shadowsocks.exe`; no second catalog is extracted.
 
-## DNS status
+The Settings page shows the active storage path and provides a single **Open** button that opens that directory in either normal or Clean Mode.
 
-The configuration/IPC contract already contains `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy modes, but transparent DNS interception/routing is **not implemented in 5.0.0**. Do not rely on these settings for DNS enforcement yet.
+Rename the executable so its file name ends in `p` before `.exe` to start **Clean Mode**, for example `Shadowsocksp.exe` or `Shadowsocks-5.0p.exe`. Clean Mode redirects settings, caches, PAC data, logs, runtime files and helper/update working data to a unique `%TEMP%\Shadowsocks\Clean\...` session and removes that session best-effort on Quit. Start with Windows is unavailable in Clean Mode.
 
-## UI status
+In normal mode, Start with Windows copies the verified product EXE to `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; the Windows Run integration points to that stable copy.
 
-The current presentation layer is still **mixed WinForms/WPF**. `Shadowsocks.Engine` is now UI-framework-independent, so the shell can be migrated to **WinUI 3 / Windows App SDK** without moving the networking logic again.
+See [STORAGE_POLICY.md](STORAGE_POLICY.md) for the complete layout and cleanup rules.
 
-## Development
+## Embedded NetworkService
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for releases. Current release history is in [CHANGELOG.md](CHANGELOG.md); the original upstream history is retained in `CHANGES`.
+Release builds publish `Shadowsocks.NetworkService` as a self-contained single-file helper and embed it into `Shadowsocks.exe`.
 
-## Security and privacy
+User Mode never extracts the helper. Admin Mode extracts it on demand below the active storage root (`%LOCALAPPDATA%\Shadowsocks\Temp\NetworkService\...` in normal mode, the Clean Mode session in Clean Mode). Extraction is serialized, SHA-256 validated and followed by an elevated control-pipe version handshake. The helper is guarded while in use and removed best-effort when the broker stops; stale runtime directories are pruned later.
 
-Do not post passwords, server addresses, subscription URLs, PAC secrets or full private configurations in public issues. See [SECURITY.md](SECURITY.md) for reporting guidance.
+Development builds may use a separate helper from the build output. That fallback is not part of the release package.
+
+## WinDivert verification
+
+Admin Mode is reported active only after the elevated capture process successfully opens WinDivert. A successful startup logs a message similar to:
+
+```text
+WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
+```
+
+For a functional test, add `curl.exe -> Block`, disable the Windows system proxy temporarily, and compare:
+
+```cmd
+curl.exe -4 --noproxy "*" https://example.com
+```
+
+The direct request should bypass application routing in User Mode and be blocked in Admin Mode.
+
+## PAC, HTTP forwarding and DNS
+
+Local PAC uses configured GeoSite sources and persistent cache data. Online PAC is downloaded through Shadowsocks and served to WinINet from the local `/pac` endpoint.
+
+`ManagedHttpProxyService` handles HTTP/1.1 and HTTPS `CONNECT`. HTTPS is tunneled as bytes, so HTTP/2 negotiated inside TLS does not require a local HTTP/2 parser. FTP gatewaying is not implemented.
+
+The configuration contract includes `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy values, but transparent DNS interception/routing is not implemented in 5.0.0.
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — project boundaries and runtime architecture.
+- [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp rules and migration.
+- [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — current WinUI design/implementation rules.
+- [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) — completed WinUI migration parity record.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — development rules.
+- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — release validation.
+- [SECURITY.md](SECURITY.md) — security reporting and sensitive areas.
+- [CHANGELOG.md](CHANGELOG.md) — fork changes; upstream history remains in `CHANGES`.
 
 ## License
 

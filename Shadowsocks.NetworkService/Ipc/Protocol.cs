@@ -53,6 +53,7 @@ internal sealed class ServiceResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
     public int TcpRedirectPort { get; set; }
     public int UdpRedirectPort { get; set; }
     public bool DriverRemoved { get; set; }

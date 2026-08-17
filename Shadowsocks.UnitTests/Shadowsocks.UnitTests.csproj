@@ -4,19 +4,18 @@
     <RootNamespace>Shadowsocks.UnitTests</RootNamespace>
     <AssemblyName>Shadowsocks.UnitTests</AssemblyName>
     <IsTestProject>true</IsTestProject>
-    <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Platforms>x64</Platforms><PlatformTarget>x64</PlatformTarget><RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="GlobalHotKeyCore" Version="1.2.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="4.3.3" />
     <PackageReference Include="MSTest.TestFramework" Version="4.3.3" />
+    <PackageReference Include="System.Management" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Shadowsocks.Engine\Shadowsocks.Engine.csproj" />
-    <ProjectReference Include="..\Shadowsocks.UI\Shadowsocks.UI.csproj" />
+    <ProjectReference Include="..\Shadowsocks.Core\Shadowsocks.Core.csproj" />
+    <ProjectReference Include="..\Shadowsocks.Windows\Shadowsocks.Windows.csproj" />
   </ItemGroup>
 </Project>

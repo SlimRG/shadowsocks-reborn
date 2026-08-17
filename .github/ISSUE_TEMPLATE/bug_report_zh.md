@@ -17,10 +17,10 @@ assignees: ""
 - Shadowsocks Reborn 版本/commit：
 - Windows 版本/build：
 - 安装方式：release ZIP / 源码构建
-- .NET 10 Desktop Runtime 版本：
+- .NET 10 SDK 版本（仅源码构建）：
 - 流量模式：User / Admin
 - 系统代理模式：Disabled / PAC / Global
-- Portable mode：是 / 否
+- 启动位置：本地磁盘 / 只读目录 / 可移动磁盘
 
 ## 复现步骤
 
@@ -33,7 +33,7 @@ assignees: ""
 <!-- 如果问题与 Admin Mode 无关，请删除本节。 -->
 
 - UAC 是否成功：是 / 否
-- 菜单中的 WinDivert 状态：active / paused / inactive
+- Traffic 页面中的 WinDivert 状态：active / paused / inactive
 - 日志中是否有 `WinDivert capture confirmed`：是 / 否
 - 是否正在运行 Game Mode 列表中的应用：是 / 否
 

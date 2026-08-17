@@ -1,0 +1,553 @@
+﻿en,ru-RU,zh-CN,zh-TW,ja,ko,fr
+#Restart program to apply translation,,,,,,
+#This is comment line,,,,,,
+#Always keep language name at head of file,,,,,,
+#Language name is output in log,,,,,,
+"#You can find it by search ""Current language is:""",,,,,,
+#Please use UTF-8 with BOM encoding so we can edit it in Excel,,,,,,
+shadowsocks-reborn,shadowsocks-reborn,shadowsocks-reborn,shadowsocks-reborn,shadowsocks-reborn,shadowsocks-reborn,shadowsocks-reborn
+#Menu,,,,,,
+System Proxy,Системный прокси-сервер,系统代理,系統代理,システムプロキシ,시스템 프록시,Proxy système
+Disable,Отключен,禁用,禁用,無効,비활성화,Désactiver
+PAC,Сценарий настройки (PAC),PAC 模式,PAC 模式,PACモード,프록시 자동 구성 (PAC),PAC
+Global,Для всей системы,全局模式,全局模式,グローバルプロキシ,전역,Global
+Servers,Серверы,服务器,伺服器,サーバー,서버,Serveurs
+More than 20 servers (total: {0}),Более 20 серверов (всего: {0}),超过 20 个服务器（共 {0} 个）,超過 20 個伺服器（共 {0} 個）,20 台を超えるサーバー（合計: {0}）,서버 20개 초과 (총 {0}개),Plus de 20 serveurs (total : {0})
+... more than {0} (total {1}),... показано {0} из {1},… 另有超过 {0} 个（共 {1} 个）,… 另有超過 {0} 個（共 {1} 個）,… さらに {0} 件以上（合計 {1} 件）,… {0}개 이상 추가(총 {1}개),… plus de {0} autres (total {1})
+Online Config,Онлайн-конфигурации,在线配置,線上配置,オンライン設定,온라인 구성,Configuration en ligne
+Start on Boot,Автозагрузка,开机启动,開機啟動,システム起動時に実行,시스템 시작 시에 시작하기,Démarrage automatique
+Associate ss:// Links,Ассоциированный ss:// Ссылки,关联 ss:// 链接,關聯 ss:// 鏈接,ss:// リンクの関連付け,ss:// 링크 연결,Associer les liens ss://
+Forward Proxy,Прямой прокси,正向代理设置,正向 Proxy 設定,フォワードプロキシの設定,포워드 프록시,Forward-proxy
+Local PAC,Локальный PAC,使用本地 PAC,使用本機 PAC,ローカル PAC,로컬 프록시 자동 구성,PAC local
+Online PAC,Удаленный PAC,使用在线 PAC,使用線上 PAC,オンライン PAC,온라인 프록시 자동 구성,PAC en ligne
+Edit Local PAC File,Редактировать локальный PAC,编辑本地 PAC 文件,編輯本機 PAC 檔案,ローカル PAC ファイルの編集,로컬 프록시 자동 구성 파일 수정,Modifier le fichier PAC local
+Update Local PAC from Geosite,Обновить локальный PAC из Geosite,从 Geosite 更新本地 PAC,從 Geosite 更新本機 PAC,Geosite からローカル PAC を更新,Geosite에서 로컬 프록시 자동 구성 파일 업데이트,Mettre à jour le PAC local à partir de Geosite
+Edit User Rule for Geosite,Редактировать свои правила для Geosite,编辑 Geosite 的用户规则,編輯 Geosite 的使用者規則,ユーザールールの編集,Geosite 사용자 수정,Modifier la règle utilisateur pour Geosite
+GeoSite Sources,Источники GeoSite,GeoSite 源,GeoSite 來源,GeoSite ソース,GeoSite 소스,Sources GeoSite
+Copy Local PAC URL,Копировать URL локального PAC,复制本地 PAC 网址,複製本機 PAC 網址,ローカル PAC URL をコピー,로컬 프록시 자동 구성 파일 URL 복사,Copier l'URL du PAC local
+Share Server Config,Поделиться конфигурацией сервера,分享服务器配置,分享伺服器設定檔,サーバーの設定を共有,서버 설정 공유,Partager la configuration du serveur
+Scan QRCode from Screen,Сканировать QRCode с экрана,扫描屏幕上的二维码,掃描螢幕上的 QR 碼,画面から QR コードをスキャン,화면에서 QR코드 스캔,Scanner le QRCode à partir de l'écran
+Import URL from Clipboard,Импорт адреса из буфера обмена,从剪贴板导入URL,從剪貼簿匯入 URL,クリップボードから URL をインポート,클립보드에서 URL 가져오기,Importer l'URL du presse-papiers
+Availability Statistics,Статистика доступности,统计可用性,統計可用性,可用性の統計,가용성 통계,Statistiques de disponibilité
+Verbose Logging,Подробный журнал,详细记录日志,詳細資訊記錄,詳細なログを記録,자세한 로깅 사용,Journalisation détaillée
+Updates,Обновления,更新,更新,アップデート,업데이트,Mettre à jour
+Check for Updates,Проверить обновления,检查更新,檢查更新,アップデートを確認,업데이트 확인하기,Vérifier les mises à jour
+Check for Updates at Startup,Проверять при запуске,启动时检查更新,啟動時檢查更新,起動時にアップデートを確認,시스템 시작 시 업데이트 확인하기,Vérifier les mises à jour au démarrage
+About,О программе,关于,關於,shadowsocks-reborn について,정보,A propos
+Help,Помощь,帮助,說明,ヘルプ,도움말,Aide
+Quit,Выход,退出,結束,終了,종료,Quitter
+Load Balance,Балансировка нагрузки,负载均衡,負載平衡,サーバーロードバランス,로드밸런싱,Répartition de charge
+High Availability,Высокая доступность,高可用,高可用性,高可用性,고가용성,Haute disponibilité
+Show Plugin Output,События плагинов в журнале,显示插件输出,顯示外掛程式輸出,プラグインの出力情報を表示,플러그인 출력 보이기,Afficher la sortie du plugin
+# Config Form,,,,,,
+Statistics configuration,Настройки статистики,统计配置,統計設定,統計の設定,통계 설정,Configuration des statistiques
+&Add,Добавить,添加(&A),新增 (&A),新規 (&A),추가 (&A),Ajouter
+&Delete,Удалить,删除(&D),移除 (&D),削除 (&D),삭제 (&D),Supprimer
+Dupli&cate,Дублир-ть,复制(&C),複製 (&C),コピー (&C),복제 (&C),Dupliquer
+Server,Сервер,服务器,伺服器,サーバー,서버,Serveur
+Server IP,IP-адрес,服务器地址,伺服器位址,サーバーアドレス,서버 IP,Serveur IP
+Server Port,Порт,服务器端口,伺服器連接埠,サーバーポート,서버 포트,Port de serveur
+Password,Пароль,密码,密碼,パスワード,비밀번호,Mot de passe
+Show Password,Показать пароль,显示密码,顯示密碼,パスワードを表示する,비밀번호 보이기,Montrer le mot de passe
+Encryption,Шифрование,加密,加密,暗号化,암호화,Chiffrement
+Plugin Program,Плагин,插件程序,外掛程式,プラグインプログラム,플러그인 프로그램,Programme de plugin
+Plugin Options,Опции плагина,插件选项,外掛程式選項,プラグインのオプション,플러그인 설정,Options de plugin
+Environment variables for plugin program,Переменные окружения для программы плагина,插件程序的环境变量,外掛程式的環境變數,プラグインプログラムの環境変数,플러그인 프로그램의 환경 변수,Variables d’environnement du programme de plugin
+Need Plugin Argument,Требуются аргументы,需要命令行参数,需要外掛程式參數,コマンドライン引数を有効にする,플러그인 인자가 필요함,Besoin d'un argument de plugin
+Plugin Arguments,Аргументы,插件参数,外掛程式參數,プラグインの引数,플러그인 인자,Arguments du plugin
+"Plugin arguments are not part of SIP003. They are passed as command-line arguments. Mandatory: %SS_LOCAL_HOST%, %SS_LOCAL_PORT%, %SS_REMOTE_HOST%, %SS_REMOTE_PORT%. Optional: %SS_PLUGIN_OPTIONS%.","Аргументы плагина не входят в стандарт SIP003 и передаются через командную строку. Обязательные: %SS_LOCAL_HOST%, %SS_LOCAL_PORT%, %SS_REMOTE_HOST%, %SS_REMOTE_PORT%. Необязательная: %SS_PLUGIN_OPTIONS%.",插件参数不属于 SIP003，它们作为命令行参数传递。必需：%SS_LOCAL_HOST%、%SS_LOCAL_PORT%、%SS_REMOTE_HOST%、%SS_REMOTE_PORT%。可选：%SS_PLUGIN_OPTIONS%。,外掛程式參數不屬於 SIP003，而是以命令列參數傳遞。必要：%SS_LOCAL_HOST%、%SS_LOCAL_PORT%、%SS_REMOTE_HOST%、%SS_REMOTE_PORT%。選用：%SS_PLUGIN_OPTIONS%。,プラグイン引数は SIP003 の一部ではなく、コマンドライン引数として渡されます。必須: %SS_LOCAL_HOST%、%SS_LOCAL_PORT%、%SS_REMOTE_HOST%、%SS_REMOTE_PORT%。任意: %SS_PLUGIN_OPTIONS%。,"플러그인 인수는 SIP003의 일부가 아니며 명령줄 인수로 전달됩니다. 필수: %SS_LOCAL_HOST%, %SS_LOCAL_PORT%, %SS_REMOTE_HOST%, %SS_REMOTE_PORT%. 선택: %SS_PLUGIN_OPTIONS%.","Les arguments de plugin ne font pas partie de SIP003. Ils sont transmis en ligne de commande. Obligatoires : %SS_LOCAL_HOST%, %SS_LOCAL_PORT%, %SS_REMOTE_HOST%, %SS_REMOTE_PORT%. Facultatif : %SS_PLUGIN_OPTIONS%."
+Proxy Port,Порт прокси,代理端口,Proxy 連接埠,プロキシポート,프록시 포트,Port proxy
+Portable Mode,Переносимый режим,便携模式,便攜模式,ポータブルモード,포터블 모드,Mode portable
+Restart required,Требуется перезапуск программы,需要重新启动SS,需要重新啟動SS,再起動が必要,재시작이 필요합니다,Redémarrage nécessaire
+Remarks,Примечания,备注,註解,付記,알림,Remarques
+Group,Группа,组,群組,グループ,그룹,Groupe
+Timeout(Sec),Таймаут(сек),超时(秒),逾時 (秒),タイムアウト (秒),시간 초과 (초),Délai d'attente(sec)
+OK,ОК,确定,確定,OK,확인,OK
+Cancel,Отмена,取消,取消,キャンセル,취소,Annuler
+Apply,Применить,应用,應用,適用,적용,Appliquer
+New server,Новый сервер,未配置的服务器,新伺服器,新規サーバー,새 서버,Nouveau serveur
+Move &Up,Выше,上移(&U),上移 (&U),上に移動 (&U),위로 (&U),Monter
+Move D&own,Ниже,下移(&O),下移 (&O),下に移動 (&O),아래로 (&O),Descendre
+deprecated,Устаревшее,不推荐,不推薦,非推奨,더 이상 사용되지 않음,Obsolète
+"Encryption method {0} not exist, will replace with {1}",Метод шифрования {0} не найден; будет использован {1},加密方法{0}不存在，将使用{1}代替,加密方式 {0} 不存在，將替換為 {1},暗号化方式{0}が存在しません，{1}に置換します,{0} 암호화 방식이 존재하지 않으므로 {1}로 대체될 것입니다.,"Méthode de chiffrement {0} n'existe pas, sera remplacée par {1}"
+# Log Form,,,,,,
+&File,Файл,文件(&F),檔案 (&F),ファイル (&F),파일 (&F),Fichier
+&Open Location,Расположение файла,在资源管理器中打开(&O),在檔案總管中開啟 (&O),ファイルの場所を開く (&O),위치 열기 (&O),Ouvrier
+E&xit,Выход,退出(&X),結束 (&X),終了 (&X),종료 (&X),Quitter
+&View,Вид,视图(&V),檢視 (&V),表示 (&V),보기 (&V),Afficher
+&Clear Logs,Очистить журнал,清空日志(&C),清除記錄檔 (&C),ログの削除 (&C),로그 초기화 (&C),Effacer les journaux
+Change &Font,Шрифт…,设置字体(&F),變更字型 (&F),フォント (&F),글꼴 변경 (&F),Définir la police
+&Font,Шрифт,字体(&F),字型(&F),フォント(&F),글꼴(&F),&Police
+&Wrap Text,Перенос строк,自动换行(&W),自動換行 (&W),右端で折り返す (&W),텍스트 감싸기 (&W),Retour à la ligne
+&Top Most,Поверх всех окон,置顶(&T),置頂 (&T),常に最前面に表示 (&T),상단 우선 (Top Most) (&T),Metter en haut
+&Show Toolbar,Панель инструментов,显示工具栏(&S),顯示工具列 (&S),ツールバーの表示 (&S),툴바 보여주기 (&S),Afficher la barre d'outils
+Log Viewer,Просмотр журнала,日志查看器,記錄檔檢視器,ログビューア,로그 뷰어,Visionneuse de journaux
+Inbound,Входящая,入站,輸入,受信,"인바운드 (Rx, 다운로드)",Entrant
+Outbound,Исходящая,出站,輸出,送信,"아웃바운드 (Tx, 업로드)",Sortant
+In,Вх.,入,入,受信,수신,Entrée
+Out,Исх.,出,出,送信,송신,Sortie
+# QRCode Form,,,,,,
+QRCode and URL,QRCode и URL,二维码与 URL,QR 碼與 URL,QR コードと URL,QR코드와 URL,QRCode et URL
+# PAC Url Form,,,,,,
+Edit Online PAC URL,Изменение URL удаленного PAC,编辑在线 PAC 网址,編輯線上 PAC 網址,オンライン PAC URL の編集,온라인 프록시 자동 구성 URL 수정,Modifier l'URL du PAC en ligne
+Please input PAC Url,Введите URL адрес для PAC-файла,请输入 PAC 网址,請輸入 PAC 網址,PAC URLを入力して下さい,프록시 자동 구성 URL을 입력하세요,Veuillez saisir l'URL PAC
+# Messages,,,,,,
+shadowsocks-reborn Error: {0},Ошибка shadowsocks-reborn: {0},shadowsocks-reborn 错误: {0},shadowsocks-reborn 錯誤: {0},shadowsocks-reborn エラー: {0},shadowsocks-reborn 오류: {0},Erreur shadowsocks-reborn: {0}
+Port {0} already in use,Порт {0} уже используется,端口 {0} 已被占用,連接埠號碼 {0} 已被使用,ポート番号 {0} は既に使用されています。,{0}번 포트는 이미 사용 중입니다.,Port {0} déjà utilisé
+Port {0} is reserved by system,Порт {0} зарезервирован системой,端口 {0} 是系统保留端口,連接埠號碼 {0} 由系統保留, ポート番号 {0} はシステムによって予約されています,{0}번 포트는 시스템에서 사용 중입니다.,Port {0} réservé par le système
+Invalid server address,Неверный адрес сервера,非法服务器地址,無效伺服器位址,サーバーアドレスが無効です。,올바르지 않은 서버 주소입니다.,Adresse de serveur non valide
+Illegal port number format,Неверный числовой формат порта,非法端口格式,無效連接埠號碼格式,ポート番号のフォーマットが無効です。,올바르지 않은 포트 번호 형식입니다.,Format de numéro de port illégal
+Illegal timeout format,Неверный формат таймаута,非法超时格式,無效逾時格式,タイムアウト値のフォーマットが無効です。,올바르지 않은 시간 초과 형식입니다.,Format de délai d'attente illégal
+Server IP can not be blank,IP-адрес сервера не может быть пустым,服务器 IP 不能为空,伺服器 IP 不能為空,サーバー IP が指定されていません。,서버 IP는 비어있으면 안됩니다.,L'adresse IP du serveur ne peut pas être vide
+Password can not be blank,Пароль не может быть пустым,密码不能为空,密碼不能為空,パスワードが指定されていません。,비밀번호는 비어있으면 안됩니다.,Le mot de passe ne peut pas être vide
+Port out of range,Порт выходит за допустимый диапазон,端口超出范围,連接埠號碼超出範圍,ポート番号は範囲外です。,올바른 포트 범위가 아닙니다.,Port hors de portée
+Port can't be 8123,Адрес порта 8123 не может быть использован,端口不能为 8123,連接埠號碼不能為 8123,8123 番以外のポート番号を指定して下さい。,8123번 포트는 사용할 수 없습니다.,Le port ne peut pas être 8123
+No update is available,Обновлений не обнаружено,没有可用的更新,沒有可用的更新,お使いのバージョンは最新です。,사용 가능한 업데이트가 없습니다.,Aucune mise à jour n'est disponible
+shadowsocks-reborn is here,shadowsocks-reborn находится здесь,shadowsocks-reborn 在这里,shadowsocks-reborn 在這裡,shadowsocks-reborn はここです。,shadowsocks-reborn는 여기에 있습니다,Veuillez trouver shadowsocks-reborn ici
+You can turn on/off shadowsocks-reborn in the context menu,Вы можете управлять shadowsocks-reborn из контекстного меню,可以在右键菜单中开关 shadowsocks-reborn,可以在右鍵選項單中開關 shadowsocks-reborn,コンテキストメニューを使って、shadowsocks-reborn を有効または無効にすることができます。,프로그램 메뉴에서 shadowsocks-reborn를 끄고 켤 수 있습니다.,Vous pouvez activer / désactiver shadowsocks-reborn dans le menu contextuel
+System Proxy Enabled,Системный прокси включен,系统代理已启用,系統 Proxy 已啟用,システム プロキシが有効です。,시스템 프록시가 활성화되었습니다.,Proxy système activé
+System Proxy Disabled,Системный прокси отключен,系统代理未启用,系統 Proxy 未啟用,システム プロキシが無効です。,시스템 프록시가 비활성화되었습니다.,Proxy système désactivé
+Failed to update PAC file,Не удалось обновить PAC файл,更新 PAC 文件失败,更新 PAC 檔案失敗,PAC の更新に失敗しました。,프록시 자동 구성 파일을 업데이트하는데 실패했습니다.,Impossible de mettre à jour le fichier PAC
+PAC updated,PAC файл обновлен,更新 PAC 成功,更新 PAC 成功,PAC を更新しました。,프록시 자동 구성 파일이 업데이트되었습니다.,PAC mis à jour
+No updates found. Please report to Geosite if you have problems with it.,Обновлений не найдено. Сообщите авторам Geosite если у вас возникли проблемы.,未发现更新。如有问题请提交给 Geosite。,未發現更新。如有問題請報告至 Geosite。,お使いのバージョンは最新です。問題がある場合は、GFWList に報告して下さい。,사용 가능한 업데이트를 찾지 못했습니다. 문제가 있다면 Geosite로 전송해주세요.,Aucune mise à jour trouvée. Veuillez signaler à Geosite si vous avez des problèmes concernant.
+No QRCode found. Try to zoom in or move it to the center of the screen.,QRCode не обнаружен. Попробуйте увеличить изображение или переместить его в центр экрана.,未发现二维码，尝试把它放大或移动到靠近屏幕中间的位置,未發現 QR 碼，嘗試把它放大或移動到靠近熒幕中間的位置,QR コードが見つかりませんでした。コードを大きくするか、画面の中央に移動して下さい。,QR코드를 찾을 수 없습니다. 가운데로 화면을 이동시키거나 확대해보세요.,Aucun QRCode trouvé. Essayez de zoomer ou de le déplacer vers le centre de l'écran.
+Shadowsocks Reborn is already running,Shadowsocks Reborn уже запущен,Shadowsocks Reborn 已在运行,Shadowsocks Reborn 已在執行,Shadowsocks Reborn はすでに実行中です,Shadowsocks Reborn이 이미 실행 중입니다,Shadowsocks Reborn est déjà en cours d’exécution
+The existing instance has been brought to the foreground.,Уже запущенный экземпляр выведен на передний план.,已将正在运行的实例切换到前台。,已將正在執行的執行個體切換到前景。,実行中のインスタンスを前面に表示しました。,실행 중인 인스턴스를 앞으로 가져왔습니다.,L’instance déjà en cours d’exécution a été placée au premier plan.
+"If you want to start multiple shadowsocks-reborn, make a copy in another directory.","Если вы хотите запустить несколько копий shadowsocks-reborn одновременно, создайте отдельную папку на каждую копию.",如果想同时启动多个，可以另外复制一份到别的目录。,如果想同時啟動多個，可以另外複製一份至別的目錄。,複数起動したい場合は、プログラムファイルを別のフォルダーにコピーしてから、もう一度実行して下さい。,"만약 여러 개의 shadowsocks-reborn를 사용하고 싶으시다면, 파일을 다른 곳에 복사해주세요.","Si vous souhaitez démarrer plusieurs shadowsocks-reborn, faites une copie dans un autre répertoire."
+Invalid QR Code content: {0},Недопустимое содержимое QR-кода: {0},无效二维码内容: {0},無效二維碼內容: {0},無効な QR コード内容: {0},잘못된 QR 코드 내용: {0},Contenu du QR code invalide : {0}
+Failed to update registry,Не удалось обновить запись в реестре,无法修改注册表,無法修改登錄檔,レジストリの更新に失敗しました。,레지스트리를 업데이트하는데에 실패했습니다.,Impossible de mettre à jour de la base de registre
+Failed to open registry key: {0},Не удалось открыть раздел реестра: {0},无法打开注册表项：{0},無法開啟登錄機碼：{0},レジストリキーを開けませんでした: {0},레지스트리 키를 열 수 없습니다: {0},Impossible d’ouvrir la clé de Registre : {0}
+Import from URL: {0} ?,импортировать из адреса: {0} ?,从URL导入: {0} ?,從URL匯入: {0} ?,{0}：このURLからインポートしますか？,URL에서 가져오기: {0} ?,Importer depuis l’URL : {0} ?
+Successfully imported from {0},Успешно импортировано из {0},导入成功：{0},導入成功：{0},{0}：インポートしました。,{0}에서 성공적으로 가져왔습니다,Importation réussie depuis {0}
+Failed to import. Please check if the link is valid.,Не удалось импортировать. Проверьте корректность ссылки.,导入失败，请检查链接是否有效。,導入失敗，請檢查鏈接是否有效。,インポートに失敗しました。リンクの有効性を確認してください。,가져오기에 실패했습니다. 링크가 유효한지 확인하세요.,Échec de l’importation. Vérifiez que le lien est valide.
+Warning: importing {0} from a legacy ss:// link. Legacy ss:// links may be removed in a future release. Please update your ss:// links.,Предупреждение: выполняется импорт {0} из устаревшей ссылки ss://. Поддержка таких ссылок может быть удалена в одной из будущих версий. Обновите ссылки ss://.,警告: 正在从旧版 ss:// 链接导入 {0}。旧版 ss:// 链接可能会在未来版本中移除，请及时更新你的链接。,警告：正在從舊版 ss:// 連結匯入 {0}。未來版本可能移除舊版 ss:// 連結支援。請更新您的 ss:// 連結。,警告: レガシー ss:// リンクから {0} をインポートしています。将来のリリースではレガシー ss:// リンクが削除される可能性があります。ss:// リンクを更新してください。,경고: 레거시 ss:// 링크에서 {0}을(를) 가져오고 있습니다. 향후 릴리스에서 레거시 ss:// 링크 지원이 제거될 수 있습니다. ss:// 링크를 업데이트하세요.,Avertissement : importation de {0} depuis un ancien lien ss://. Les anciens liens ss:// pourront être supprimés dans une future version. Veuillez mettre à jour vos liens ss://.
+System Proxy On:,Системный прокси:,系统代理已启用：,系統 Proxy 已啟用：,システム プロキシが有効：,시스템 프록시 활성화됨: ,Proxy système activé:
+Running: Port {0},Запущен на порту {0},正在运行：端口 {0},正在執行：連接埠號碼 {0},実行中：ポート {0},실행 중: 포트 {0}번,En cours d'exécution: port {0}
+"Unexpected error, shadowsocks-reborn will exit. Please report to","Непредвиденная ошибка, пожалуйста сообщите на",非预期错误，shadowsocks-reborn将退出。请提交此错误到,非預期錯誤，shadowsocks-reborn 將結束。請報告此錯誤至,予想外のエラーが発生したため、shadowsocks-reborn を終了します。詳しくは下記までお問い合わせ下さい：,알 수 없는 오류로 shadowsocks-reborn가 종료될 것입니다. 오류를 여기로 제보해주세요:,shadowsocks-reborn va quitter en présence d/érreur inattendue. Veuillez signaler à
+Unsupported operating system. Windows 10 version 2004 (build 19041) or newer is required.,Операционная система не поддерживается. Требуется Windows 10 версии 2004 (сборка 19041) или новее.,需要 Windows 10 版本 2004（内部版本 19041）或更高版本。,需要 Windows 10 版本 2004（組建 19041）或更新版本。,Windows 10 バージョン 2004（ビルド 19041）以降が必要です.,Windows 10 버전 2004(빌드 19041) 이상이 필요합니다.,Windows 10 version 2004 (build 19041) ou une version ultérieure est requis.
+Proxy request failed,Не удалось выполнить запрос,代理请求失败,Proxy 要求失敗,プロキシリクエストが失敗しました。,프록시 요청에 실패했습니다.,Échec de la demande de proxy
+Proxy handshake failed,Не удалось выполнить хэндшейк,代理握手失败,Proxy 交握失敗,プロキシ ハンドシェイクに失敗しました。,프록시 핸드쉐이크에 실패했습니다.,Échec de la prise de contact par proxy
+Register hotkey failed,Не удалось применить настройки горячих клавиш,注册快捷键失败,註冊快速鍵失敗,ホットキーの登錄に失敗しました。,단축키 등록에 실패했습니다.,Échec de l'enregistrement du raccourci clavier
+Cannot parse hotkey: {0},Не удалось распознать следующие горячие клавиши: {0},解析快捷键失败: {0},剖析快速鍵失敗: {0},ホットキーを解析できません: {0},단축키를 해석할 수 없습니다: {0},Impossible d'analyser le raccourci clavier: {0}
+"Timeout is invalid, it should not exceed {0}",Таймаут не может превышать значение {0},超时无效，不应超过 {0},逾時無效，不應超過 {0},タイムアウト値が無効です。{0} 以下の値を指定して下さい。,올바르지 않은 시간 초과 설정입니다. {0}을 초과하지 않아야 합니다.,"Le délai d'attente invalide, il ne doit pas dépasser {0}"
+Cannot find the plugin program file,Файл плагина не найден,找不到插件程序文件,找不到外掛程式文件,プラグインプログラムが見つかりません,플러그인 프로그램 파일을 찾을 수 없습니다.,Impossible de trouver le fichier du programme du plugin
+Operation failure,Операция завершилась неудачей,操作失败,操作失敗,操作に失敗しました,작업에 실패했습니다.,Échec de l’opération
+Auto save failed,Автоматическое сохранение не удалось,自动保存失败,自動儲存失敗,オートセーブに失敗しました,자동 저장에 실패했습니다.,Échec de l'enregistrement automatique
+Whether to discard unconfigured servers,Внесенные изменения будут утеряны,是否丢弃未配置的服务器,是否捨棄未設定的伺服器,未設定のサーバーを破棄しますか,구성되지 않은 서버 설정 변경 사항을 폐기하시겠습니까?,Eliminer les serveurs non configurés ou non
+"Invalid server address, Cannot automatically save or discard changes",Неверный адрес сервера. Невозможно сохранить или отменить изменения,非法服务器地址，无法自动保存，是否丢弃修改,伺服器位址無效，無法自動儲存或捨棄變更,サーバーアドレスが無効なため、オートセーブできません。変更を破棄しますか,"서버 주소가 올바르지 않아 자동 저장 할 수 없습니다, 변경 사항을 폐기하시겠습니까?","Adresse de serveur invalide, impossible d'enregistrer ou d'annuler automatiquement les modifications"
+"Illegal port number format, Cannot automatically save or discard changes",Неверный числовой адрес порта. Невозможно сохранить или отменить изменения,非法端口格式，无法自动保存，是否丢弃修改,連接埠號格式無效，無法自動儲存或捨棄變更,ポート番号のフォーマットが無効なため、オートセーブできません。変更を破棄しますか,"포트 번호가 올바르지 않아 자동 저장 할 수 없습니다, 변경 사항을 폐기하시겠습니까?","Format de numéro de port illégal, impossible d'enregistrer ou d'annuler automatiquement les modifications"
+"Password can not be blank, Cannot automatically save or discard changes",Пароль не может быть пустым. Невозможно сохранить или отменить изменения,密码不能为空，无法自动保存，是否丢弃修改,密碼不能為空白，無法自動儲存或捨棄變更,サーバーアドレスが無効なため、オートセーブできません。変更を破棄しますか,"비밀번호를 입력하지 않아 자동 저장 할 수 없습니다, 변경 사항을 폐기하시겠습니까?","Le mot de passe ne peut pas être vide, impossible d'enregistrer ou d'annuler automatiquement les modifications"
+"Illegal timeout format, Cannot automatically save or discard changes",Неверный формат таймаута. Невозможно сохранить или отменить изменения,非法超时格式，无法自动保存，是否丢弃修改,逾時格式無效，無法自動儲存或捨棄變更,パスワードが指定されていないため、オートセーブできません。変更を破棄しますか,시간 초과 형식이 올바르지 않아 자동 저장 할 수 없습니다. 변경 사항을 폐기하시겠습니까?,"Format de délai d'attente illégal, impossible d'enregistrer ou d'annuler automatiquement les modifications"
+"Error occured when process proxy setting, do you want reset current setting and retry?",Произошла ошибка при обработке настроек. Хотите сбросить текущие настройки и попробовать снова?,处理代理设置时发生错误，是否重置当前代理设置并重试？,處理 Proxy 設定時發生錯誤，是否重設目前設定並重試？,プロキシ設定の処理にエラーが発生しました、現在のプロキシ設定をリセットし、再試行してもいいですか,프록시 설정을 처리하는데에 오류가 발생했습니다. 현재 설정을 폐기하고 다시 시도하시겠습니까?,Une erreur s'est produite lors du processus de configuration du proxy. Voulez-vous réinitialiser le paramètre actuel et réessayer?
+"Unrecoverable proxy setting error occured, see log for detail","Произошла серьезная ошибка, подробности можно узнать в журналах",发生不可恢复的代理设置错误，查看日志以取得详情,發生無法復原的 Proxy 設定錯誤，詳細資料請參閱記錄,プロキシ設定に回復不能なエラーが発生しました、ログで詳細をご確認ください,복구 불가능한 프록시 설정 오류가 발생했습니다. 자세한 정보는 로그를 참조하세요.,"Une erreur de paramètre de proxy irrécupérable s'est produite, consultez le journal pour plus de détails"
+Traffic Mode,Режим трафика,流量模式,流量模式,トラフィックモード,트래픽 모드,Mode trafic
+User Mode,Пользовательский режим,用户模式,使用者模式,ユーザーモード,사용자 모드,Mode utilisateur
+Admin Mode,Режим администратора,管理员模式,系統管理員模式,管理者モード,관리자 모드,Mode administrateur
+Traffic Routing,Маршрутизация трафика,流量路由,流量路由,トラフィックルーティング,트래픽 라우팅,Routage du trafic
+WinDivert: active,WinDivert: активен,WinDivert：已启用,WinDivert：已啟用,WinDivert: 有効,WinDivert: 활성,WinDivert : actif
+WinDivert: paused (game running),WinDivert: приостановлен (игра запущена),WinDivert：已暂停（游戏运行中）,WinDivert：已暫停（遊戲執行中）,WinDivert: 一時停止（ゲーム実行中）,WinDivert: 일시 중지됨 (게임 실행 중),WinDivert : suspendu (jeu en cours)
+WinDivert: inactive,WinDivert: неактивен,WinDivert：未启用,WinDivert：未啟用,WinDivert: 無効,WinDivert: 비활성,WinDivert : inactif
+.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64,.NET 10 · WinUI 3 · Windows App SDK · x64
+About & updates,О программе и обновления,关于和更新,關於與更新,バージョン情報と更新,정보 및 업데이트,À propos et mises à jour
+Action,Действие,操作,動作,操作,작업,Action
+Activation,Активация,激活,啟用,アクティベーション,활성화,Activation
+Active,Активен,活动,啟用中,アクティブ,활성,Actif
+ACTIVE,АКТИВЕН,活动,啟用中,アクティブ,활성,ACTIF
+Add,Добавить,添加,新增,追加,추가,Ajouter
+Add application,Добавить приложение,添加应用程序,新增應用程式,アプリケーションを追加,애플리케이션 추가,Ajouter une application
+Add source URL(s),Добавить URL источников,添加源 URL,新增來源 URL,ソース URL を追加,소스 URL 추가,Ajouter des URL sources
+Admin capture is suspended automatically while a configured anti-cheat-sensitive application is running.,"Захват в режиме администратора автоматически приостанавливается, пока запущено настроенное приложение, чувствительное к античиту.",运行已配置的反作弊敏感应用程序时，将自动暂停管理员捕获。,執行已設定的反作弊敏感應用程式時，會自動暫停系統管理員擷取。,設定済みのアンチチートに敏感なアプリケーションの実行中は、管理者キャプチャが自動的に停止します。,설정된 안티치트 민감 애플리케이션이 실행 중이면 관리자 캡처가 자동으로 일시 중지됩니다.,La capture administrateur est automatiquement suspendue lorsqu’une application configurée sensible à l’anti-triche est en cours d’exécution.
+Administrator capture status,Состояние захвата администратора,管理员捕获状态,系統管理員擷取狀態,管理者キャプチャの状態,관리자 캡처 상태,État de la capture administrateur
+All configured shortcuts registered.,Все настроенные горячие клавиши зарегистрированы.,已注册所有已配置的快捷键。,已註冊所有已設定的快速鍵。,設定済みのショートカットをすべて登録しました。,구성된 모든 바로 가기를 등록했습니다.,Tous les raccourcis configurés ont été enregistrés.
+All online configurations updated.,Все онлайн-конфигурации обновлены.,已更新所有在线配置。,已更新所有線上設定。,すべてのオンライン設定を更新しました。,모든 온라인 구성을 업데이트했습니다.,Toutes les configurations en ligne ont été mises à jour.
+App theme,Тема приложения,应用主题,應用程式主題,アプリのテーマ,앱 테마,Thème de l’application
+Appearance,Оформление,外观,外觀,外観,모양,Apparence
+Application,Приложение,应用程序,應用程式,アプリケーション,애플리케이션,Application
+Application preferences use native Windows controls and follow the Windows 11 settings layout.,Параметры приложения используют нативные элементы Windows и компоновку настроек Windows 11.,应用首选项使用原生 Windows 控件，并遵循 Windows 11 设置布局。,應用程式偏好設定使用原生 Windows 控制項，並遵循 Windows 11 設定版面配置。,アプリ設定にはネイティブ Windows コントロールを使用し、Windows 11 の設定レイアウトに従います。,애플리케이션 환경설정은 네이티브 Windows 컨트롤을 사용하며 Windows 11 설정 레이아웃을 따릅니다.,Les préférences de l’application utilisent les contrôles Windows natifs et suivent la disposition des paramètres de Windows 11.
+Application routing,Маршрутизация приложений,应用程序路由,應用程式路由,アプリケーションルーティング,애플리케이션 라우팅,Routage des applications
+Applications,Приложения,应用程序,應用程式,アプリケーション,애플리케이션,Applications
+Apply port,Применить порт,应用端口,套用連接埠,ポートを適用,포트 적용,Appliquer le port
+At least one GeoSite source is required.,Необходимо указать хотя бы один источник GeoSite.,至少需要一个 GeoSite 源。,至少需要一個 GeoSite 來源。,少なくとも1つの GeoSite ソースが必要です。,GeoSite 소스가 하나 이상 필요합니다.,Au moins une source GeoSite est requise.
+Auto-refresh,Автообновление,自动刷新,自動重新整理,自動更新,자동 새로 고침,Actualisation automatique
+Automatic Game Mode application list saved.,Список приложений автоматического игрового режима сохранён.,自动游戏模式应用程序列表已保存。,自動遊戲模式應用程式清單已儲存。,自動 Game Mode のアプリケーション一覧を保存しました。,자동 Game Mode 애플리케이션 목록을 저장했습니다.,La liste des applications du Game Mode automatique a été enregistrée.
+Background mode,Фоновый режим,后台模式,背景模式,バックグラウンドモード,백그라운드 모드,Mode arrière-plan
+Behavior,Поведение,行为,行為,動作,동작,Comportement
+Logging,Журналирование,日志,記錄,ログ,로깅,Journalisation
+Block,Блокировать,阻止,封鎖,ブロック,차단,Bloquer
+Bold,Полужирный,粗体,粗體,太字,굵게,Gras
+Capture mode,Режим захвата,捕获模式,擷取模式,キャプチャモード,캡처 모드,Mode de capture
+Checking GitHub releases…,Проверка релизов GitHub…,正在检查 GitHub 版本…,正在檢查 GitHub 版本…,GitHub のリリースを確認しています…,GitHub 릴리스를 확인하는 중…,Vérification des versions GitHub…
+Choose Local GeoSite PAC or an Online PAC and manage the ordered GeoSite source list.,Выберите локальный PAC на основе GeoSite или онлайн-PAC и управляйте упорядоченным списком источников GeoSite.,选择本地 GeoSite PAC 或在线 PAC，并管理有序的 GeoSite 源列表。,選擇本機 GeoSite PAC 或線上 PAC，並管理已排序的 GeoSite 來源清單。,ローカル GeoSite PAC またはオンライン PAC を選択し、順序付きの GeoSite ソース一覧を管理します。,로컬 GeoSite PAC 또는 온라인 PAC를 선택하고 정렬된 GeoSite 소스 목록을 관리합니다.,Choisir le PAC GeoSite local ou un PAC en ligne et gérer la liste ordonnée des sources GeoSite.
+"Choose User or Administrator capture, inspect WinDivert state, and route individual applications.","Выберите пользовательский режим или режим администратора, контролируйте состояние WinDivert и задавайте маршрутизацию отдельных приложений.",选择用户或管理员捕获，查看 WinDivert 状态，并按应用程序路由。,選擇使用者或系統管理員擷取、檢視 WinDivert 狀態，並依應用程式路由。,ユーザーまたは管理者キャプチャを選択し、WinDivert の状態を確認してアプリケーションごとにルーティングします。,사용자 또는 관리자 캡처를 선택하고 WinDivert 상태를 확인하며 애플리케이션별로 라우팅합니다.,"Choisir la capture utilisateur ou administrateur, inspecter l’état de WinDivert et router les applications individuellement."
+Clear logs,Очистить логи,清除日志,清除記錄,ログを消去,로그 지우기,Effacer les journaux
+Clipboard does not contain an ss:// URL,Буфер обмена не содержит URL ss://,剪贴板不包含 ss:// URL,剪貼簿不包含 ss:// URL,クリップボードに ss:// URL がありません,클립보드에 ss:// URL이 없습니다,Le Presse-papiers ne contient pas d’URL ss://
+Clipboard does not contain text,Буфер обмена не содержит текста,剪贴板不包含文本,剪貼簿不包含文字,クリップボードにテキストがありません,클립보드에 텍스트가 없습니다,Le Presse-papiers ne contient pas de texte
+Closing the window hides it to the notification area. The proxy controller keeps running until you choose Exit from the tray menu.,"Закрытие окна скрывает его в область уведомлений. Контроллер прокси продолжает работать, пока вы не выберете выход в меню трея.",关闭窗口会将其隐藏到通知区域。代理控制器会继续运行，直到从托盘菜单选择“退出”。,關閉視窗會將其隱藏到通知區域。Proxy 控制器會繼續執行，直到從系統匣選單選擇「結束」。,ウィンドウを閉じると通知領域に隠れます。トレイメニューから「終了」を選ぶまでプロキシコントローラーは動作を続けます。,창을 닫으면 알림 영역으로 숨겨집니다. 트레이 메뉴에서 종료를 선택할 때까지 프록시 컨트롤러는 계속 실행됩니다.,La fermeture de la fenêtre la masque dans la zone de notification. Le contrôleur proxy continue de fonctionner jusqu’à ce que vous choisissiez Quitter dans le menu de la zone de notification.
+Configure global keyboard shortcuts.,Настройте глобальные сочетания клавиш.,配置全局键盘快捷键。,設定全域鍵盤快速鍵。,グローバルキーボードショートカットを設定します。,전역 키보드 단축키를 구성합니다.,Configurer les raccourcis clavier globaux.
+Connect to the Shadowsocks server through an optional upstream proxy.,Подключайтесь к серверу Shadowsocks через необязательный внешний прокси.,通过可选的上游代理连接 Shadowsocks 服务器。,透過選用的上游 Proxy 連線 Shadowsocks 伺服器。,任意の上流プロキシ経由で Shadowsocks サーバーに接続します。,선택적 업스트림 프록시를 통해 Shadowsocks 서버에 연결합니다.,Se connecter au serveur Shadowsocks via un proxy amont facultatif.
+Connection state,Состояние подключения,连接状态,連線狀態,接続状態,연결 상태,État de la connexion
+Controller,Контроллер,控制器,控制器,コントローラー,컨트롤러,Contrôleur
+Controller is unavailable.,Контроллер недоступен.,控制器不可用。,控制器無法使用。,コントローラーを利用できません。,컨트롤러를 사용할 수 없습니다.,Le contrôleur est indisponible.
+Controller unavailable,Контроллер недоступен,控制器不可用,控制器無法使用,コントローラー利用不可,컨트롤러 사용 불가,Contrôleur indisponible
+Copy,Копировать,复制,複製,コピー,복사,Copier
+Copy link,Копировать ссылку,复制链接,複製連結,リンクをコピー,링크 복사,Copier le lien
+"Core networking is UI-independent. Windows integration, WinDivert coordination and tray support live in the Windows platform layer.","Сетевое ядро не зависит от интерфейса. Интеграция с Windows, координация WinDivert и поддержка трея находятся в платформенном слое Windows.",核心网络逻辑独立于 UI。Windows 集成、WinDivert 协调和托盘支持位于 Windows 平台层。,核心網路邏輯獨立於 UI。Windows 整合、WinDivert 協調與系統匣支援位於 Windows 平台層。,コアネットワークは UI から独立しています。Windows 統合、WinDivert の制御、トレイ対応は Windows プラットフォーム層にあります。,"핵심 네트워킹은 UI와 독립적입니다. Windows 통합, WinDivert 조정 및 트레이 지원은 Windows 플랫폼 계층에 있습니다.","Le réseau principal est indépendant de l’interface. L’intégration Windows, la coordination WinDivert et la prise en charge de la zone de notification résident dans la couche de plateforme Windows."
+Credentials (optional),Учётные данные (необязательно),凭据（可选）,認證資訊（選用）,認証情報（任意）,자격 증명(선택 사항),Identifiants (facultatif)
+Ctrl+Alt+S,Ctrl+Alt+S,Ctrl+Alt+S,Ctrl+Alt+S,Ctrl+Alt+S,Ctrl+Alt+S,Ctrl+Alt+S
+"Current proxy, server, and system-shell state at a glance.","Краткое состояние прокси, сервера и системной оболочки.",一览当前代理、服务器和系统 shell 状态。,快速檢視目前的 Proxy、伺服器與系統 Shell 狀態。,現在のプロキシ、サーバー、システムシェルの状態を一覧表示します。,"현재 프록시, 서버 및 시스템 셸 상태를 한눈에 확인합니다.","Afficher d’un coup d’œil l’état actuel du proxy, du serveur et du shell système."
+Current state,Текущее состояние,当前状态,目前狀態,現在の状態,현재 상태,État actuel
+Dark,Тёмная,深色,深色,ダーク,어둡게,Sombre
+Debug,Отладка,调试,偵錯,デバッグ,디버그,Débogage
+Details,Параметры,详细信息,詳細資料,詳細,세부 정보,Détails
+Direct,Напрямую,直连,直接連線,直接接続,직접 연결,Direct
+Disabled,Отключён,已禁用,已停用,無効,비활성화됨,Désactivé
+Discard,Отбросить,丢弃,捨棄,破棄,버리기,Ignorer
+Discard changes,Отменить изменения,丢弃更改,捨棄變更,変更を破棄,변경 내용 버리기,Ignorer les modifications
+Download / refresh GeoSite,Скачать / обновить GeoSite,下载 / 刷新 GeoSite,下載 / 重新整理 GeoSite,GeoSite をダウンロード / 更新,GeoSite 다운로드 / 새로 고침,Télécharger / actualiser GeoSite
+Download update,Скачать обновление,下载更新,下載更新,更新をダウンロード,업데이트 다운로드,Télécharger la mise à jour
+Enabled,Включено,已启用,已啟用,有効,활성화됨,Activé
+Enabled · Global,Включён · Глобальный,已启用 · 全局,已啟用 · 全域,有効 · グローバル,활성화됨 · 글로벌,Activé · Global
+Enabled · PAC,Включён · PAC,已启用 · PAC,已啟用 · PAC,有効 · PAC,활성화됨 · PAC,Activé · PAC
+Enter an absolute HTTP or HTTPS URL.,Введите абсолютный HTTP- или HTTPS-URL.,输入绝对 HTTP 或 HTTPS URL。,輸入絕對 HTTP 或 HTTPS URL。,絶対 HTTP または HTTPS URL を入力します。,절대 HTTP 또는 HTTPS URL을 입력합니다.,Saisir une URL absolue HTTP ou HTTPS.
+Every 2 seconds,Каждые 2 секунды,每 2 秒,每 2 秒,2秒ごと,2초마다,Toutes les 2 secondes
+Every source must be an absolute HTTP or HTTPS URL.,Каждый источник должен быть абсолютным HTTP- или HTTPS-URL.,每个源都必须是绝对 HTTP 或 HTTPS URL。,每個來源都必須是絕對 HTTP 或 HTTPS URL。,各ソースは絶対 HTTP または HTTPS URL である必要があります。,각 소스는 절대 HTTP 또는 HTTPS URL이어야 합니다.,Chaque source doit être une URL absolue HTTP ou HTTPS.
+Failed sources: {0},Не удалось обновить источники: {0},失败的源：{0},失敗的來源：{0},失敗したソース: {0},실패한 소스: {0},Sources en échec : {0}
+Failed to open {0}: {1},Не удалось открыть {0}: {1},无法打开 {0}：{1},無法開啟 {0}：{1},{0} を開けませんでした: {1},{0}을(를) 열 수 없습니다: {1},Impossible d’ouvrir {0} : {1}
+Failed to start,Не удалось запустить,启动失败,啟動失敗,起動に失敗しました,시작 실패,Échec du démarrage
+Failed to update ss:// protocol association,Не удалось обновить ассоциацию протокола ss://,无法更新 ss:// 协议关联,無法更新 ss:// 通訊協定關聯,ss:// プロトコルの関連付けを更新できませんでした,ss:// 프로토콜 연결을 업데이트하지 못했습니다,Échec de la mise à jour de l’association du protocole ss://
+Failed to update Start on Boot.,Не удалось изменить автозагрузку.,更新开机启动失败。,更新開機啟動失敗。,スタートアップ設定の更新に失敗しました。,시작 시 실행 설정을 업데이트하지 못했습니다.,Échec de la mise à jour du démarrage automatique.
+Font family,Семейство шрифта,字体系列,字型系列,フォントファミリー,글꼴 패밀리,Famille de polices
+Forward proxy settings saved.,Настройки внешнего прокси сохранены.,上游代理设置已保存。,上游 Proxy 設定已儲存。,上流プロキシ設定を保存しました。,업스트림 프록시 설정을 저장했습니다.,Les paramètres du proxy amont ont été enregistrés.
+Game compatibility,Совместимость с играми,游戏兼容性,遊戲相容性,ゲーム互換性,게임 호환성,Compatibilité des jeux
+Game Mode,Игровой режим,游戏模式,遊戲模式,ゲームモード,게임 모드,Mode jeu
+Game Mode is automatic,Игровой режим включается автоматически,游戏模式是自动的,遊戲模式是自動的,Game Mode は自動です,Game Mode는 자동입니다,Le Game Mode est automatique
+game.exe or C:\Games\Game\game.exe,game.exe или C:\Games\Game\game.exe,game.exe 或 C:\Games\Game\game.exe,game.exe 或 C:\Games\Game\game.exe,game.exe または C:\Games\Game\game.exe,game.exe 또는 C:\Games\Game\game.exe,game.exe ou C:\Games\Game\game.exe
+GeoSite,GeoSite,GeoSite,GeoSite,GeoSite,GeoSite,GeoSite
+GeoSite source list saved.,Список источников GeoSite сохранён.,GeoSite 源列表已保存。,GeoSite 來源清單已儲存。,GeoSite ソース一覧を保存しました。,GeoSite 소스 목록을 저장했습니다.,La liste des sources GeoSite a été enregistrée.
+GeoSite sources,Источники GeoSite,GeoSite 源,GeoSite 來源,GeoSite ソース,GeoSite 소스,Sources GeoSite
+GeoSite update did not complete,Обновление GeoSite не завершено,GeoSite 更新未完成,GeoSite 更新未完成,GeoSite の更新が完了しませんでした,GeoSite 업데이트가 완료되지 않았습니다,La mise à jour GeoSite ne s’est pas terminée
+Global shortcuts,Глобальные горячие клавиши,全局快捷键,全域快速鍵,グローバルショートカット,전역 단축키,Raccourcis globaux
+Hotkeys,Горячие клавиши,编辑快捷键,編輯快速鍵,ホットキーの編集,단축키 수정,Modifier les raccourcis clavier
+Hotkeys saved and registered.,Горячие клавиши сохранены и зарегистрированы.,快捷键已保存并注册。,快速鍵已儲存並註冊。,ホットキーを保存して登録しました。,단축키를 저장하고 등록했습니다.,Les raccourcis ont été enregistrés et inscrits.
+How tray mode works,Как работает режим трея,托盘模式的工作方式,系統匣模式的運作方式,トレイモードの仕組み,트레이 모드 작동 방식,Fonctionnement du mode zone de notification
+Import,Импортировать,导入,匯入,インポート,가져오기,Importer
+Import server,Импорт сервера,导入服务器,匯入伺服器,サーバーをインポート,서버 가져오기,Importer un serveur
+Import server configuration?,Импортировать конфигурацию сервера?,导入服务器配置？,匯入伺服器設定？,サーバー設定をインポートしますか？,서버 구성을 가져오시겠습니까?,Importer la configuration du serveur ?
+In 0 B/s · Out 0 B/s,Вход 0 Б/с · Выход 0 Б/с,入 0 B/s · 出 0 B/s,入 0 B/s · 出 0 B/s,受信 0 B/s · 送信 0 B/s,수신 0 B/s · 송신 0 B/s,Entrée 0 B/s · Sortie 0 B/s
+In {0}/s · Out {1}/s,Вход {0}/с · Выход {1}/с,入 {0}/s · 出 {1}/s,入 {0}/s · 出 {1}/s,受信 {0}/s · 送信 {1}/s,수신 {0}/s · 송신 {1}/s,Entrée {0}/s · Sortie {1}/s
+In: 0 B · Out: 0 B,Вход: 0 Б · Выход: 0 Б,入：0 B · 出：0 B,入：0 B · 出：0 B,受信: 0 B · 送信: 0 B,수신: 0 B · 송신: 0 B,Entrée : 0 B · Sortie : 0 B
+In: {0} · Out: {1},Вход: {0} · Выход: {1},入：{0} · 出：{1},入：{0} · 出：{1},受信: {0} · 送信: {1},수신: {0} · 송신: {1},Entrée : {0} · Sortie : {1}
+Inactive,Неактивен,非活动,非啟用,非アクティブ,비활성,Inactif
+Include prerelease versions,Учитывать предварительные версии,检查测试版更新,檢查發行前版本更新,ベータ版のアップデートも確認,개발 버전 업데이트 확인하기,Vérifier la version préliminaire
+Info,Информация,信息,資訊,情報,정보,Informations
+Invalid shortcut: {0},Некорректное сочетание клавиш: {0},无效快捷键：{0},無效的快速鍵：{0},無効なショートカット: {0},잘못된 단축키: {0},Raccourci invalide : {0}
+Italic,Курсив,斜体,斜體,斜体,기울임꼴,Italique
+Light,Светлая,浅色,淺色,ライト,밝게,Clair
+"Live log viewer with traffic history, font, wrap, toolbar, and always-on-top settings.","Просмотр логов в реальном времени с историей трафика, настройками шрифта, переноса строк, панели инструментов и режима поверх окон.",实时日志查看器，包含流量历史、字体、自动换行、工具栏和置顶设置。,即時記錄檢視器，包含流量歷程、字型、自動換行、工具列與最上層設定。,トラフィック履歴、フォント、折り返し、ツールバー、常に手前の設定を備えたライブログビューアです。,"트래픽 기록, 글꼴, 줄 바꿈, 도구 모음 및 항상 위 설정이 있는 실시간 로그 뷰어입니다.","Visionneuse de journaux en direct avec historique du trafic, police, retour à la ligne, barre d’outils et option toujours au premier plan."
+Local client,Локальный клиент,本地客户端,本機用戶端,ローカルクライアント,로컬 클라이언트,Client local
+Local GeoSite,Локальный GeoSite,本地 GeoSite,本機 GeoSite,ローカル GeoSite,로컬 GeoSite,GeoSite local
+Local only,Только локально,仅本地,僅本機,ローカルのみ,로컬 전용,Local uniquement
+Local PAC updated from GeoSite,Локальный PAC обновлён из GeoSite,已从 GeoSite 更新本地 PAC,已從 GeoSite 更新本機 PAC,GeoSite からローカル PAC を更新しました,GeoSite에서 로컬 PAC를 업데이트했습니다,PAC local mis à jour depuis GeoSite
+Local PAC URL copied,URL локального PAC скопирован,本地 PAC URL 已复制,本機 PAC URL 已複製,ローカル PAC URL をコピーしました,로컬 PAC URL을 복사했습니다,URL PAC locale copiée
+Local proxy port changed to {0}.,Порт локального прокси изменён на {0}.,本地代理端口已更改为 {0}。,本機 Proxy 連接埠已變更為 {0}。,ローカルプロキシポートを {0} に変更しました。,로컬 프록시 포트를 {0}(으)로 변경했습니다.,Le port proxy local a été changé en {0}.
+Local SOCKS/HTTP port,Локальный порт SOCKS/HTTP,本地 SOCKS/HTTP 端口,本機 SOCKS/HTTP 連接埠,ローカル SOCKS/HTTP ポート,로컬 SOCKS/HTTP 포트,Port SOCKS/HTTP local
+Log file cleared.,Файл лога очищен.,日志文件已清除。,記錄檔已清除。,ログファイルを消去しました。,로그 파일을 지웠습니다.,Le fichier journal a été effacé.
+Log file has not been created yet.,Файл лога ещё не создан.,尚未创建日志文件。,尚未建立記錄檔。,ログファイルはまだ作成されていません。,로그 파일이 아직 생성되지 않았습니다.,Le fichier journal n’a pas encore été créé.
+Log font,Шрифт лога,日志字体,記錄字型,ログフォント,로그 글꼴,Police du journal
+Logs,Логи,显示日志,顯示記錄檔,ログの表示,로그 보기,Afficher les journaux
+Manage proxy servers and local client settings.,Управляйте прокси-серверами и настройками локального клиента.,管理代理服务器和本地客户端设置。,管理 Proxy 伺服器與本機用戶端設定。,プロキシサーバーとローカルクライアント設定を管理します。,프록시 서버 및 로컬 클라이언트 설정을 관리합니다.,Gérer les serveurs proxy et les paramètres du client local.
+Manage SIP008 / online configuration sources.,Управляйте источниками SIP008 / онлайн-конфигураций.,管理 SIP008 / 在线配置源。,管理 SIP008 / 線上設定來源。,SIP008 / オンライン設定ソースを管理します。,SIP008 / 온라인 구성 소스를 관리합니다.,Gérer les sources de configuration SIP008 / en ligne.
+Move down,Переместить вниз,下移,下移,下へ,아래로 이동,Descendre
+Move up,Переместить вверх,上移,上移,上へ,위로 이동,Monter
+Network service,Сетевая служба,网络服务,網路服務,ネットワークサービス,네트워크 서비스,Service réseau
+New server {0},Новый сервер {0},新服务器 {0},新伺服器 {0},新しいサーバー {0},새 서버 {0},Nouveau serveur {0}
+No application-specific rules.,Правила для отдельных приложений не настроены.,没有按应用程序规则。,沒有個別應用程式規則。,アプリケーション固有のルールはありません。,애플리케이션별 규칙이 없습니다.,Aucune règle spécifique à une application.
+No elevation. Uses the normal local proxy path.,Без повышения прав. Используется обычный локальный прокси.,无需提升权限。使用普通本地代理路径。,不需要提高權限。使用一般本機 Proxy 路徑。,昇格は不要です。通常のローカルプロキシ経路を使用します。,권한 상승이 필요 없습니다. 일반 로컬 프록시 경로를 사용합니다.,Aucune élévation. Utilise le chemin proxy local normal.
+No game applications are configured yet.,Приложения для игрового режима ещё не настроены.,尚未配置游戏模式应用程序。,尚未設定遊戲模式應用程式。,Game Mode のアプリケーションはまだ設定されていません。,Game Mode 애플리케이션이 아직 구성되지 않았습니다.,Aucune application de Game Mode n’est encore configurée.
+No proxy,Без прокси,无代理,無 Proxy,プロキシなし,프록시 없음,Aucun proxy
+No server configured,Сервер не настроен,未配置服务器,未設定伺服器,サーバー未設定,구성된 서버 없음,Aucun serveur configuré
+No valid ss:// server links were found.,Корректные ссылки серверов ss:// не найдены.,未找到有效的 ss:// 服务器链接。,找不到有效的 ss:// 伺服器連結。,有効な ss:// サーバーリンクが見つかりませんでした。,유효한 ss:// 서버 링크를 찾지 못했습니다.,Aucun lien de serveur ss:// valide n’a été trouvé.
+Not checked yet.,Проверка ещё не выполнялась.,尚未检查。,尚未檢查。,まだ確認していません。,아직 확인하지 않음.,Pas encore vérifié.
+Not configured,Не настроен,未配置,未設定,未設定,구성되지 않음,Non configuré
+Not now,Не сейчас,稍后,稍後,後で,나중에,Plus tard
+Not running,Не запущено,未运行,未執行,未実行,실행 중 아님,Non exécuté
+Off,Выкл.,关闭,關閉,オフ,끔,Désactivé
+On,Вкл.,开启,開啟,オン,켬,Activé
+One URL per line,Один URL на строку,每行一个 URL,每行一個 URL,1行に1つの URL,한 줄에 URL 하나,Une URL par ligne
+Online,Онлайн,在线,線上,オンライン,온라인,En ligne
+Online PAC URL,URL онлайн-PAC,在线 PAC URL,線上 PAC URL,オンライン PAC URL,온라인 PAC URL,URL PAC en ligne
+Online PAC URL saved.,URL онлайн-PAC сохранён.,在线 PAC URL 已保存。,線上 PAC URL 已儲存。,オンライン PAC URL を保存しました。,온라인 PAC URL을 저장했습니다.,L’URL PAC en ligne a été enregistrée.
+Open,Открыть,打开,開啟,開く,열기,Ouvrir
+Open file,Открыть файл,打开文件,開啟檔案,ファイルを開く,파일 열기,Ouvrir le fichier
+Open location,Открыть расположение,打开位置,開啟位置,場所を開く,위치 열기,Ouvrir l’emplacement
+Overview,Обзор,概览,概覽,概要,개요,Vue d’ensemble
+PAC / GeoSite,PAC / GeoSite,PAC / GeoSite,PAC / GeoSite,PAC / GeoSite,PAC / GeoSite,PAC / GeoSite
+PAC mode,Режим PAC,PAC 模式,PAC 模式,PAC モード,PAC 모드,Mode PAC
+Paste one or more ss:// links,Вставьте одну или несколько ссылок ss://,粘贴一个或多个 ss:// 链接,貼上一個或多個 ss:// 連結,1つ以上の ss:// リンクを貼り付け,하나 이상의 ss:// 링크 붙여넣기,Coller un ou plusieurs liens ss://
+Paused,Приостановлен,已暂停,已暫停,一時停止,일시 중지됨,En pause
+Please input PAC URL before enabling Online PAC.,Перед включением онлайн-PAC укажите URL PAC.,启用在线 PAC 前请输入 PAC URL。,啟用線上 PAC 前請輸入 PAC URL。,オンライン PAC を有効にする前に PAC URL を入力してください。,온라인 PAC를 활성화하기 전에 PAC URL을 입력하세요.,Veuillez saisir l’URL PAC avant d’activer le PAC en ligne.
+Please input PAC URL.,Укажите URL PAC.,请输入 PAC URL。,請輸入 PAC URL。,PAC URL を入力してください。,PAC URL을 입력하세요.,Veuillez saisir l’URL PAC.
+Pre-release,Предварительная версия,预发布,預發行,プレリリース,사전 릴리스,Préversion
+Project,Проект,项目,專案,プロジェクト,프로젝트,Projet
+Proxy,Прокси,代理,代理,プロキシ,프록시,Proxy
+Proxy address is required.,Необходимо указать адрес прокси.,必须填写代理地址。,必須填寫 Proxy 位址。,プロキシアドレスが必要です。,프록시 주소가 필요합니다.,L’adresse du proxy est requise.
+Proxy port must be between 1 and 65535.,Порт прокси должен быть в диапазоне от 1 до 65535.,代理端口必须在 1 到 65535 之间。,Proxy 連接埠必須介於 1 到 65535 之間。,プロキシポートは 1～65535 の範囲で指定してください。,프록시 포트는 1에서 65535 사이여야 합니다.,Le port du proxy doit être compris entre 1 et 65535.
+Refresh,Обновить,刷新,重新整理,更新,새로 고침,Actualiser
+Regenerate Local PAC after application updates,Пересоздавать локальный PAC после обновлений приложения,应用更新后重新生成本地 PAC,應用程式更新後重新產生本機 PAC,アプリ更新後にローカル PAC を再生成,앱 업데이트 후 로컬 PAC 다시 생성,Régénérer le PAC local après les mises à jour de l’application
+Register all,Зарегистрировать все,全部注册,全部註冊,すべて登録,모두 등록,Tout enregistrer
+Register hotkeys at startup,Регистрировать горячие клавиши при запуске,启动时注册快捷键,啟動時註冊快速鍵,起動時にホットキーを登録,시작 시 단축키 등록,Enregistrer les raccourcis au démarrage
+Release,Релиз,正式版本,正式版本,リリース,릴리스,Version
+Release notes,Примечания к выпуску,发行说明,版本資訊,リリースノート,릴리스 정보,Notes de version
+Release notes are unavailable.,Примечания к выпуску недоступны.,发行说明不可用。,版本資訊無法使用。,リリースノートを利用できません。,릴리스 정보를 사용할 수 없습니다.,Les notes de version ne sont pas disponibles.
+Remove,Удалить,删除,移除,削除,제거,Supprimer
+Report issue,Сообщить о проблеме,报告问题,回報問題,問題を報告,문제 보고,Signaler un problème
+Require secret for local PAC URL,Требовать секрет для URL локального PAC,要求本地 PAC URL 使用密钥,要求本機 PAC URL 使用密鑰,ローカル PAC URL にシークレットを要求,로컬 PAC URL에 비밀 키 요구,Exiger un secret pour l’URL PAC locale
+Restore default,Восстановить по умолчанию,恢复默认,還原預設值,既定値に戻す,기본값 복원,Restaurer les valeurs par défaut
+"Rules are matched by executable name, full path, or wildcard. Proxy, Direct and Block are explicit actions.","Правила сопоставляются по имени исполняемого файла, полному пути или маске. Действия «Прокси», «Напрямую» и «Блокировать» задаются явно.",规则按可执行文件名、完整路径或通配符匹配。代理、直连和阻止是明确的操作。,規則會依執行檔名稱、完整路徑或萬用字元比對。Proxy、直接連線與封鎖是明確的動作。,ルールは実行ファイル名、完全パス、またはワイルドカードで照合します。Proxy、Direct、Block は明示的な操作です。,"규칙은 실행 파일 이름, 전체 경로 또는 와일드카드로 일치합니다. Proxy, Direct, Block은 명시적 동작입니다.","Les règles correspondent au nom de l’exécutable, au chemin complet ou à un motif générique. Proxy, Direct et Block sont des actions explicites."
+Running,Работает,运行中,執行中,実行中,실행 중,En cours d’exécution
+Runs quietly in the background,Работает в фоне,在后台安静运行,在背景安靜執行,バックグラウンドで静かに実行,백그라운드에서 조용히 실행,S’exécute discrètement en arrière-plan
+Runtime mode,Фактический режим,运行模式,執行模式,実行モード,런타임 모드,Mode d’exécution
+Save,Сохранить,保存,儲存,保存,저장,Enregistrer
+Save PAC URL,Сохранить URL PAC,保存 PAC URL,儲存 PAC URL,PAC URL を保存,PAC URL 저장,Enregistrer l’URL PAC
+Save routing,Сохранить маршрутизацию,保存路由,儲存路由,ルーティングを保存,라우팅 저장,Enregistrer le routage
+Save sources,Сохранить источники,保存源,儲存來源,ソースを保存,소스 저장,Enregistrer les sources
+"Saved, but Windows refused: {0}","Сохранено, но Windows отклонила: {0}",已保存，但 Windows 拒绝：{0},已儲存，但 Windows 拒絕：{0},保存しましたが、Windows に拒否されました: {0},저장했지만 Windows에서 거부했습니다: {0},"Enregistré, mais Windows a refusé : {0}"
+Scale 1 KiB/s,Шкала 1 КиБ/с,刻度 1 KiB/s,刻度 1 KiB/s,スケール 1 KiB/s,스케일 1 KiB/s,Échelle 1 Kio/s
+Scale {0}/s,Шкала {0}/с,刻度 {0}/s,刻度 {0}/s,スケール {0}/s,스케일 {0}/s,Échelle {0}/s
+Secure,Защищённый,安全,安全,セキュア,보안,Sécurisé
+Server configuration imported.,Конфигурация сервера импортирована.,服务器配置已导入。,伺服器設定已匯入。,サーバー設定をインポートしました。,서버 구성을 가져왔습니다.,La configuration du serveur a été importée.
+Server configuration saved.,Конфигурация сервера сохранена.,服务器配置已保存。,伺服器設定已儲存。,サーバー設定を保存しました。,서버 구성을 저장했습니다.,La configuration du serveur a été enregistrée.
+Server is not configured.,Сервер не настроен.,服务器未配置。,伺服器未設定。,サーバーは設定されていません。,서버가 구성되지 않았습니다.,Le serveur n’est pas configuré.
+Server link copied to the clipboard.,Ссылка на сервер скопирована в буфер обмена.,服务器链接已复制到剪贴板。,伺服器連結已複製到剪貼簿。,サーバーリンクをクリップボードにコピーしました。,서버 링크를 클립보드에 복사했습니다.,Le lien du serveur a été copié dans le Presse-papiers.
+Server {0},Сервер {0},服务器 {0},伺服器 {0},サーバー {0},서버 {0},Serveur {0}
+Settings,Настройки,设置,設定,設定,설정,Paramètres
+Shadowsocks Reborn,Shadowsocks Reborn,Shadowsocks Reborn,Shadowsocks Reborn,Shadowsocks Reborn,Shadowsocks Reborn,Shadowsocks Reborn
+Share,Поделиться,分享,分享,共有,공유,Partager
+Share / QR,Поделиться / QR,分享 / QR,分享 / QR,共有 / QR,공유 / QR,Partage / QR
+"Share a server using the same list + QR workflow as the original client, or import ss:// links.","Поделитесь сервером через список и QR-код, как в оригинальном клиенте, или импортируйте ссылки ss://.",使用与原客户端相同的列表 + QR 流程分享服务器，或导入 ss:// 链接。,使用與原始用戶端相同的清單 + QR 流程分享伺服器，或匯入 ss:// 連結。,元のクライアントと同じ一覧 + QR の流れでサーバーを共有するか、ss:// リンクをインポートします。,기존 클라이언트와 동일한 목록 + QR 흐름으로 서버를 공유하거나 ss:// 링크를 가져옵니다.,"Partager un serveur avec le même flux liste + QR que le client d’origine, ou importer des liens ss://."
+Shared,Доступ из сети,已共享,已分享,共有済み,공유됨,Partagé
+Shell initialization warning: {0},Предупреждение инициализации оболочки: {0},Shell 初始化警告：{0},Shell 初始化警告：{0},シェル初期化の警告: {0},셸 초기화 경고: {0},Avertissement d’initialisation du shell : {0}
+Shortcut format,Формат сочетания клавиш,快捷键格式,快速鍵格式,ショートカット形式,단축키 형식,Format du raccourci
+Single instance · tray active · controller unavailable,Один экземпляр · трей активен · контроллер недоступен,单实例 · 托盘活动 · 控制器不可用,單一執行個體 · 系統匣作用中 · 控制器無法使用,単一インスタンス · トレイ有効 · コントローラー利用不可,단일 인스턴스 · 트레이 활성 · 컨트롤러 사용 불가,Instance unique · zone de notification active · contrôleur indisponible
+Single instance · tray active · system shell ready,Один экземпляр · трей активен · системная оболочка готова,单实例 · 托盘活动 · 系统 shell 就绪,單一執行個體 · 系統匣作用中 · 系統 Shell 就緒,単一インスタンス · トレイ有効 · システムシェル準備完了,단일 인스턴스 · 트레이 활성 · 시스템 셸 준비됨,Instance unique · zone de notification active · shell système prêt
+Size (pt),Размер (пт),大小（pt）,大小（pt）,サイズ (pt),크기(pt),Taille (pt)
+Skip this version,Пропустить эту версию,跳过此版本,略過此版本,このバージョンをスキップ,이 버전 건너뛰기,Ignorer cette version
+Source URL copied.,URL источника скопирован.,源 URL 已复制。,來源 URL 已複製。,ソース URL をコピーしました。,소스 URL을 복사했습니다.,URL source copiée.
+Sources are tried independently and merged. A missing .sha256sum sidecar is non-fatal.,"Источники обрабатываются независимо, а результаты объединяются. Отсутствие файла .sha256sum не является критической ошибкой.",各源会独立尝试并合并。缺少 .sha256sum sidecar 不会导致失败。,各來源會獨立嘗試並合併。缺少 .sha256sum sidecar 不會造成失敗。,各ソースは個別に試行され、結果がマージされます。.sha256sum サイドカーがなくても致命的ではありません。,각 소스는 독립적으로 시도되고 병합됩니다. .sha256sum 사이드카가 없어도 치명적이지 않습니다.,Les sources sont essayées indépendamment puis fusionnées. L’absence d’un fichier annexe .sha256sum n’est pas bloquante.
+ss:// link,Ссылка ss://,ss:// 链接,ss:// 連結,ss:// リンク,ss:// 링크,Lien ss://
+Start on Boot disabled,Автозагрузка отключена,开机启动已禁用,開機啟動已停用,スタートアップを無効化しました,시작 시 실행 비활성화됨,Démarrage automatique désactivé
+Start on Boot enabled,Автозагрузка включена,开机启动已启用,開機啟動已啟用,スタートアップを有効化しました,시작 시 실행 활성화됨,Démarrage automatique activé
+Starting…,Запуск…,正在启动…,正在啟動…,起動中…,시작하는 중…,Démarrage…
+Startup,Автозапуск,启动,啟動,スタートアップ,시작,Démarrage
+Stay,Остаться,保留,保留,このまま,유지,Conserver
+Stopped,Остановлен,已停止,已停止,停止,중지됨,Arrêté
+Suspended,Приостановлен,已暂停,已暫停,一時停止,일시 중지됨,Suspendu
+Suspended by Game Mode,Приостановлен игровым режимом,被游戏模式暂停,由遊戲模式暫停,Game Mode により一時停止,Game Mode에 의해 일시 중지됨,Suspendu par le Game Mode
+System,Системная,系统,系統,システム,시스템,Système
+System proxy,Системный прокси,系统代理,系統 Proxy,システムプロキシ,시스템 프록시,Proxy système
+System shell,Системная оболочка,系统 shell,系統 Shell,システムシェル,시스템 셸,Shell système
+TCP capture,Захват TCP,TCP 捕获,TCP 擷取,TCP キャプチャ,TCP 캡처,Capture TCP
+TCP redirect port,Порт перенаправления TCP,TCP 重定向端口,TCP 重新導向連接埠,TCP リダイレクトポート,TCP 리디렉션 포트,Port de redirection TCP
+The application list could not be applied.,Не удалось применить список приложений.,无法应用应用程序列表。,無法套用應用程式清單。,アプリケーション一覧を適用できませんでした。,애플리케이션 목록을 적용할 수 없습니다.,Impossible d’appliquer la liste des applications.
+Theme follows Windows by default. Choose a fixed theme only when you explicitly want to override the system setting.,По умолчанию тема следует настройкам Windows. Выберите фиксированную тему только если хотите переопределить системную настройку.,默认跟随 Windows 主题。仅在明确需要覆盖系统设置时选择固定主题。,預設跟隨 Windows 主題。只有在明確需要覆寫系統設定時才選擇固定主題。,既定では Windows テーマに従います。システム設定を明示的に上書きしたい場合のみ固定テーマを選択してください。,기본적으로 Windows 테마를 따릅니다. 시스템 설정을 명시적으로 재정의하려는 경우에만 고정 테마를 선택하세요.,Le thème suit Windows par défaut. Choisissez un thème fixe uniquement si vous souhaitez explicitement remplacer le réglage système.
+Theme now follows Windows.,Теперь тема следует настройкам Windows.,主题现在跟随 Windows。,主題現在跟隨 Windows。,テーマは Windows に従うようになりました。,이제 테마가 Windows를 따릅니다.,Le thème suit désormais Windows.
+This server has not been configured. Discard it and switch to the selected server?,Этот сервер не настроен. Отбросить его и перейти к выбранному серверу?,此服务器尚未配置。是否丢弃它并切换到选中的服务器？,此伺服器尚未設定。是否捨棄它並切換至選取的伺服器？,このサーバーは未設定です。破棄して選択したサーバーに切り替えますか？,이 서버는 구성되지 않았습니다. 버리고 선택한 서버로 전환하시겠습니까?,Ce serveur n’est pas configuré. L’ignorer et passer au serveur sélectionné ?
+This version will be skipped.,Эта версия будет пропущена.,将跳过此版本。,將略過此版本。,このバージョンはスキップされます。,이 버전은 건너뜁니다.,Cette version sera ignorée.
+Timeout must be between 1 and {0} seconds.,Тайм-аут должен быть от 1 до {0} секунд.,超时必须在 1 到 {0} 秒之间。,逾時必須介於 1 到 {0} 秒之間。,タイムアウトは 1～{0} 秒の範囲で指定してください。,제한 시간은 1초에서 {0}초 사이여야 합니다.,Le délai doit être compris entre 1 et {0} secondes.
+Top most,Поверх остальных окон,始终置顶,最上層,常に手前に表示,항상 위,Toujours au premier plan
+Traffic,Трафик,流量,流量,トラフィック,트래픽,Trafic
+Traffic mode,Режим трафика,流量模式,流量模式,トラフィックモード,트래픽 모드,Mode de trafic
+Traffic unavailable,Данные о трафике недоступны,流量不可用,流量無法使用,トラフィック利用不可,트래픽 사용 불가,Trafic indisponible
+Traffic · last 60 seconds,Трафик · последние 60 секунд,流量 · 最近 60 秒,流量 · 最近 60 秒,トラフィック · 過去60秒,트래픽 · 최근 60초,Trafic · 60 dernières secondes
+Transparent TCP/UDP capture through the elevated NetworkService helper.,"Прозрачный захват TCP/UDP через NetworkService, запущенный с повышенными правами.",通过已提升权限的 NetworkService helper 进行透明 TCP/UDP 捕获。,透過已提高權限的 NetworkService helper 進行透明 TCP/UDP 擷取。,昇格された NetworkService ヘルパーによる透過 TCP/UDP キャプチャです。,권한이 상승된 NetworkService 도우미를 통한 투명 TCP/UDP 캡처입니다.,Capture TCP/UDP transparente via le helper NetworkService élevé.
+Tray active · {0} hotkey(s) failed to register,Трей активен · не удалось зарегистрировать горячих клавиш: {0},托盘活动 · {0} 个快捷键注册失败,系統匣作用中 · {0} 個快速鍵註冊失敗,トレイ有効 · {0} 個のホットキー登録に失敗,트레이 활성 · 단축키 {0}개 등록 실패,Zone de notification active · échec d’enregistrement de {0} raccourci(s)
+Tray command failed: {0},Ошибка команды трея: {0},托盘命令失败：{0},系統匣命令失敗：{0},トレイコマンドに失敗しました: {0},트레이 명령 실패: {0},Échec de la commande de la zone de notification : {0}
+Triggered by,Активирован приложением,触发者,觸發者,トリガー,트리거,Déclenché par
+Type,Тип,类型,類型,種類,유형,Type
+UDP capture,Захват UDP,UDP 捕获,UDP 擷取,UDP キャプチャ,UDP 캡처,Capture UDP
+UDP redirect port,Порт перенаправления UDP,UDP 重定向端口,UDP 重新導向連接埠,UDP リダイレクトポート,UDP 리디렉션 포트,Port de redirection UDP
+Unable to read log: {0},Не удалось прочитать лог: {0},无法读取日志：{0},無法讀取記錄：{0},ログを読み取れません: {0},로그를 읽을 수 없습니다: {0},Impossible de lire le journal : {0}
+Unavailable,Недоступно,不可用,無法使用,利用不可,사용 불가,Indisponible
+Unconfigured server,Ненастроенный сервер,未配置服务器,未設定伺服器,未設定サーバー,구성되지 않은 서버,Serveur non configuré
+Update,Обновить,更新,更新,更新,업데이트,Mise à jour
+Update all,Обновить всё,全部更新,全部更新,すべて更新,모두 업데이트,Tout mettre à jour
+Update assets were downloaded to the temporary folder.,Файлы обновления загружены во временную папку.,更新资源已下载到临时文件夹。,更新資產已下載至暫存資料夾。,更新アセットを一時フォルダーにダウンロードしました。,업데이트 자산을 임시 폴더에 다운로드했습니다.,Les fichiers de mise à jour ont été téléchargés dans le dossier temporaire.
+Update available: {0},Доступно обновление: {0},有可用更新：{0},有可用更新：{0},利用可能な更新: {0},사용 가능한 업데이트: {0},Mise à jour disponible : {0}
+Update postponed for this session.,Обновление отложено до следующего запуска.,本次会话已推迟更新。,本次工作階段已延後更新。,このセッションでは更新を延期しました。,이번 세션에서 업데이트를 연기했습니다.,La mise à jour est reportée pour cette session.
+"Use an executable name, full path, or wildcard pattern. Game Mode is automatic and is never a selectable traffic mode.","Укажите имя исполняемого файла, полный путь или маску. Игровой режим включается автоматически и никогда не является выбираемым режимом трафика.",使用可执行文件名、完整路径或通配符模式。游戏模式是自动的，永远不是可选择的流量模式。,使用執行檔名稱、完整路徑或萬用字元模式。遊戲模式是自動的，永遠不是可選擇的流量模式。,実行ファイル名、完全パス、またはワイルドカードパターンを使用します。Game Mode は自動であり、選択可能なトラフィックモードではありません。,"실행 파일 이름, 전체 경로 또는 와일드카드 패턴을 사용합니다. Game Mode는 자동이며 선택 가능한 트래픽 모드가 아닙니다.","Utiliser un nom d’exécutable, un chemin complet ou un motif générique. Le Game Mode est automatique et n’est jamais un mode de trafic sélectionnable."
+Use Shadowsocks as the Windows system proxy,Использовать Shadowsocks как системный прокси Windows,将 Shadowsocks 用作 Windows 系统代理,將 Shadowsocks 用作 Windows 系統 Proxy,Shadowsocks を Windows システムプロキシとして使用,Shadowsocks를 Windows 시스템 프록시로 사용,Utiliser Shadowsocks comme proxy système Windows
+User mode,Пользовательский режим,用户模式,使用者模式,ユーザーモード,사용자 모드,Mode utilisateur
+Username and password must be specified together.,Имя пользователя и пароль должны быть указаны вместе.,必须同时指定用户名和密码。,必須同時指定使用者名稱與密碼。,ユーザー名とパスワードは両方指定する必要があります。,사용자 이름과 비밀번호를 함께 지정해야 합니다.,Le nom d’utilisateur et le mot de passe doivent être spécifiés ensemble.
+Verbose logging,Подробное логирование,详细日志,詳細記錄,詳細ログ,상세 로깅,Journalisation détaillée
+"Version information, project links and update controls.","Информация о версии, ссылки проекта и управление обновлениями.",版本信息、项目链接和更新控制。,版本資訊、專案連結與更新控制項。,バージョン情報、プロジェクトリンク、更新コントロールです。,"버전 정보, 프로젝트 링크 및 업데이트 제어입니다.","Informations de version, liens du projet et contrôles de mise à jour."
+WinDivert,WinDivert,WinDivert,WinDivert,WinDivert,WinDivert,WinDivert
+Windows proxy,Прокси Windows,Windows 代理,Windows Proxy,Windows プロキシ,Windows 프록시,Proxy Windows
+Windows refused: {0},Windows отклонила: {0},Windows 拒绝：{0},Windows 拒絕：{0},Windows に拒否されました: {0},Windows에서 거부됨: {0},Windows a refusé : {0}
+Wrap text,Переносить строки,自动换行,自動換行,テキストを折り返す,텍스트 줄 바꿈,Renvoyer à la ligne
+You are up to date · {0},Установлена актуальная версия · {0},已是最新版本 · {0},已是最新版本 · {0},最新です · {0},최신 버전입니다 · {0},Vous êtes à jour · {0}
+{0} available: {1},{0} доступен: {1},{0} 可用：{1},{0} 可用：{1},{0} が利用可能: {1},{0} 사용 가능: {1},{0} disponible : {1}
+{0} Fix the current server before selecting another one.,{0} Исправьте текущий сервер перед выбором другого.,{0} 请先修复当前服务器，再选择其他服务器。,{0} 請先修正目前伺服器，再選擇其他伺服器。,{0} 別のサーバーを選択する前に現在のサーバーを修正してください。,{0} 다른 서버를 선택하기 전에 현재 서버를 수정하세요.,{0} Corrigez le serveur actuel avant d’en sélectionner un autre.
+{0} theme enabled.,Включена тема «{0}».,已启用 {0} 主题。,已啟用 {0} 主題。,{0} テーマを有効にしました。,{0} 테마를 활성화했습니다.,Thème {0} activé.
+{0} · {1} mode,{0} · режим {1},{0} · {1} 模式,{0} · {1} 模式,{0} · {1} モード,{0} · {1} 모드,{0} · mode {1}
+… showing the last 512 KiB …,… показаны последние 512 КиБ …,…仅显示最后 512 KiB…,…僅顯示最後 512 KiB…,…末尾 512 KiB のみ表示…,…마지막 512 KiB만 표시…,… affichage des 512 derniers Kio …
+Version {0},Версия {0},版本 {0},版本 {0},バージョン {0},버전 {0},Version {0}
+A configured game temporarily changes the runtime state to Game and suspends WinDivert. It is not a third selectable capture mode.,Настроенная игра временно переводит runtime-состояние в Game и приостанавливает WinDivert. Это не третий выбираемый режим захвата.,已配置的游戏会暂时将运行状态切换为 Game 并暂停 WinDivert。它不是第三种可选的捕获模式。,已設定的遊戲會暫時將執行狀態切換為 Game 並暫停 WinDivert。它不是第三種可選的擷取模式。,設定済みのゲームが実行されると、実行状態が一時的に Game に切り替わり WinDivert が停止します。これは3つ目の選択可能なキャプチャモードではありません。,설정된 게임이 실행되면 런타임 상태가 일시적으로 Game으로 전환되고 WinDivert가 중지됩니다. 이는 세 번째로 선택 가능한 캡처 모드가 아닙니다.,Un jeu configuré fait temporairement passer l’état d’exécution à Game et suspend WinDivert. Il ne s’agit pas d’un troisième mode de capture sélectionnable.
+Focus a shortcut field and press Ctrl/Alt/Shift/Win plus a key. Press Delete or Backspace with a modifier to use that key; use Esc to clear the field. The status column shows the last registration result.,Выберите поле сочетания клавиш и нажмите Ctrl/Alt/Shift/Win вместе с нужной клавишей. Delete или Backspace с модификатором можно использовать как клавишу сочетания; Esc очищает поле. В колонке состояния показывается результат последней регистрации.,聚焦快捷键字段，然后按 Ctrl/Alt/Shift/Win 加一个按键。按住修饰键时可使用 Delete 或 Backspace；按 Esc 清空字段。状态列显示上次注册结果。,聚焦快速鍵欄位，然後按 Ctrl/Alt/Shift/Win 加一個按鍵。按住修飾鍵時可使用 Delete 或 Backspace；按 Esc 清空欄位。狀態欄會顯示上次註冊結果。,ショートカット欄にフォーカスし、Ctrl/Alt/Shift/Win とキーを押します。修飾キーと一緒なら Delete または Backspace も使用できます。Esc で欄をクリアします。状態列には前回の登録結果が表示されます。,단축키 필드에 포커스를 두고 Ctrl/Alt/Shift/Win과 키를 누르세요. 수정 키와 함께 Delete 또는 Backspace도 사용할 수 있습니다. Esc로 필드를 지웁니다. 상태 열에는 마지막 등록 결과가 표시됩니다.,"Placez le focus dans un champ de raccourci puis appuyez sur Ctrl/Alt/Shift/Win avec une touche. Avec un modificateur, Delete ou Backspace peuvent être utilisés ; Esc efface le champ. La colonne d’état affiche le dernier résultat d’enregistrement."
+Use the tray icon to reopen Shadowsocks Reborn. A plain second launch points you back to the tray instead of starting another proxy.,"Используйте значок в трее, чтобы снова открыть Shadowsocks Reborn. Обычный повторный запуск укажет на уже работающий экземпляр в трее вместо запуска ещё одного прокси.",使用托盘图标重新打开 Shadowsocks Reborn。普通的第二次启动只会指向已运行的托盘实例，不会启动另一个代理。,使用系統匣圖示重新開啟 Shadowsocks Reborn。一般的第二次啟動只會指向已執行的系統匣執行個體，不會啟動另一個 Proxy。,トレイアイコンから Shadowsocks Reborn を開き直してください。通常の2回目の起動は別のプロキシを開始せず、既存のトレイインスタンスへ誘導します。,트레이 아이콘을 사용해 Shadowsocks Reborn을 다시 여세요. 일반적인 두 번째 실행은 다른 프록시를 시작하지 않고 실행 중인 트레이 인스턴스로 안내합니다.,Utilisez l’icône de la zone de notification pour rouvrir Shadowsocks Reborn. Un second lancement normal vous renvoie vers l’instance déjà active au lieu de démarrer un autre proxy.
+GeoSite data refreshed and Local PAC was regenerated.,"Данные GeoSite обновлены, локальный PAC пересоздан.",GeoSite 数据已刷新，并重新生成了本地 PAC。,GeoSite 資料已重新整理，並重新產生本機 PAC。,GeoSite データを更新し、ローカル PAC を再生成しました。,GeoSite 데이터를 새로 고치고 로컬 PAC를 다시 생성했습니다.,Les données GeoSite ont été actualisées et le PAC local a été régénéré.
+GeoSite refresh did not complete successfully.,Обновление GeoSite не завершилось успешно.,GeoSite 刷新未成功完成。,GeoSite 重新整理未成功完成。,GeoSite の更新が正常に完了しませんでした。,GeoSite 새로 고침이 정상적으로 완료되지 않았습니다.,L’actualisation GeoSite ne s’est pas terminée correctement.
+Invalid port,Недопустимый порт,无效端口,無效的連接埠,無効なポート,잘못된 포트,Port invalide
+Local proxy,Локальный прокси,本地代理,本機 Proxy,ローカルプロキシ,로컬 프록시,Proxy local
+Online configuration update failed.,Не удалось обновить онлайн-конфигурацию.,在线配置更新失败。,線上設定更新失敗。,オンライン設定の更新に失敗しました。,온라인 구성 업데이트에 실패했습니다.,Échec de la mise à jour de la configuration en ligne.
+Online configuration updated.,Онлайн-конфигурация обновлена.,在线配置已更新。,線上設定已更新。,オンライン設定を更新しました。,온라인 구성을 업데이트했습니다.,La configuration en ligne a été mise à jour.
+QR code,QR-код,二维码,QR 碼,QR コード,QR 코드,Code QR
+Server configuration,Конфигурация сервера,服务器配置,伺服器設定,サーバー設定,서버 구성,Configuration du serveur
+The requested routing configuration could not be applied.,Не удалось применить запрошенную конфигурацию маршрутизации.,无法应用请求的路由配置。,無法套用要求的路由設定。,要求されたルーティング設定を適用できませんでした。,요청한 라우팅 구성을 적용할 수 없습니다.,Impossible d’appliquer la configuration de routage demandée.
+Traffic routing applied.,Маршрутизация трафика применена.,流量路由已应用。,流量路由已套用。,トラフィックルーティングを適用しました。,트래픽 라우팅을 적용했습니다.,Le routage du trafic a été appliqué.
+Import from URL:,Импортировать из URL:,从 URL 导入：,從 URL 匯入：,URL からインポート:,URL에서 가져오기:,Importer depuis l’URL :
+Administrator mode could not be enabled.,Не удалось включить режим администратора.,无法启用管理员模式。,無法啟用系統管理員模式。,管理者モードを有効にできませんでした。,관리자 모드를 활성화할 수 없습니다.,Impossible d’activer le mode administrateur.
+User mode could not be enabled.,Не удалось включить пользовательский режим.,无法启用用户模式。,無法啟用使用者模式。,ユーザーモードを有効にできませんでした。,사용자 모드를 활성화할 수 없습니다.,Impossible d’activer le mode utilisateur.
+Detected games,Найденные игры,检测到的游戏,偵測到的遊戲,検出されたゲーム,감지된 게임,Jeux détectés
+"Shadowsocks can scan local Steam, Epic Games, GOG and Xbox game libraries. Nothing is added until you choose Add.","Shadowsocks может сканировать локальные библиотеки Steam, Epic Games, GOG и Xbox. Ничего не добавляется, пока вы не нажмёте «Добавить».",Shadowsocks 可以扫描本地 Steam、Epic Games、GOG 和 Xbox 游戏库。只有选择“添加”后才会加入列表。,Shadowsocks 可以掃描本機 Steam、Epic Games、GOG 與 Xbox 遊戲庫。只有選擇「新增」後才會加入清單。,Shadowsocks はローカルの Steam、Epic Games、GOG、Xbox ライブラリをスキャンできます。「追加」を選ぶまで何も追加されません。,"Shadowsocks는 로컬 Steam, Epic Games, GOG 및 Xbox 게임 라이브러리를 검색할 수 있습니다. 추가를 선택하기 전에는 아무것도 추가되지 않습니다.","Shadowsocks peut analyser les bibliothèques locales Steam, Epic Games, GOG et Xbox. Rien n’est ajouté tant que vous ne choisissez pas Ajouter."
+Scan installed games,Найти установленные игры,扫描已安装游戏,掃描已安裝遊戲,インストール済みゲームをスキャン,설치된 게임 검색,Analyser les jeux installés
+Scan has not run yet.,Сканирование ещё не запускалось.,尚未运行扫描。,尚未執行掃描。,まだスキャンしていません。,아직 검색하지 않았습니다.,L’analyse n’a pas encore été exécutée.
+Scanning installed games…,Поиск установленных игр…,正在扫描已安装游戏…,正在掃描已安裝遊戲…,インストール済みゲームをスキャンしています…,설치된 게임을 검색하는 중…,Analyse des jeux installés…
+No supported game libraries were detected.,Поддерживаемые библиотеки игр не обнаружены.,未检测到受支持的游戏库。,未偵測到受支援的遊戲庫。,対応するゲームライブラリが検出されませんでした。,지원되는 게임 라이브러리가 감지되지 않았습니다.,Aucune bibliothèque de jeux prise en charge n’a été détectée.
+Found {0} games.,Найдено игр: {0}.,找到 {0} 个游戏。,找到 {0} 個遊戲。,{0} 件のゲームが見つかりました。,게임 {0}개를 찾았습니다.,{0} jeu(x) trouvé(s).
+Game scan failed.,Не удалось выполнить поиск игр.,游戏扫描失败。,遊戲掃描失敗。,ゲームのスキャンに失敗しました。,게임 검색에 실패했습니다.,Échec de l’analyse des jeux.
+No detected games to show.,Найденных игр пока нет.,没有可显示的检测到游戏。,沒有可顯示的偵測遊戲。,表示できる検出済みゲームはありません。,표시할 감지된 게임이 없습니다.,Aucun jeu détecté à afficher.
+Added,Добавлено,已添加,已新增,追加済み,추가됨,Ajouté
+Add application manually,Добавить приложение вручную,手动添加应用程序,手動新增應用程式,アプリケーションを手動で追加,애플리케이션 수동 추가,Ajouter une application manuellement
+"Live log viewer with traffic history, wrap, toolbar, and always-on-top settings.","Просмотр логов в реальном времени с историей трафика, переносом строк, панелью инструментов и режимом поверх окон.",带流量历史、自动换行、工具栏和置顶设置的实时日志查看器。,具有流量歷史、自動換行、工具列與最上層設定的即時記錄檢視器。,トラフィック履歴、折り返し、ツールバー、常に手前の設定を備えたライブログビューアです。,"트래픽 기록, 줄 바꿈, 도구 모음 및 항상 위 설정이 있는 실시간 로그 뷰어입니다.","Visionneuse de journaux en direct avec historique du trafic, retour à la ligne, barre d’outils et option toujours au premier plan."
+Storage,Хранилище,存储,儲存,ストレージ,저장소,Stockage
+Clean Mode is active. All writable data is stored in a temporary session directory and removed when Shadowsocks exits.,Clean Mode активен. Все изменяемые данные хранятся во временном каталоге сеанса и удаляются при выходе из Shadowsocks.,Clean Mode 已启用。所有可写数据都存储在临时会话目录中，并在 Shadowsocks 退出时删除。,Clean Mode 已啟用。所有可寫入資料都儲存在暫時工作階段目錄中，並在 Shadowsocks 結束時刪除。,Clean Mode が有効です。書き込み可能なデータはすべて一時セッション ディレクトリに保存され、Shadowsocks 終了時に削除されます。,Clean Mode가 활성화되었습니다. 쓰기 가능한 모든 데이터는 임시 세션 디렉터리에 저장되며 Shadowsocks 종료 시 삭제됩니다.,Clean Mode est actif. Toutes les données modifiables sont stockées dans un dossier de session temporaire et supprimées à la fermeture de Shadowsocks.
+Start on Boot is unavailable in Clean Mode.,Автозагрузка недоступна в Clean Mode.,Clean Mode 下无法启用 Windows 启动项。,Clean Mode 下無法啟用 Windows 啟動項。,Clean Mode では Windows と同時に起動できません。,Clean Mode에서는 Windows 시작 프로그램을 사용할 수 없습니다.,Le démarrage avec Windows est indisponible en Clean Mode.
+Failed to open data folder.,Не удалось открыть папку данных.,无法打开数据文件夹。,無法開啟資料資料夾。,データ フォルダーを開けませんでした。,데이터 폴더를 열 수 없습니다.,Impossible d’ouvrir le dossier de données.
+All writable application data is stored under %LOCALAPPDATA%\Shadowsocks.,Все изменяемые данные приложения хранятся в %LOCALAPPDATA%\Shadowsocks.,所有可写应用数据都存储在 %LOCALAPPDATA%\Shadowsocks 中。,所有可寫入應用程式資料都儲存在 %LOCALAPPDATA%\Shadowsocks 中。,書き込み可能なアプリケーション データはすべて %LOCALAPPDATA%\Shadowsocks に保存されます。,쓰기 가능한 모든 애플리케이션 데이터는 %LOCALAPPDATA%\Shadowsocks에 저장됩니다.,Toutes les données modifiables de l’application sont stockées dans %LOCALAPPDATA%\Shadowsocks.
+Open %LOCALAPPDATA%\Shadowsocks,Открыть %LOCALAPPDATA%\Shadowsocks,打开 %LOCALAPPDATA%\Shadowsocks,開啟 %LOCALAPPDATA%\Shadowsocks,%LOCALAPPDATA%\Shadowsocks を開く,%LOCALAPPDATA%\Shadowsocks 열기,Ouvrir %LOCALAPPDATA%\Shadowsocks
+Open Clean Mode folder,Открыть папку Clean Mode,打开 Clean Mode 文件夹,開啟 Clean Mode 資料夾,Clean Mode フォルダーを開く,Clean Mode 폴더 열기,Ouvrir le dossier Clean Mode
+Server Name,Имя сервера,服务器名称,伺服器名稱,サーバー名,서버 이름,Nom du serveur
+Optional display name,Необязательное отображаемое имя,可选显示名称,選用顯示名稱,任意の表示名,선택적 표시 이름,Nom d’affichage facultatif
+Delete server,Удалить сервер,删除服务器,刪除伺服器,サーバーを削除,서버 삭제,Supprimer le serveur
+Server deleted.,Сервер удалён.,服务器已删除。,伺服器已刪除。,サーバーを削除しました。,서버가 삭제되었습니다.,Serveur supprimé.
+Paste URL from clipboard,Вставить URL из буфера обмена,从剪贴板粘贴 URL,從剪貼簿貼上 URL,クリップボードから URL を貼り付け,클립보드에서 URL 붙여넣기,Coller l’URL depuis le presse-papiers
+Open image,Открыть изображение,打开图片,開啟圖片,画像を開く,이미지 열기,Ouvrir une image
+Scan QR from clipboard image,Сканировать QR из изображения в буфере,扫描剪贴板图片中的二维码,掃描剪貼簿圖片中的 QR 碼,クリップボード画像から QR をスキャン,클립보드 이미지에서 QR 스캔,Scanner le QR depuis l’image du presse-papiers
+Clipboard does not contain an image.,В буфере обмена нет изображения.,剪贴板中没有图片。,剪貼簿中沒有圖片。,クリップボードに画像がありません。,클립보드에 이미지가 없습니다.,Le presse-papiers ne contient pas d’image.
+Allow other devices to connect,Разрешить подключения других устройств,允许其他设备连入,允許其他裝置連入,他のデバイスからの接続を許可する,다른 기기에서 연결 허용,Autoriser d'autres appareils à se connecter
+Add a per-application routing rule.,Добавить правило маршрутизации для отдельного приложения.,添加按应用程序路由规则。,新增個別應用程式路由規則。,アプリケーションごとのルーティングルールを追加します。,애플리케이션별 라우팅 규칙을 추가합니다.,Ajouter une règle de routage par application.
+Add the entered URL to the online configuration source list.,Добавить введённый URL в список источников онлайн-конфигурации.,将输入的 URL 添加到在线配置源列表。,將輸入的 URL 新增至線上設定來源清單。,入力した URL をオンライン設定ソース一覧に追加します。,입력한 URL을 온라인 구성 소스 목록에 추가합니다.,Ajouter l’URL saisie à la liste des sources de configuration en ligne.
+Add the manually entered application pattern to the Game Mode list.,Добавить введённое вручную приложение или шаблон в список игрового режима.,将手动输入的应用程序模式添加到游戏模式列表。,將手動輸入的應用程式模式新增至遊戲模式清單。,手動入力したアプリケーションパターンを Game Mode の一覧に追加します。,수동으로 입력한 애플리케이션 패턴을 Game Mode 목록에 추가합니다.,Ajouter le modèle d’application saisi manuellement à la liste du Game Mode.
+Add this detected game executable to the automatic Game Mode list.,Добавить исполняемый файл найденной игры в список автоматического игрового режима.,将检测到的游戏可执行文件添加到自动游戏模式列表。,將偵測到的遊戲執行檔新增至自動遊戲模式清單。,検出されたゲーム実行ファイルを自動 Game Mode 一覧に追加します。,감지된 게임 실행 파일을 자동 Game Mode 목록에 추가합니다.,Ajouter cet exécutable de jeu détecté à la liste automatique du Game Mode.
+Additional command-line arguments passed directly to the plugin process.,"Дополнительные аргументы командной строки, передаваемые непосредственно процессу плагина.",直接传递给插件进程的额外命令行参数。,直接傳遞給外掛程式處理程序的額外命令列參數。,プラグインプロセスに直接渡す追加のコマンドライン引数です。,플러그인 프로세스에 직접 전달되는 추가 명령줄 인수입니다.,Arguments de ligne de commande supplémentaires transmis directement au processus du plugin.
+Allow devices on the local network to connect to the local Shadowsocks proxy port.,Разрешить устройствам в локальной сети подключаться к локальному прокси-порту Shadowsocks.,允许本地网络中的设备连接到本机 Shadowsocks 代理端口。,允許區域網路中的裝置連線至本機 Shadowsocks Proxy 連接埠。,ローカルネットワーク上のデバイスから、この Shadowsocks のローカルプロキシポートへの接続を許可します。,로컬 네트워크의 장치가 로컬 Shadowsocks 프록시 포트에 연결하도록 허용합니다.,Autoriser les appareils du réseau local à se connecter au port proxy local de Shadowsocks.
+Append the entered URLs to the GeoSite source list.,Добавить введённые URL в список источников GeoSite.,将输入的 URL 追加到 GeoSite 源列表。,將輸入的 URL 附加至 GeoSite 來源清單。,入力した URL を GeoSite ソース一覧の末尾に追加します。,입력한 URL을 GeoSite 소스 목록에 추가합니다.,Ajouter les URL saisies à la liste des sources GeoSite.
+Apply the local proxy port immediately.,Немедленно применить локальный порт прокси.,立即应用本地代理端口。,立即套用本機 Proxy 連接埠。,ローカルプロキシポートをすぐに適用します。,로컬 프록시 포트를 즉시 적용합니다.,Appliquer immédiatement le port proxy local.
+Capture the screen and import the first supported Shadowsocks QR code found.,Снять изображение экрана и импортировать первый найденный поддерживаемый QR-код Shadowsocks.,捕获屏幕并导入找到的第一个受支持的 Shadowsocks 二维码。,擷取螢幕並匯入找到的第一個受支援 Shadowsocks QR Code。,画面をキャプチャし、最初に見つかった対応 Shadowsocks QR コードをインポートします。,화면을 캡처하고 발견된 첫 번째 지원 Shadowsocks QR 코드를 가져옵니다.,Capturer l’écran et importer le premier QR code Shadowsocks pris en charge trouvé.
+Check GitHub for a newer Shadowsocks Reborn release after the application starts.,Проверять GitHub на наличие новой версии Shadowsocks Reborn после запуска приложения.,应用启动后检查 GitHub 上是否有更新的 Shadowsocks Reborn 版本。,應用程式啟動後檢查 GitHub 是否有較新的 Shadowsocks Reborn 版本。,アプリ起動後に GitHub で新しい Shadowsocks Reborn リリースを確認します。,애플리케이션 시작 후 GitHub에서 더 최신 Shadowsocks Reborn 릴리스를 확인합니다.,Vérifier sur GitHub s’il existe une version plus récente de Shadowsocks Reborn après le démarrage de l’application.
+Check GitHub for available updates now.,Проверить GitHub на наличие обновлений сейчас.,立即检查 GitHub 更新。,立即檢查 GitHub 更新。,GitHub で利用可能な更新を今すぐ確認します。,지금 GitHub에서 사용 가능한 업데이트를 확인합니다.,Vérifier maintenant les mises à jour disponibles sur GitHub.
+Choose an image file and scan it for a Shadowsocks QR code.,Выбрать файл изображения и проверить его на наличие QR-кода Shadowsocks.,选择图像文件并扫描其中的 Shadowsocks 二维码。,選擇影像檔並掃描其中的 Shadowsocks QR Code。,画像ファイルを選択し、Shadowsocks QR コードをスキャンします。,이미지 파일을 선택하고 Shadowsocks QR 코드를 스캔합니다.,Choisir un fichier image et rechercher un QR code Shadowsocks.
+Choose whether Shadowsocks follows the Windows theme or always uses light or dark mode.,"Выбрать, следует ли Shadowsocks системной теме Windows или всегда использует светлую либо тёмную тему.",选择 Shadowsocks 跟随 Windows 主题，或始终使用浅色/深色模式。,選擇 Shadowsocks 跟隨 Windows 主題，或固定使用淺色/深色模式。,Shadowsocks が Windows テーマに従うか、常にライト/ダークモードを使うかを選択します。,"Shadowsocks가 Windows 테마를 따를지, 항상 밝은/어두운 모드를 사용할지 선택합니다.",Choisir si Shadowsocks suit le thème Windows ou utilise toujours le mode clair ou sombre.
+"Choose whether matching traffic is proxied, sent directly, or blocked.","Выбрать, направлять ли совпавший трафик через прокси, напрямую или блокировать.",选择匹配的流量是走代理、直连还是阻止。,選擇符合的流量要經由 Proxy、直接連線或封鎖。,一致した通信をプロキシ、直接接続、またはブロックのどれにするか選択します。,"일치하는 트래픽을 프록시, 직접 연결 또는 차단할지 선택합니다.","Choisir si le trafic correspondant passe par le proxy, en direct ou est bloqué."
+Clear the current log file and the text shown in this viewer.,Очистить текущий файл журнала и отображаемый в этом окне текст.,清除当前日志文件以及此查看器中显示的文本。,清除目前的記錄檔以及此檢視器中顯示的文字。,現在のログファイルと、このビューアに表示されているテキストを消去します。,현재 로그 파일과 이 뷰어에 표시된 텍스트를 지웁니다.,Effacer le fichier journal actuel et le texte affiché dans cette visionneuse.
+"Configure PAC behavior, local PAC security and GeoSite sources.","Настроить PAC, защиту локального PAC и источники GeoSite.",配置 PAC 行为、本地 PAC 安全性和 GeoSite 源。,設定 PAC 行為、本機 PAC 安全性與 GeoSite 來源。,PAC の動作、ローカル PAC のセキュリティ、GeoSite ソースを設定します。,"PAC 동작, 로컬 PAC 보안 및 GeoSite 소스를 구성합니다.","Configurer le comportement PAC, la sécurité du PAC local et les sources GeoSite."
+Configure Windows to use this Shadowsocks instance as the system proxy.,Настроить Windows на использование этого экземпляра Shadowsocks как системного прокси.,配置 Windows 使用此 Shadowsocks 实例作为系统代理。,設定 Windows 使用此 Shadowsocks 執行個體作為系統 Proxy。,Windows がこの Shadowsocks インスタンスをシステムプロキシとして使用するよう設定します。,Windows가 이 Shadowsocks 인스턴스를 시스템 프록시로 사용하도록 구성합니다.,Configurer Windows pour utiliser cette instance de Shadowsocks comme proxy système.
+Configure an optional upstream proxy used to reach Shadowsocks servers.,Настроить необязательный вышестоящий прокси для подключения к серверам Shadowsocks.,配置用于连接 Shadowsocks 服务器的可选上游代理。,設定用來連線 Shadowsocks 伺服器的選用上游 Proxy。,Shadowsocks サーバーへの接続に使用する任意の上流プロキシを設定します。,Shadowsocks 서버에 연결할 때 사용할 선택적 업스트림 프록시를 구성합니다.,Configurer un proxy amont facultatif utilisé pour atteindre les serveurs Shadowsocks.
+"Configure capture mode, Windows proxy settings and per-application routing.","Настроить режим перехвата, системный прокси Windows и маршрутизацию по приложениям.",配置捕获模式、Windows 代理设置和按应用程序路由。,設定擷取模式、Windows Proxy 設定與個別應用程式路由。,キャプチャモード、Windows プロキシ設定、アプリケーションごとのルーティングを設定します。,"캡처 모드, Windows 프록시 설정 및 애플리케이션별 라우팅을 구성합니다.","Configurer le mode de capture, les paramètres proxy Windows et le routage par application."
+Configure global keyboard shortcuts for common Shadowsocks actions.,Настроить глобальные сочетания клавиш для основных действий Shadowsocks.,配置常用 Shadowsocks 操作的全局键盘快捷键。,設定常用 Shadowsocks 動作的全域鍵盤快速鍵。,一般的な Shadowsocks 操作用のグローバルキーボードショートカットを設定します。,자주 사용하는 Shadowsocks 작업의 전역 키보드 단축키를 구성합니다.,Configurer des raccourcis clavier globaux pour les actions Shadowsocks courantes.
+"Connect to the Shadowsocks server directly, without an upstream proxy.","Подключаться к серверу Shadowsocks напрямую, без вышестоящего прокси.",直接连接 Shadowsocks 服务器，不使用上游代理。,直接連線 Shadowsocks 伺服器，不使用上游 Proxy。,上流プロキシを使わず Shadowsocks サーバーに直接接続します。,업스트림 프록시 없이 Shadowsocks 서버에 직접 연결합니다.,"Se connecter directement au serveur Shadowsocks, sans proxy amont."
+Connect to the Shadowsocks server through an upstream HTTP proxy.,Подключаться к серверу Shadowsocks через вышестоящий HTTP-прокси.,通过上游 HTTP 代理连接 Shadowsocks 服务器。,透過上游 HTTP Proxy 連線 Shadowsocks 伺服器。,上流 HTTP プロキシ経由で Shadowsocks サーバーに接続します。,업스트림 HTTP 프록시를 통해 Shadowsocks 서버에 연결합니다.,Se connecter au serveur Shadowsocks via un proxy HTTP amont.
+Connect to the Shadowsocks server through an upstream SOCKS5 proxy.,Подключаться к серверу Shadowsocks через вышестоящий SOCKS5-прокси.,通过上游 SOCKS5 代理连接 Shadowsocks 服务器。,透過上游 SOCKS5 Proxy 連線 Shadowsocks 伺服器。,上流 SOCKS5 プロキシ経由で Shadowsocks サーバーに接続します。,업스트림 SOCKS5 프록시를 통해 Shadowsocks 서버에 연결합니다.,Se connecter au serveur Shadowsocks via un proxy SOCKS5 amont.
+"Connection timeout for the upstream proxy, in seconds.",Тайм-аут подключения к вышестоящему прокси в секундах.,上游代理连接超时（秒）。,上游 Proxy 連線逾時（秒）。,上流プロキシの接続タイムアウト（秒）。,업스트림 프록시 연결 제한 시간(초)입니다.,"Délai de connexion au proxy amont, en secondes."
+"Connection timeout for this server, in seconds.",Тайм-аут подключения к этому серверу в секундах.,此服务器的连接超时（秒）。,此伺服器的連線逾時（秒）。,このサーバーの接続タイムアウト（秒）。,이 서버의 연결 제한 시간(초)입니다.,"Délai de connexion pour ce serveur, en secondes."
+Copy the local PAC endpoint URL to the clipboard.,Скопировать URL локального PAC в буфер обмена.,将本地 PAC 端点 URL 复制到剪贴板。,將本機 PAC 端點 URL 複製到剪貼簿。,ローカル PAC エンドポイント URL をクリップボードにコピーします。,로컬 PAC 엔드포인트 URL을 클립보드에 복사합니다.,Copier l’URL du point de terminaison PAC local dans le Presse-papiers.
+Copy the selected online configuration URL to the clipboard.,Скопировать URL выбранной онлайн-конфигурации в буфер обмена.,将选中的在线配置 URL 复制到剪贴板。,將選取的線上設定 URL 複製到剪貼簿。,選択したオンライン設定 URL をクリップボードにコピーします。,선택한 온라인 구성 URL을 클립보드에 복사합니다.,Copier l’URL de configuration en ligne sélectionnée dans le Presse-papiers.
+Copy the selected server as an ss:// URL.,Скопировать выбранный сервер в виде URL ss://.,将选中的服务器复制为 ss:// URL。,將選取的伺服器複製為 ss:// URL。,選択したサーバーを ss:// URL としてコピーします。,선택한 서버를 ss:// URL로 복사합니다.,Copier le serveur sélectionné sous forme d’URL ss://.
+Create a copy of the selected server.,Создать копию выбранного сервера.,创建选中服务器的副本。,建立所選伺服器的副本。,選択したサーバーのコピーを作成します。,선택한 서버의 복사본을 만듭니다.,Créer une copie du serveur sélectionné.
+Create a new server entry.,Создать новую запись сервера.,创建新的服务器条目。,建立新的伺服器項目。,新しいサーバーエントリを作成します。,새 서버 항목을 만듭니다.,Créer une nouvelle entrée de serveur.
+Delete the selected server.,Удалить выбранный сервер.,删除选中的服务器。,刪除選取的伺服器。,選択したサーバーを削除します。,선택한 서버를 삭제합니다.,Supprimer le serveur sélectionné.
+Discard unsaved Game Mode application changes.,Отменить несохранённые изменения списка приложений игрового режима.,丢弃未保存的游戏模式应用程序更改。,捨棄未儲存的遊戲模式應用程式變更。,未保存の Game Mode アプリケーション変更を破棄します。,저장하지 않은 Game Mode 애플리케이션 변경 내용을 버립니다.,Ignorer les modifications non enregistrées des applications du Game Mode.
+Discard unsaved forward-proxy changes.,Отменить несохранённые изменения вышестоящего прокси.,丢弃未保存的上游代理更改。,捨棄未儲存的上游 Proxy 變更。,未保存の上流プロキシ変更を破棄します。,저장하지 않은 업스트림 프록시 변경 내용을 버립니다.,Ignorer les modifications non enregistrées du proxy amont.
+Discard unsaved hotkey edits and reload the saved shortcuts.,Отменить несохранённые изменения горячих клавиш и загрузить сохранённые сочетания.,丢弃未保存的快捷键修改并重新加载已保存的快捷键。,捨棄未儲存的快速鍵變更並重新載入已儲存的快速鍵。,未保存のホットキー編集を破棄し、保存済みショートカットを再読み込みします。,저장하지 않은 단축키 편집을 버리고 저장된 단축키를 다시 불러옵니다.,Ignorer les modifications de raccourcis non enregistrées et recharger les raccourcis sauvegardés.
+Discard unsaved routing-rule changes and reload the saved configuration.,Отменить несохранённые изменения правил маршрутизации и загрузить сохранённую конфигурацию.,丢弃未保存的路由规则更改并重新加载已保存配置。,捨棄未儲存的路由規則變更並重新載入已儲存設定。,未保存のルーティングルール変更を破棄し、保存済み設定を再読み込みします。,저장하지 않은 라우팅 규칙 변경 내용을 버리고 저장된 구성을 다시 불러옵니다.,Ignorer les modifications de règles de routage non enregistrées et recharger la configuration sauvegardée.
+Download and apply every configured online source.,Загрузить и применить все настроенные онлайн-источники.,下载并应用所有已配置的在线源。,下載並套用所有已設定的線上來源。,設定済みのオンラインソースをすべてダウンロードして適用します。,구성된 모든 온라인 소스를 다운로드하고 적용합니다.,Télécharger et appliquer toutes les sources en ligne configurées.
+Download and apply the selected online configuration source now.,Загрузить и применить выбранный источник онлайн-конфигурации сейчас.,立即下载并应用选中的在线配置源。,立即下載並套用選取的線上設定來源。,選択したオンライン設定ソースを今すぐダウンロードして適用します。,선택한 온라인 구성 소스를 지금 다운로드하고 적용합니다.,Télécharger et appliquer maintenant la source de configuration en ligne sélectionnée.
+Download the configured GeoSite data now and rebuild dependent local PAC data.,Загрузить настроенные данные GeoSite и пересобрать зависящий от них локальный PAC.,立即下载已配置的 GeoSite 数据并重建相关本地 PAC 数据。,立即下載已設定的 GeoSite 資料並重建相依的本機 PAC 資料。,設定済み GeoSite データを今すぐダウンロードし、関連するローカル PAC データを再構築します。,구성된 GeoSite 데이터를 지금 다운로드하고 종속 로컬 PAC 데이터를 다시 생성합니다.,Télécharger maintenant les données GeoSite configurées et reconstruire les données PAC locales dépendantes.
+Download the selected release asset to the application update workspace.,Загрузить файл выбранного релиза во временную область обновления приложения.,将选中的发行资源下载到应用更新工作区。,將選取的版本資產下載到應用程式更新工作區。,選択したリリースアセットをアプリ更新ワークスペースにダウンロードします。,선택한 릴리스 자산을 애플리케이션 업데이트 작업 공간에 다운로드합니다.,Télécharger l’asset de version sélectionné dans l’espace de travail de mise à jour de l’application.
+Enable an additional command-line argument string for the plugin.,Разрешить дополнительную строку аргументов командной строки для плагина.,为插件启用额外的命令行参数字符串。,為外掛程式啟用額外的命令列參數字串。,プラグイン用の追加コマンドライン引数文字列を有効にします。,플러그인에 추가 명령줄 인수 문자열을 사용하도록 설정합니다.,Activer une chaîne d’arguments de ligne de commande supplémentaire pour le plugin.
+Enable debug-level application logging. This can significantly increase log volume.,Включить журналирование уровня Debug. Это может существенно увеличить объём журнала.,启用调试级应用日志。这可能会显著增加日志量。,啟用偵錯層級的應用程式記錄。這可能會大幅增加記錄量。,デバッグレベルのアプリケーションログを有効にします。ログ量が大幅に増える場合があります。,디버그 수준 애플리케이션 로깅을 활성화합니다. 로그 양이 크게 늘어날 수 있습니다.,Activer la journalisation de niveau débogage. Cela peut augmenter considérablement le volume des journaux.
+Enable or disable this application routing rule without deleting it.,Включить или отключить это правило маршрутизации приложения без его удаления.,启用或禁用此应用程序路由规则而不删除它。,啟用或停用此應用程式路由規則而不刪除它。,このアプリケーションルーティングルールを削除せずに有効/無効にします。,이 애플리케이션 라우팅 규칙을 삭제하지 않고 활성화하거나 비활성화합니다.,Activer ou désactiver cette règle de routage d’application sans la supprimer.
+Encryption method negotiated with the selected Shadowsocks server.,"Метод шифрования, используемый выбранным сервером Shadowsocks.",与所选 Shadowsocks 服务器协商的加密方式。,與所選 Shadowsocks 伺服器協商的加密方式。,選択した Shadowsocks サーバーとネゴシエートする暗号化方式です。,선택한 Shadowsocks 서버와 협상되는 암호화 방식입니다.,Méthode de chiffrement négociée avec le serveur Shadowsocks sélectionné.
+Enter an absolute HTTP or HTTPS SIP008 / online configuration URL.,Введите абсолютный HTTP- или HTTPS-URL SIP008 / онлайн-конфигурации.,输入绝对 HTTP 或 HTTPS SIP008 / 在线配置 URL。,輸入絕對 HTTP 或 HTTPS SIP008 / 線上設定 URL。,絶対 HTTP または HTTPS の SIP008 / オンライン設定 URL を入力します。,절대 HTTP 또는 HTTPS SIP008 / 온라인 구성 URL을 입력합니다.,Saisir une URL absolue HTTP ou HTTPS de configuration SIP008 / en ligne.
+"Enter an executable name, full path, or wildcard pattern to trigger automatic Game Mode.","Введите имя исполняемого файла, полный путь или шаблон для автоматического включения игрового режима.",输入可执行文件名、完整路径或通配符模式以触发自动游戏模式。,輸入執行檔名稱、完整路徑或萬用字元模式以觸發自動遊戲模式。,自動 Game Mode を起動する実行ファイル名、完全パス、またはワイルドカードパターンを入力します。,"자동 Game Mode를 트리거할 실행 파일 이름, 전체 경로 또는 와일드카드 패턴을 입력합니다.","Saisir un nom d’exécutable, un chemin complet ou un motif générique pour déclencher le Game Mode automatique."
+"Enter one or more GeoSite source URLs, one per line.","Введите один или несколько URL источников GeoSite, по одному на строку.",输入一个或多个 GeoSite 源 URL，每行一个。,輸入一個或多個 GeoSite 來源 URL，每行一個。,1行に1つ、1つ以上の GeoSite ソース URL を入力します。,GeoSite 소스 URL을 한 줄에 하나씩 입력합니다.,"Saisir une ou plusieurs URL de source GeoSite, une par ligne."
+"Executable name, full path, or wildcard pattern used to match a process.","Имя исполняемого файла, полный путь или шаблон для сопоставления с процессом.",用于匹配进程的可执行文件名、完整路径或通配符模式。,用於比對處理程序的執行檔名稱、完整路徑或萬用字元模式。,プロセス照合に使用する実行ファイル名、完全パス、またはワイルドカードパターンです。,"프로세스를 일치시키는 데 사용할 실행 파일 이름, 전체 경로 또는 와일드카드 패턴입니다.","Nom d’exécutable, chemin complet ou motif générique utilisé pour faire correspondre un processus."
+Explain how closing or hiding the main window differs from exiting the tray application.,"Показать, чем закрытие или скрытие главного окна отличается от полного выхода из приложения в трее.",说明关闭或隐藏主窗口与从托盘退出应用程序之间的区别。,說明關閉或隱藏主視窗與從系統匣結束應用程式之間的差異。,メインウィンドウを閉じる/隠す操作と、トレイからアプリを終了する操作の違いを説明します。,기본 창을 닫거나 숨기는 것과 트레이에서 애플리케이션을 종료하는 것의 차이를 설명합니다.,Expliquer la différence entre fermer ou masquer la fenêtre principale et quitter l’application depuis la zone de notification.
+Focus this field and press the desired modifier keys plus a key. Press Esc to clear it.,"Выберите это поле и нажмите нужные модификаторы и клавишу. Нажмите Esc, чтобы очистить сочетание.",聚焦此字段，然后按所需的修饰键和按键。按 Esc 清除。,聚焦此欄位，然後按所需的修飾鍵與按鍵。按 Esc 清除。,この欄にフォーカスし、目的の修飾キーとキーを押します。Esc でクリアします。,이 필드에 포커스를 두고 원하는 수정 키와 키를 누르세요. Esc를 누르면 지워집니다.,Placez le focus dans ce champ et appuyez sur les modificateurs et la touche souhaités. Appuyez sur Esc pour effacer.
+"Friendly name shown in server lists. If left empty, Shadowsocks assigns a unique Server N name.","Понятное имя, отображаемое в списках серверов. Если оставить поле пустым, Shadowsocks назначит уникальное имя Server N.",服务器列表中显示的友好名称。留空时，Shadowsocks 会分配唯一的 Server N 名称。,伺服器清單中顯示的易讀名稱。留空時，Shadowsocks 會指派唯一的 Server N 名稱。,サーバー一覧に表示する分かりやすい名前です。空欄の場合、Shadowsocks が一意の Server N 名を割り当てます。,서버 목록에 표시되는 친숙한 이름입니다. 비워 두면 Shadowsocks가 고유한 Server N 이름을 할당합니다.,"Nom convivial affiché dans les listes de serveurs. S’il est vide, Shadowsocks attribue un nom unique de type Server N."
+Hide the current update notification without skipping the release.,"Скрыть текущее уведомление об обновлении, не пропуская этот релиз.",隐藏当前更新通知，但不跳过此版本。,隱藏目前的更新通知，但不略過此版本。,このリリースをスキップせず、現在の更新通知を隠します。,이 릴리스를 건너뛰지 않고 현재 업데이트 알림을 숨깁니다.,Masquer la notification de mise à jour actuelle sans ignorer cette version.
+Hostname or IP address of the Shadowsocks server.,Имя хоста или IP-адрес сервера Shadowsocks.,Shadowsocks 服务器的主机名或 IP 地址。,Shadowsocks 伺服器的主機名稱或 IP 位址。,Shadowsocks サーバーのホスト名または IP アドレスです。,Shadowsocks 서버의 호스트 이름 또는 IP 주소입니다.,Nom d’hôte ou adresse IP du serveur Shadowsocks.
+Hostname or IP address of the upstream proxy.,Имя хоста или IP-адрес вышестоящего прокси.,上游代理的主机名或 IP 地址。,上游 Proxy 的主機名稱或 IP 位址。,上流プロキシのホスト名または IP アドレスです。,업스트림 프록시의 호스트 이름 또는 IP 주소입니다.,Nom d’hôte ou adresse IP du proxy amont.
+Ignore this release in future automatic update checks.,Игнорировать этот релиз при последующих автоматических проверках обновлений.,在以后的自动更新检查中忽略此版本。,在之後的自動更新檢查中略過此版本。,今後の自動更新確認でこのリリースを無視します。,향후 자동 업데이트 확인에서 이 릴리스를 무시합니다.,Ignorer cette version lors des futures vérifications automatiques de mises à jour.
+Import every valid ss:// link from the text box.,Импортировать все корректные ссылки ss:// из текстового поля.,从文本框导入所有有效的 ss:// 链接。,從文字方塊匯入所有有效的 ss:// 連結。,テキストボックス内の有効な ss:// リンクをすべてインポートします。,텍스트 상자의 유효한 ss:// 링크를 모두 가져옵니다.,Importer tous les liens ss:// valides depuis la zone de texte.
+Include SIP003 plugin stdout and stderr events in the Shadowsocks log.,Добавлять stdout и stderr событий SIP003-плагина в журнал Shadowsocks.,在 Shadowsocks 日志中包含 SIP003 插件的 stdout 和 stderr 事件。,在 Shadowsocks 記錄中包含 SIP003 外掛程式的 stdout 與 stderr 事件。,Shadowsocks ログに SIP003 プラグインの stdout / stderr イベントを含めます。,Shadowsocks 로그에 SIP003 플러그인의 stdout 및 stderr 이벤트를 포함합니다.,Inclure les événements stdout et stderr des plugins SIP003 dans le journal Shadowsocks.
+Include prerelease builds when checking GitHub for updates.,Учитывать предварительные версии при проверке обновлений на GitHub.,检查 GitHub 更新时包含预发布版本。,檢查 GitHub 更新時包含預發行版本。,GitHub の更新確認時にプレリリースビルドを含めます。,GitHub 업데이트 확인 시 사전 릴리스 빌드를 포함합니다.,Inclure les versions préliminaires lors de la recherche de mises à jour GitHub.
+Keep the main Shadowsocks window above other windows while viewing logs.,Держать главное окно Shadowsocks поверх остальных окон при просмотре журнала.,查看日志时使 Shadowsocks 主窗口保持在其他窗口之上。,檢視記錄時讓 Shadowsocks 主視窗保持在其他視窗上方。,ログ表示中、Shadowsocks のメインウィンドウを他のウィンドウより前面に保ちます。,로그를 보는 동안 Shadowsocks 기본 창을 다른 창 위에 유지합니다.,Maintenir la fenêtre principale de Shadowsocks au-dessus des autres fenêtres lors de la consultation des journaux.
+Local SOCKS/HTTP listening port used by Shadowsocks.,"Локальный порт SOCKS/HTTP, который прослушивает Shadowsocks.",Shadowsocks 使用的本地 SOCKS/HTTP 监听端口。,Shadowsocks 使用的本機 SOCKS/HTTP 接聽連接埠。,Shadowsocks が使用するローカル SOCKS/HTTP 待受ポートです。,Shadowsocks가 사용하는 로컬 SOCKS/HTTP 수신 포트입니다.,Port d’écoute SOCKS/HTTP local utilisé par Shadowsocks.
+Local SOCKS/HTTP port used by applications and the Windows proxy configuration.,"Локальный порт SOCKS/HTTP, используемый приложениями и системным прокси Windows.",应用程序和 Windows 代理配置使用的本地 SOCKS/HTTP 端口。,應用程式與 Windows Proxy 設定使用的本機 SOCKS/HTTP 連接埠。,アプリケーションと Windows プロキシ設定で使用するローカル SOCKS/HTTP ポートです。,애플리케이션 및 Windows 프록시 구성에서 사용하는 로컬 SOCKS/HTTP 포트입니다.,Port SOCKS/HTTP local utilisé par les applications et la configuration proxy Windows.
+Manage SIP008 and other online server configuration sources.,Управлять SIP008 и другими источниками онлайн-конфигурации серверов.,管理 SIP008 和其他在线服务器配置源。,管理 SIP008 與其他線上伺服器設定來源。,SIP008 およびその他のオンラインサーバー設定ソースを管理します。,SIP008 및 기타 온라인 서버 구성 소스를 관리합니다.,Gérer SIP008 et les autres sources de configuration de serveurs en ligne.
+Manage Shadowsocks servers and local client connection settings.,Управлять серверами Shadowsocks и параметрами локального клиента.,管理 Shadowsocks 服务器和本地客户端连接设置。,管理 Shadowsocks 伺服器與本機用戶端連線設定。,Shadowsocks サーバーとローカルクライアント接続設定を管理します。,Shadowsocks 서버 및 로컬 클라이언트 연결 설정을 관리합니다.,Gérer les serveurs Shadowsocks et les paramètres de connexion du client local.
+Manage applications that automatically suspend WinDivert while they are running.,"Управлять приложениями, при работе которых WinDivert автоматически приостанавливается.",管理运行时自动暂停 WinDivert 的应用程序。,管理執行時會自動暫停 WinDivert 的應用程式。,実行中に WinDivert を自動停止するアプリケーションを管理します。,실행 중 WinDivert를 자동으로 일시 중지하는 애플리케이션을 관리합니다.,Gérer les applications qui suspendent automatiquement WinDivert pendant leur exécution.
+Move the selected GeoSite source one position down.,Переместить выбранный источник GeoSite на одну позицию вниз.,将选中的 GeoSite 源下移一位。,將選取的 GeoSite 來源下移一個位置。,選択した GeoSite ソースを1つ下へ移動します。,선택한 GeoSite 소스를 한 단계 아래로 이동합니다.,Déplacer la source GeoSite sélectionnée d’une position vers le bas.
+Move the selected GeoSite source one position up.,Переместить выбранный источник GeoSite на одну позицию вверх.,将选中的 GeoSite 源上移一位。,將選取的 GeoSite 來源上移一個位置。,選択した GeoSite ソースを1つ上へ移動します。,선택한 GeoSite 소스를 한 단계 위로 이동합니다.,Déplacer la source GeoSite sélectionnée d’une position vers le haut.
+Move the selected server one position down.,Переместить выбранный сервер на одну позицию вниз.,将选中的服务器下移一位。,將選取的伺服器下移一個位置。,選択したサーバーを1つ下へ移動します。,선택한 서버를 한 단계 아래로 이동합니다.,Déplacer le serveur sélectionné d’une position vers le bas.
+Move the selected server one position up.,Переместить выбранный сервер на одну позицию вверх.,将选中的服务器上移一位。,將選取的伺服器上移一個位置。,選択したサーバーを1つ上へ移動します。,선택한 서버를 한 단계 위로 이동합니다.,Déplacer le serveur sélectionné d’une position vers le haut.
+Open Share / QR for the selected server.,Открыть раздел «Поделиться / QR» для выбранного сервера.,为选中的服务器打开“共享 / QR”。,為選取的伺服器開啟「分享 / QR」。,選択したサーバーの「共有 / QR」を開きます。,선택한 서버의 공유 / QR을 엽니다.,Ouvrir Partage / QR pour le serveur sélectionné.
+Open the GitHub issue tracker for bug reports and feature requests.,Открыть GitHub Issues для сообщений об ошибках и предложений функций.,在默认浏览器中打开 GitHub issue 跟踪器，用于错误报告和功能请求。,在預設瀏覽器中開啟 GitHub Issue 追蹤器，以回報錯誤與提出功能需求。,既定のブラウザーで GitHub の Issue トラッカーを開き、バグ報告や機能要望を送ります。,기본 브라우저에서 GitHub 이슈 트래커를 열어 버그 보고 및 기능 요청을 합니다.,Ouvrir le suivi des issues GitHub dans le navigateur par défaut pour les rapports de bugs et les demandes de fonctionnalités.
+Open the Shadowsocks Reborn project page in your default browser.,Открыть страницу проекта Shadowsocks Reborn в браузере по умолчанию.,在默认浏览器中打开 Shadowsocks Reborn 项目页面。,在預設瀏覽器中開啟 Shadowsocks Reborn 專案頁面。,既定のブラウザーで Shadowsocks Reborn のプロジェクトページを開きます。,기본 브라우저에서 Shadowsocks Reborn 프로젝트 페이지를 엽니다.,Ouvrir la page du projet Shadowsocks Reborn dans le navigateur par défaut.
+Open the active log file with the default Windows application.,Открыть активный файл журнала приложением Windows по умолчанию.,使用 Windows 默认应用程序打开当前日志文件。,使用 Windows 預設應用程式開啟目前記錄檔。,現在のログファイルを Windows の既定アプリで開きます。,현재 로그 파일을 기본 Windows 애플리케이션으로 엽니다.,Ouvrir le fichier journal actif avec l’application Windows par défaut.
+Open the connection overview and current runtime status.,Открыть обзор подключения и текущего состояния приложения.,打开连接概览和当前运行状态。,開啟連線概覽與目前執行狀態。,接続の概要と現在の実行状態を開きます。,연결 개요와 현재 런타임 상태를 엽니다.,Ouvrir l’aperçu de la connexion et l’état d’exécution actuel.
+"Open the folder containing settings, logs, caches and runtime data for the current mode.","Открыть папку с настройками, журналами, кэшами и служебными данными текущего режима.",打开包含当前模式的设置、日志、缓存和运行时数据的文件夹。,開啟包含目前模式設定、記錄、快取與執行階段資料的資料夾。,現在のモードの設定、ログ、キャッシュ、ランタイムデータを含むフォルダーを開きます。,"현재 모드의 설정, 로그, 캐시 및 런타임 데이터가 있는 폴더를 엽니다.","Ouvrir le dossier contenant les paramètres, journaux, caches et données d’exécution du mode actuel."
+Open the folder that contains Shadowsocks log files.,Открыть папку с файлами журнала Shadowsocks.,打开包含 Shadowsocks 日志文件的文件夹。,開啟包含 Shadowsocks 記錄檔的資料夾。,Shadowsocks のログファイルがあるフォルダーを開きます。,Shadowsocks 로그 파일이 있는 폴더를 엽니다.,Ouvrir le dossier contenant les fichiers journaux Shadowsocks.
+Optional SIP003 plugin executable name or absolute path.,Необязательное имя исполняемого файла SIP003-плагина или абсолютный путь к нему.,可选的 SIP003 插件可执行文件名或绝对路径。,選用的 SIP003 外掛程式執行檔名稱或絕對路徑。,任意の SIP003 プラグイン実行ファイル名または絶対パスです。,선택적 SIP003 플러그인 실행 파일 이름 또는 절대 경로입니다.,Nom d’exécutable ou chemin absolu facultatif du plugin SIP003.
+Optional password for upstream proxy authentication.,Необязательный пароль для аутентификации на вышестоящем прокси.,上游代理认证的可选密码。,上游 Proxy 驗證的選用密碼。,上流プロキシ認証用の任意のパスワードです。,업스트림 프록시 인증을 위한 선택적 비밀번호입니다.,Mot de passe facultatif pour l’authentification du proxy amont.
+Optional username for upstream proxy authentication.,Необязательное имя пользователя для аутентификации на вышестоящем прокси.,上游代理认证的可选用户名。,上游 Proxy 驗證的選用使用者名稱。,上流プロキシ認証用の任意のユーザー名です。,업스트림 프록시 인증을 위한 선택적 사용자 이름입니다.,Nom d’utilisateur facultatif pour l’authentification du proxy amont.
+Options passed to the SIP003 plugin through SS_PLUGIN_OPTIONS.,"Параметры, передаваемые SIP003-плагину через SS_PLUGIN_OPTIONS.",通过 SS_PLUGIN_OPTIONS 传递给 SIP003 插件的选项。,透過 SS_PLUGIN_OPTIONS 傳遞給 SIP003 外掛程式的選項。,SS_PLUGIN_OPTIONS を通じて SIP003 プラグインに渡すオプションです。,SS_PLUGIN_OPTIONS를 통해 SIP003 플러그인에 전달되는 옵션입니다.,Options transmises au plugin SIP003 via SS_PLUGIN_OPTIONS.
+Password used by this Shadowsocks server configuration.,"Пароль, используемый этой конфигурацией сервера Shadowsocks.",此 Shadowsocks 服务器配置使用的密码。,此 Shadowsocks 伺服器設定使用的密碼。,この Shadowsocks サーバー設定で使用するパスワードです。,이 Shadowsocks 서버 구성에서 사용하는 비밀번호입니다.,Mot de passe utilisé par cette configuration de serveur Shadowsocks.
+"Paste one or more ss:// server links, one per line.","Вставьте одну или несколько ссылок серверов ss://, по одной на строку.",粘贴一个或多个 ss:// 服务器链接，每行一个。,貼上一個或多個 ss:// 伺服器連結，每行一個。,1行に1つ、1つ以上の ss:// サーバーリンクを貼り付けます。,ss:// 서버 링크를 한 줄에 하나씩 붙여넣습니다.,"Coller un ou plusieurs liens de serveur ss://, un par ligne."
+Paste text from the clipboard into the ss:// import field.,Вставить текст из буфера обмена в поле импорта ss://.,将剪贴板文本粘贴到 ss:// 导入字段。,將剪貼簿文字貼到 ss:// 匯入欄位。,クリップボードのテキストを ss:// インポート欄に貼り付けます。,클립보드 텍스트를 ss:// 가져오기 필드에 붙여넣습니다.,Coller le texte du Presse-papiers dans le champ d’importation ss://.
+"Read-only group supplied by an imported or online configuration, when available.","Группа только для чтения, полученная из импортированной или онлайн-конфигурации, если она задана.",导入或在线配置提供的只读组（如果有）。,匯入或線上設定提供的唯讀群組（如果有）。,インポートまたはオンライン設定から提供された読み取り専用グループです（利用可能な場合）。,가져오기 또는 온라인 구성에서 제공하는 읽기 전용 그룹입니다(사용 가능한 경우).,"Groupe en lecture seule fourni par une importation ou une configuration en ligne, s’il est disponible."
+Rebuild the local PAC automatically after application or GeoSite data updates.,Автоматически пересобирать локальный PAC после обновления приложения или данных GeoSite.,应用或 GeoSite 数据更新后自动重建本地 PAC。,應用程式或 GeoSite 資料更新後自動重建本機 PAC。,アプリケーションまたは GeoSite データの更新後にローカル PAC を自動再構築します。,애플리케이션 또는 GeoSite 데이터 업데이트 후 로컬 PAC를 자동으로 다시 생성합니다.,Reconstruire automatiquement le PAC local après les mises à jour de l’application ou des données GeoSite.
+Refresh the log viewer automatically every two seconds.,Автоматически обновлять просмотр журнала каждые две секунды.,每两秒自动刷新日志查看器。,每兩秒自動重新整理記錄檢視器。,ログビューアを2秒ごとに自動更新します。,로그 뷰어를 2초마다 자동으로 새로 고칩니다.,Actualiser automatiquement la visionneuse de journaux toutes les deux secondes.
+Register the configured global hotkeys automatically when Shadowsocks starts.,Автоматически регистрировать настроенные глобальные горячие клавиши при запуске Shadowsocks.,Shadowsocks 启动时自动注册已配置的全局快捷键。,Shadowsocks 啟動時自動註冊已設定的全域快速鍵。,Shadowsocks 起動時に設定済みグローバルホットキーを自動登録します。,Shadowsocks 시작 시 구성된 전역 단축키를 자동으로 등록합니다.,Enregistrer automatiquement les raccourcis globaux configurés au démarrage de Shadowsocks.
+Reload the latest log contents immediately.,Немедленно перечитать последние данные журнала.,立即重新加载最新日志内容。,立即重新載入最新記錄內容。,最新のログ内容をすぐに再読み込みします。,최신 로그 내용을 즉시 다시 불러옵니다.,Recharger immédiatement le contenu le plus récent du journal.
+Remove the selected GeoSite source from the list.,Удалить выбранный источник GeoSite из списка.,从列表中删除选中的 GeoSite 源。,從清單中移除選取的 GeoSite 來源。,選択した GeoSite ソースを一覧から削除します。,선택한 GeoSite 소스를 목록에서 제거합니다.,Supprimer la source GeoSite sélectionnée de la liste.
+Remove the selected online configuration source.,Удалить выбранный источник онлайн-конфигурации.,删除选中的在线配置源。,移除選取的線上設定來源。,選択したオンライン設定ソースを削除します。,선택한 온라인 구성 소스를 제거합니다.,Supprimer la source de configuration en ligne sélectionnée.
+Remove this application from the automatic Game Mode list.,Удалить это приложение из списка автоматического игрового режима.,从自动游戏模式列表中删除此应用程序。,從自動遊戲模式清單中移除此應用程式。,このアプリケーションを自動 Game Mode 一覧から削除します。,이 애플리케이션을 자동 Game Mode 목록에서 제거합니다.,Supprimer cette application de la liste automatique du Game Mode.
+Remove this application routing rule.,Удалить это правило маршрутизации приложения.,删除此应用程序路由规则。,移除此應用程式路由規則。,このアプリケーションルーティングルールを削除します。,이 애플리케이션 라우팅 규칙을 제거합니다.,Supprimer cette règle de routage d’application.
+Request elevation and enable transparent TCP/UDP capture through NetworkService and WinDivert.,Запросить повышение прав и включить прозрачный перехват TCP/UDP через NetworkService и WinDivert.,请求提升权限，并通过 NetworkService 和 WinDivert 启用透明 TCP/UDP 捕获。,要求提高權限，並透過 NetworkService 與 WinDivert 啟用透明 TCP/UDP 擷取。,昇格を要求し、NetworkService と WinDivert による透過 TCP/UDP キャプチャを有効にします。,권한 상승을 요청하고 NetworkService 및 WinDivert를 통한 투명 TCP/UDP 캡처를 활성화합니다.,Demander une élévation et activer la capture TCP/UDP transparente via NetworkService et WinDivert.
+Require a random secret in the local PAC URL before the PAC file is served.,Требовать случайный секрет в URL локального PAC перед выдачей PAC-файла.,提供本地 PAC 文件前，要求本地 PAC URL 中包含随机密钥。,提供本機 PAC 檔案前，要求本機 PAC URL 中包含隨機密鑰。,ローカル PAC を配信する前に、ローカル PAC URL にランダムなシークレットを要求します。,로컬 PAC 파일을 제공하기 전에 로컬 PAC URL에 임의의 비밀값을 요구합니다.,Exiger un secret aléatoire dans l’URL PAC locale avant de servir le fichier PAC.
+Restore the built-in default GeoSite source list.,Восстановить встроенный список источников GeoSite по умолчанию.,恢复内置的默认 GeoSite 源列表。,還原內建的預設 GeoSite 來源清單。,組み込みの既定 GeoSite ソース一覧を復元します。,기본 제공 GeoSite 소스 목록을 복원합니다.,Restaurer la liste intégrée des sources GeoSite par défaut.
+Restore the selected server fields to their last saved values.,Вернуть поля выбранного сервера к последним сохранённым значениям.,将选中服务器字段恢复为上次保存的值。,將選取伺服器欄位還原為上次儲存的值。,選択したサーバーの各項目を最後に保存した値へ戻します。,선택한 서버 필드를 마지막으로 저장한 값으로 복원합니다.,Restaurer les champs du serveur sélectionné à leurs dernières valeurs enregistrées.
+Save the configured Game Mode application list.,Сохранить настроенный список приложений игрового режима.,保存已配置的游戏模式应用程序列表。,儲存已設定的遊戲模式應用程式清單。,設定した Game Mode アプリケーション一覧を保存します。,구성된 Game Mode 애플리케이션 목록을 저장합니다.,Enregistrer la liste configurée des applications du Game Mode.
+Save the current GeoSite source order and URLs.,Сохранить текущий порядок и URL источников GeoSite.,保存当前 GeoSite 源顺序和 URL。,儲存目前 GeoSite 來源順序與 URL。,現在の GeoSite ソースの順序と URL を保存します。,현재 GeoSite 소스 순서와 URL을 저장합니다.,Enregistrer l’ordre actuel des sources GeoSite et leurs URL.
+Save the hotkey configuration and apply it to the running application.,Сохранить настройки горячих клавиш и применить их к запущенному приложению.,保存快捷键配置并应用到正在运行的应用程序。,儲存快速鍵設定並套用至執行中的應用程式。,ホットキー設定を保存し、実行中のアプリケーションに適用します。,단축키 구성을 저장하고 실행 중인 애플리케이션에 적용합니다.,Enregistrer la configuration des raccourcis et l’appliquer à l’application en cours d’exécution.
+Save the online PAC URL and refresh the online PAC cache.,Сохранить URL онлайн-PAC и обновить его кэш.,保存在线 PAC URL 并刷新在线 PAC 缓存。,儲存線上 PAC URL 並重新整理線上 PAC 快取。,オンライン PAC URL を保存し、オンライン PAC キャッシュを更新します。,온라인 PAC URL을 저장하고 온라인 PAC 캐시를 새로 고칩니다.,Enregistrer l’URL PAC en ligne et actualiser le cache PAC en ligne.
+"Scan Steam, Epic Games, GOG and Xbox libraries for installed games that can be added to automatic Game Mode.","Просканировать библиотеки Steam, Epic Games, GOG и Xbox на установленные игры, которые можно добавить в автоматический игровой режим.",扫描 Steam、Epic Games、GOG 和 Xbox 游戏库，查找可添加到自动游戏模式的已安装游戏。,掃描 Steam、Epic Games、GOG 與 Xbox 遊戲庫，尋找可新增至自動遊戲模式的已安裝遊戲。,Steam、Epic Games、GOG、Xbox のライブラリをスキャンし、自動 Game Mode に追加できるインストール済みゲームを探します。,"Steam, Epic Games, GOG 및 Xbox 라이브러리를 검색하여 자동 Game Mode에 추가할 수 있는 설치된 게임을 찾습니다.","Analyser les bibliothèques Steam, Epic Games, GOG et Xbox pour rechercher les jeux installés pouvant être ajoutés au Game Mode automatique."
+Scan the image currently stored in the clipboard for a Shadowsocks QR code.,Проверить изображение из буфера обмена на наличие QR-кода Shadowsocks.,扫描剪贴板中的当前图像以查找 Shadowsocks 二维码。,掃描剪貼簿中的目前影像以尋找 Shadowsocks QR Code。,現在クリップボードにある画像から Shadowsocks QR コードをスキャンします。,현재 클립보드에 있는 이미지에서 Shadowsocks QR 코드를 스캔합니다.,Analyser l’image actuellement stockée dans le Presse-papiers à la recherche d’un QR code Shadowsocks.
+"Select an online configuration source to update, copy, or remove it.","Выберите источник онлайн-конфигурации, чтобы обновить, скопировать или удалить его.",选择一个在线配置源进行更新、复制或删除。,選擇一個線上設定來源以更新、複製或移除。,更新、コピー、削除するオンライン設定ソースを選択します。,"업데이트, 복사 또는 제거할 온라인 구성 소스를 선택합니다.","Sélectionner une source de configuration en ligne à mettre à jour, copier ou supprimer."
+Share servers and import ss:// links or QR codes.,Делиться серверами и импортировать ссылки ss:// или QR-коды.,分享服务器并导入 ss:// 链接或二维码。,分享伺服器並匯入 ss:// 連結或 QR Code。,サーバーを共有し、ss:// リンクまたは QR コードをインポートします。,서버를 공유하고 ss:// 링크 또는 QR 코드를 가져옵니다.,Partager des serveurs et importer des liens ss:// ou des QR codes.
+Start Shadowsocks automatically when you sign in to Windows. This option is unavailable in Clean Mode.,Автоматически запускать Shadowsocks при входе в Windows. В Clean Mode эта опция недоступна.,登录 Windows 时自动启动 Shadowsocks。Clean Mode 下此选项不可用。,登入 Windows 時自動啟動 Shadowsocks。Clean Mode 下此選項無法使用。,Windows へのサインイン時に Shadowsocks を自動起動します。Clean Mode ではこのオプションは使用できません。,Windows 로그인 시 Shadowsocks를 자동으로 시작합니다. Clean Mode에서는 이 옵션을 사용할 수 없습니다.,Démarrer automatiquement Shadowsocks à la connexion à Windows. Cette option n’est pas disponible en Clean Mode.
+Switch between an online PAC URL and the locally generated GeoSite PAC.,Переключаться между URL онлайн-PAC и локально созданным PAC на основе GeoSite.,在在线 PAC URL 与本地生成的 GeoSite PAC 之间切换。,在線上 PAC URL 與本機產生的 GeoSite PAC 之間切換。,オンライン PAC URL とローカル生成の GeoSite PAC を切り替えます。,온라인 PAC URL과 로컬로 생성된 GeoSite PAC 간에 전환합니다.,Basculer entre une URL PAC en ligne et le PAC GeoSite généré localement.
+TCP port of the upstream proxy.,TCP-порт вышестоящего прокси.,上游代理的 TCP 端口。,上游 Proxy 的 TCP 連接埠。,上流プロキシの TCP ポートです。,업스트림 프록시의 TCP 포트입니다.,Port TCP du proxy amont.
+TCP/UDP port exposed by the Shadowsocks server.,TCP/UDP-порт сервера Shadowsocks.,Shadowsocks 服务器公开的 TCP/UDP 端口。,Shadowsocks 伺服器公開的 TCP/UDP 連接埠。,Shadowsocks サーバーが公開する TCP/UDP ポートです。,Shadowsocks 서버가 노출하는 TCP/UDP 포트입니다.,Port TCP/UDP exposé par le serveur Shadowsocks.
+Temporarily reveal the password for manually managed servers. Link-managed servers keep this option hidden.,"Временно показать пароль для серверов, управляемых вручную. Для серверов из ссылок эта опция скрыта.",临时显示手动管理服务器的密码。通过链接管理的服务器会隐藏此选项。,暫時顯示手動管理伺服器的密碼。由連結管理的伺服器會隱藏此選項。,手動管理サーバーのパスワードを一時的に表示します。リンク管理のサーバーではこのオプションは非表示です。,수동 관리 서버의 비밀번호를 일시적으로 표시합니다. 링크로 관리되는 서버에서는 이 옵션이 숨겨집니다.,Afficher temporairement le mot de passe des serveurs gérés manuellement. Cette option reste masquée pour les serveurs gérés par lien.
+Try to register every configured global hotkey immediately.,Попытаться немедленно зарегистрировать все настроенные глобальные горячие клавиши.,立即尝试注册所有已配置的全局快捷键。,立即嘗試註冊所有已設定的全域快速鍵。,設定済みのグローバルホットキーをすべて今すぐ登録します。,구성된 모든 전역 단축키를 지금 등록해 봅니다.,Essayer d’enregistrer immédiatement tous les raccourcis globaux configurés.
+URL downloaded and served when Online PAC mode is enabled.,"URL, который загружается и используется при включённом режиме Online PAC.",启用在线 PAC 模式时下载并提供的 URL。,啟用線上 PAC 模式時下載並提供的 URL。,オンライン PAC モード有効時にダウンロードして配信する URL です。,온라인 PAC 모드가 활성화되었을 때 다운로드하고 제공하는 URL입니다.,URL téléchargée et servie lorsque le mode PAC en ligne est activé.
+Use the normal user-mode local proxy path without elevation or WinDivert capture.,Использовать обычный пользовательский режим локального прокси без повышения прав и перехвата WinDivert.,使用普通用户模式本地代理路径，不提升权限，也不进行 WinDivert 捕获。,使用一般使用者模式本機 Proxy 路徑，不提高權限，也不進行 WinDivert 擷取。,昇格や WinDivert キャプチャを使わず、通常のユーザーモードのローカルプロキシ経路を使用します。,권한 상승이나 WinDivert 캡처 없이 일반 사용자 모드 로컬 프록시 경로를 사용합니다.,"Utiliser le chemin proxy local normal en mode utilisateur, sans élévation ni capture WinDivert."
+Validate and save all application routing rules.,Проверить и сохранить все правила маршрутизации приложений.,验证并保存所有应用程序路由规则。,驗證並儲存所有應用程式路由規則。,すべてのアプリケーションルーティングルールを検証して保存します。,모든 애플리케이션 라우팅 규칙을 검증하고 저장합니다.,Valider et enregistrer toutes les règles de routage d’application.
+Validate and save the current server and local client settings.,Проверить и сохранить текущий сервер и настройки локального клиента.,验证并保存当前服务器和本地客户端设置。,驗證並儲存目前伺服器與本機用戶端設定。,現在のサーバーとローカルクライアント設定を検証して保存します。,현재 서버 및 로컬 클라이언트 설정을 검증하고 저장합니다.,Valider et enregistrer les paramètres actuels du serveur et du client local.
+Validate and save the forward-proxy configuration.,Проверить и сохранить настройки вышестоящего прокси.,验证并保存上游代理配置。,驗證並儲存上游 Proxy 設定。,上流プロキシ設定を検証して保存します。,업스트림 프록시 구성을 검증하고 저장합니다.,Valider et enregistrer la configuration du proxy amont.
+"View logs, traffic history and logging options.","Просматривать журналы, историю трафика и параметры журналирования.",查看日志、流量历史和日志选项。,檢視記錄、流量歷程與記錄選項。,ログ、トラフィック履歴、ログ設定を表示します。,"로그, 트래픽 기록 및 로깅 옵션을 봅니다.","Afficher les journaux, l’historique du trafic et les options de journalisation."
+View version information and configure update checks.,Просматривать информацию о версии и настраивать проверку обновлений.,查看版本信息并配置更新检查。,檢視版本資訊並設定更新檢查。,バージョン情報を表示し、更新確認を設定します。,버전 정보를 보고 업데이트 확인을 구성합니다.,Afficher les informations de version et configurer la vérification des mises à jour.
+Wrap long log lines instead of requiring horizontal scrolling.,Переносить длинные строки журнала вместо горизонтальной прокрутки.,自动换行长日志行，而不是要求水平滚动。,自動換行較長的記錄行，而不是要求水平捲動。,長いログ行を折り返し、横スクロールを不要にします。,긴 로그 줄을 줄 바꿈하여 가로 스크롤이 필요 없게 합니다.,Renvoyer à la ligne les longues lignes de journal au lieu d’imposer un défilement horizontal.

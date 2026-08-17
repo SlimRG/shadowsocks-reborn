@@ -21,10 +21,11 @@ If known, note any impact on:
 - User Mode / Admin Mode / automatic Game Mode;
 - WinDivert or elevated helper behavior;
 - PAC / GeoSite / system proxy;
-- `gui-config.json` compatibility;
+- Registry settings / legacy `gui-config.json` migration compatibility;
 - Shadowsocks protocol or SIP003 behavior;
 - x64 release packaging;
-- WinForms/WPF UI and localization.
+- WinUI 3 UI and localization;
+- single-file release / LocalAppData / Temp storage policy.
 
 ## Alternatives
 

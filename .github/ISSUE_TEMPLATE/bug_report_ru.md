@@ -17,10 +17,10 @@ assignees: ""
 - Версия/commit Shadowsocks Reborn:
 - Версия/build Windows:
 - Запуск: release ZIP / сборка из исходников
-- Версия .NET 10 Desktop Runtime:
+- Версия .NET 10 SDK (только для сборки из исходников):
 - Режим трафика: User / Admin
 - Системный proxy: Disabled / PAC / Global
-- Portable mode: да / нет
+- Место запуска: локальный диск / read-only каталог / флешка
 
 ## Шаги воспроизведения
 
@@ -33,7 +33,7 @@ assignees: ""
 <!-- Удали раздел, если ошибка не связана с Admin Mode. -->
 
 - UAC прошёл успешно: да / нет
-- Статус WinDivert в меню: активен / приостановлен / неактивен
+- Статус WinDivert на странице Traffic: активен / приостановлен / неактивен
 - Есть ли в логе `WinDivert capture confirmed`: да / нет
 - Было ли запущено приложение из списка Game Mode: да / нет
 

@@ -1,127 +1,150 @@
 ﻿# shadowsocks-reborn для Windows
 
-<img src="Shadowsocks.UI/Resources/ssw128.png" alt="Shadowsocks logo" width="64">
+<img src="docs/assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
 
 [English](README.md) | **Русский**
 
-`shadowsocks-reborn` — Windows-ориентированное продолжение классического Shadowsocks for Windows v4. Текущая кодовая база переведена на **.NET 10**, поддерживает **Windows 10 2004 (сборка 19041) и новее** и собирается **только под x64**, сохраняя классическую модель протокола и конфигурации Shadowsocks.
+`shadowsocks-reborn` — Windows-ориентированное продолжение классического Shadowsocks for Windows v4. Ветка 5.x использует **.NET 10**, **WinUI 3 / Windows App SDK**, только **x64** и поддерживает Windows 10 build 19041 или новее.
 
-> Текущая ветка релизов: **5.0**. Это отдельный fork, а не upstream-репозиторий `shadowsocks/shadowsocks-windows`.
+> Это независимый fork, не upstream `shadowsocks/shadowsocks-windows`.
 
-## Основные возможности
+## Основное
 
-- .NET 10, TFM `net10.0-windows10.0.19041.0`.
-- Только x64 для приложения, тестов и elevated helper.
-- AEAD через `System.Security.Cryptography`; старые native crypto wrappers больше не используются.
-- Управление системным proxy через WinINet внутри процесса; `sysproxy.exe` удалён.
-- Managed HTTP/1.1 и HTTPS `CONNECT` proxy; Privoxy удалён.
-- Local PAC с настраиваемыми GeoSite-источниками и кэшируемый Online PAC.
-- Маршрутизация приложений `Proxy` / `Direct` / `Block`.
-- Опциональный прозрачный TCP/UDP-перехват в Admin Mode через WinDivert.
-- Автоматический Game Mode, временно полностью отключающий WinDivert при запуске выбранных приложений.
-- SIP003 plugins, классический UDP relay Shadowsocks, QR import/export, hotkeys и локализованный WinForms/WPF UI.
+- WinUI 3 — единственный desktop UI; WinForms и WPF больше не входят в продукт.
+- Unpackaged, self-contained, win-x64, single-file deployment.
+- В release находится только `Shadowsocks.exe`.
+- Постоянные пользовательские настройки хранятся в `%LOCALAPPDATA%\Shadowsocks\settings.json`; каталог EXE не используется как изменяемое хранилище.
+- В обычном режиме настройки, PAC/GeoSite cache, PAC-данные, logs и startup copy находятся в `%LOCALAPPDATA%\Shadowsocks`.
+- Clean Mode по Rufus-схеме (`...p.exe`) переносит все изменяемые данные в одноразовый сеанс `%TEMP%\Shadowsocks\Clean\...`.
+- Managed HTTP/1.1 proxy и HTTPS `CONNECT`; Privoxy/sysproxy удалены.
+- Маршрутизация приложений: `Proxy`, `Direct`, `Block`.
+- Transparent TCP/UDP capture в Admin Mode через WinDivert.
+- Автоматический Game Mode временно останавливает Admin capture при запуске заданного приложения.
+- Страница игр предлагает найденные Steam, Epic Games, GOG и Xbox игры; ручное добавление правил сохранено.
+- SIP003 plugins, UDP relay, QR import/export, hotkeys и единственный embedded CSV-каталог локализации.
 
 ## Режимы трафика
 
-В tray есть только два выбираемых режима:
+Выбираются только два режима:
 
-- **User Mode** — без UAC и драйвера. Правила приложений применяются к трафику, который реально проходит через системный/локальный HTTP proxy. Прямые сокеты приложений, произвольный UDP и QUIC прозрачно не перехватываются.
-- **Admin Mode** — запрашивает UAC, при необходимости загружает официальный x64 WinDivert и запускает elevated broker `Shadowsocks.NetworkService.exe`. TCP/UDP классифицируются по приложению и получают действие `Proxy`, `Direct` или `Block`.
+- **User Mode** — без UAC и без извлечения NetworkService. Правила маршрутизации применяются к трафику, который приходит в локальный/system proxy.
+- **Admin Mode** — запрашивает UAC, извлекает embedded `Shadowsocks.NetworkService.exe` под активный storage-root, проверяет его, запускает elevated и включает transparent TCP/UDP capture через WinDivert.
 
-**Game Mode не является третьим режимом трафика.** Это автоматическое состояние совместимости. Если выбран Admin Mode и запускается приложение из настроенного списка, capture-child WinDivert останавливается, а служба драйвера WinDivert удаляется. После закрытия приложения Admin Mode восстанавливается автоматически.
+**Game Mode — не третий режим трафика, а автоматическое runtime-состояние.** Если выбран Admin Mode и запускается приложение из списка Game Mode, WinDivert capture временно останавливается. После завершения приложения Admin capture восстанавливается автоматически.
 
-В меню отображается фактический runtime-статус: `WinDivert: активен`, `приостановлен (игра запущена)` или `неактивен`.
-
-## Как проверить WinDivert
-
-Admin Mode считается успешно запущенным только после того, как elevated capture-child выполнил `WinDivertOpen`. В логе должна появиться строка примерно такого вида:
-
-```text
-WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
-```
-
-Для функционального A/B-теста добавь правило `curl.exe -> Block`, на время теста отключи системный proxy и сравни прямой запрос в User Mode и Admin Mode:
-
-```cmd
-curl.exe -4 --noproxy "*" https://example.com
-```
-
-В User Mode запрос должен пройти мимо application routing, а в Admin Mode — блокироваться.
+Страница Traffic показывает configured/runtime mode, NetworkService, WinDivert, TCP/UDP capture и redirect ports.
 
 ## Требования
 
-Для запуска release-сборки:
+- Windows 10 2004 / build 19041 или новее, либо Windows 11;
+- x64 Windows;
+- .NET 10 SDK нужен только для сборки из исходников.
 
-- Windows 10 версии 2004 / сборка 19041 или новее, либо Windows 11;
-- x64 OS;
-- .NET 10 Desktop Runtime x64 для основного приложения.
-
-`Shadowsocks.NetworkService.exe` публикуется self-contained и отдельного .NET Runtime не требует. WinDivert опционален и загружается только при включении Admin Mode.
+Опубликованный продукт self-contained и не требует отдельно установленного .NET runtime.
 
 ## Структура solution
 
-- `Shadowsocks.Engine` — движок и controller layer без зависимостей WinForms/WPF.
-- `Shadowsocks.UI` — текущий переходный WinForms/WPF UI; собирает `shadowsocks-reborn.exe`.
-- `Shadowsocks.NetworkService` — elevated helper для WinDivert.
-- `Shadowsocks.UnitTests` — тесты.
+- `Shadowsocks.Core` — protocol, encryption, configuration model, PAC/GeoSite, routing models, localization и storage abstractions.
+- `Shadowsocks.Windows` — file-storage bootstrap, WinINet/system proxy, startup, UAC/Admin capture, WinDivert runtime, hotkeys и Windows integration.
+- `Shadowsocks.Windows.WinUI` — WinUI-specific Windows shell/tray integration.
+- `Shadowsocks.WinUI` — WinUI 3 shell и проект, публикующий `Shadowsocks.exe`.
+- `Shadowsocks.NetworkService` — изолированный elevated WinDivert helper, embedded в release build.
+- `Shadowsocks.UnitTests` — тесты Core/Windows без зависимости от UI.
 
-Граница UI описана в `ARCHITECTURE.md`; она подготовлена для следующего этапа миграции на WinUI 3.
+Подробнее: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Сборка
 
-На Windows с .NET 10 SDK:
+Нужен .NET 10 SDK под Windows:
 
-```cmd
+```powershell
 dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
-dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1
+dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
 
-Публикация:
+Product publish:
 
-```cmd
-dotnet publish .\Shadowsocks.UI\Shadowsocks.UI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --no-self-contained
+```powershell
+dotnet restore .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64
+dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --self-contained true --no-restore
 ```
 
-Полная подготовка release ZIP и SHA-256:
+Либо release ZIP + SHA-256:
 
 ```powershell
 .\packaging\Build-Release.ps1 -Version v5.0.0
 ```
 
-Продуктовая публикация содержит основной framework-dependent single-file EXE и отдельный self-contained single-file elevated helper. Поэтому в release-архиве `shadowsocks-reborn.exe` и `Shadowsocks.NetworkService.exe` должны лежать рядом.
+Финальный publish directory и release ZIP должны содержать ровно:
 
-## Конфигурация и runtime-данные
+```text
+Shadowsocks.exe
+```
 
-- Основной конфиг: `gui-config.json`.
-- Пользовательские PAC-правила: `user-rule.txt`.
-- GeoSite и Online PAC загружаются/кэшируются во время работы и не вшиваются в EXE.
-- В portable mode WinDivert хранится в локальном каталоге `runtime`; иначе — в `%LOCALAPPDATA%\Shadowsocks\runtime`.
+DLL, PDB, runtime JSON, ICO и отдельный `Shadowsocks.NetworkService.exe` запрещены validator-ом.
 
-Проект явно исключает из build/publish устаревшие `ApplicationSettingsBase`, Privoxy, sysproxy и старые native crypto artifacts, чтобы они не вернулись при распаковке новой версии поверх старого checkout.
+## Хранение данных и автозагрузка
 
-## PAC и HTTP forwarding
+В обычном режиме всё постоянное состояние приложения хранится под:
 
-Local PAC загружает настроенные GeoSite-источники через активное соединение Shadowsocks и кэширует их отдельно. Online PAC также загружается через Shadowsocks и отдаётся WinINet через локальный `/pac`, поэтому Windows не требуется прямой доступ к удалённому PAC-хосту.
+```text
+%LOCALAPPDATA%\Shadowsocks
+```
 
-`ManagedHttpProxyService` обрабатывает HTTP/1.1 и HTTPS `CONNECT` в managed-коде. HTTPS остаётся байтовым tunnel, поэтому HTTP/2 внутри TLS работает без собственного HTTP/2 parser. FTP gateway не реализован.
+Основной backend конфигурации — `%LOCALAPPDATA%\Shadowsocks\settings.json`, резервный документ — `settings.backup.json`. Старые значения `HKCU\Software\Shadowsocks Reborn\Settings` игнорируются. Локализация использует только `i18n.csv`, встроенный внутрь `Shadowsocks.exe`; второй файл больше не распаковывается.
 
-## DNS
+В Settings показывается активный путь хранилища и одна кнопка **Открыть**, которая открывает этот каталог как в обычном режиме, так и в Clean Mode.
 
-Контракт конфигурации/IPC уже содержит режимы `System`, `Direct`, `Proxy` и `CustomDoh`, но прозрачный DNS interception/routing **не реализован в 5.0.0**. Пока эти настройки нельзя считать механизмом принудительной DNS-маршрутизации.
+Если имя EXE заканчивается на `p` перед `.exe`, например `Shadowsocksp.exe` или `Shadowsocks-5.0p.exe`, включается **Clean Mode**. В нём настройки, кэши, PAC, логи, runtime, helper и update/working-файлы пишутся в уникальный `%TEMP%\Shadowsocks\Clean\...` сеанс и удаляются best-effort при Quit. Автозагрузка в Clean Mode недоступна.
 
-## Состояние UI
+В обычном режиме Start with Windows копирует проверенный EXE в `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; Windows Run integration указывает только на эту стабильную копию.
 
-Текущий presentation layer пока остаётся **смешанным WinForms/WPF**. `Shadowsocks.Engine` уже не зависит от UI framework, поэтому shell можно переносить на **WinUI 3 / Windows App SDK** без повторного переноса сетевой логики.
+Полная схема — в [STORAGE_POLICY.md](STORAGE_POLICY.md).
 
-## Разработка
+## Embedded NetworkService
 
-Перед PR см. [CONTRIBUTING.md](CONTRIBUTING.md). История текущей ветки находится в [CHANGELOG.md](CHANGELOG.md), исходная история upstream сохранена в `CHANGES`.
+В product publish `Shadowsocks.NetworkService` собирается как self-contained single-file helper и встраивается в `Shadowsocks.exe`.
 
-## Безопасность и приватность
+В User Mode helper не извлекается. При включении Admin Mode он materialize-ится под активный storage-root (`%LOCALAPPDATA%\Shadowsocks\Temp\NetworkService\...` в обычном режиме и внутри Clean Mode session в Clean Mode). Извлечение сериализовано, файл проверяется SHA-256, после UAC выполняется version handshake по control pipe. Пока broker работает, helper защищён от замены/удаления; после остановки каталог удаляется best-effort, а stale runtime очищается при следующих запусках.
 
-Не публикуй в Issues пароли, адреса серверов, subscription URL, PAC secrets и полные приватные конфиги. Рекомендации по отчётам — в [SECURITY.md](SECURITY.md).
+Development build может использовать отдельный helper из build output. В release package его нет.
+
+## Проверка WinDivert
+
+Admin Mode считается активным только после успешного `WinDivertOpen` в elevated capture process. Успешный запуск даёт лог примерно такого вида:
+
+```text
+WinDivert capture confirmed (start): Admin capture active.; TCP redirect port=..., UDP redirect port=...
+```
+
+Для функционального A/B теста добавь `curl.exe -> Block`, временно отключи Windows system proxy и сравни:
+
+```cmd
+curl.exe -4 --noproxy "*" https://example.com
+```
+
+В User Mode прямой запрос должен пройти мимо application routing, а в Admin Mode — блокироваться.
+
+## PAC, HTTP forwarding и DNS
+
+Local PAC использует заданные GeoSite sources и persistent cache. Online PAC скачивается через Shadowsocks и отдаётся WinINet через локальный `/pac` endpoint.
+
+`ManagedHttpProxyService` поддерживает HTTP/1.1 и HTTPS `CONNECT`. HTTPS идёт как byte tunnel, поэтому HTTP/2 внутри TLS не требует отдельного HTTP/2 parser в локальном proxy. FTP gateway не реализован.
+
+В configuration contract есть DNS policy `System`, `Direct`, `Proxy`, `CustomDoh`, но transparent DNS interception/routing в 5.0.0 пока не реализован.
+
+## Документация
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — архитектура проектов и runtime flow.
+- [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp и migration.
+- [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — актуальные правила WinUI.
+- [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) — зафиксированный результат миграции UI.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — правила разработки.
+- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — проверки перед релизом.
+- [SECURITY.md](SECURITY.md) — security reporting и чувствительные компоненты.
+- [CHANGELOG.md](CHANGELOG.md) — изменения fork; история upstream остаётся в `CHANGES`.
 
 ## Лицензия
 
-`shadowsocks-reborn` распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии.
+`shadowsocks-reborn` распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют свои лицензии.

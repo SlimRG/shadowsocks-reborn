@@ -290,8 +290,21 @@ internal static class Program
         }
     }
 
-    private static ServiceResponse Success(string message) => new() { Success = true, Message = message };
-    private static ServiceResponse Failure(string message) => new() { Success = false, Message = message };
+    private static string ServiceVersion => typeof(Program).Assembly.GetName().Version?.ToString(4) ?? "0.0.0.0";
+
+    private static ServiceResponse Success(string message) => new()
+    {
+        Success = true,
+        Message = message,
+        Version = ServiceVersion,
+    };
+
+    private static ServiceResponse Failure(string message) => new()
+    {
+        Success = false,
+        Message = message,
+        Version = ServiceVersion,
+    };
 
     private static Task SendAsync(StreamWriter writer, ServiceResponse response)
         => writer.WriteLineAsync(JsonSerializer.Serialize(response, NetworkServiceJsonContext.Default.ServiceResponse));

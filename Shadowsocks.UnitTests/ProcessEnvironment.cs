@@ -6,7 +6,7 @@ running in a Windows system.
 History:
 
  - v1.2.ss Add GetCommandLine for convenience.
- 
+
  - v1.2: Added support for inspection of 64 bit processes from 32 bit host
  - v1.1: Fixed issue with environment block size detection
  - v1.0: Initial
@@ -269,7 +269,7 @@ namespace Shadowsocks.UnitTests
             }
             finally
             {
-                int dataSize = sizeof(Int32);
+                int dataSize = sizeof(int);
                 var data = Marshal.AllocHGlobal(dataSize);
                 IntPtr res_len = IntPtr.Zero;
                 bool b = WindowsApi.ReadProcessMemory(

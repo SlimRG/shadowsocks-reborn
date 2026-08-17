@@ -17,10 +17,10 @@ Describe the problem and what you expected to happen.
 - Shadowsocks Reborn version/commit:
 - Windows version/build:
 - Installation: release ZIP / source build
-- .NET 10 Desktop Runtime version:
+- .NET 10 SDK version (source builds only):
 - Traffic mode: User / Admin
 - System proxy mode: Disabled / PAC / Global
-- Portable mode: yes / no
+- Launch location: local disk / read-only folder / removable drive
 
 ## Steps to reproduce
 
@@ -33,7 +33,7 @@ Describe the problem and what you expected to happen.
 <!-- Delete this section when the problem is unrelated to Admin Mode. -->
 
 - Did UAC succeed: yes / no
-- WinDivert menu status: active / paused / inactive
+- WinDivert status on the Traffic page: active / paused / inactive
 - Does the log contain `WinDivert capture confirmed`: yes / no
 - Was a Game Mode application running: yes / no
 

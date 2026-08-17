@@ -1,0 +1,244 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <Version>5.0.0</Version>
+    <Authors>Shadowsocks community</Authors>
+    <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <RootNamespace>Shadowsocks.WinUI</RootNamespace>
+    <AssemblyName>Shadowsocks</AssemblyName>
+    <ApplicationIcon>shadowsocks.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <UseWinUI>true</UseWinUI>
+    <!-- Keep this a pure WinUI 3 projection graph. Do not enable UseUwp: legacy
+         Windows.UI.Xaml projections are incompatible with Microsoft.UI.Xaml. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <EnableDefaultPageItems>false</EnableDefaultPageItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Shadowsocks.Core\Shadowsocks.Core.csproj" />
+    <ProjectReference Include="..\Shadowsocks.Windows\Shadowsocks.Windows.csproj" />
+    <ProjectReference Include="..\Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj" />
+  </ItemGroup>
+
+  <!-- WinUI's XAML compiler can inspect ProjectReference TargetPath values before
+       Visual Studio has materialized those assemblies (WMC1006). Keep the normal
+       ProjectReference graph, but make the three library outputs exist before any
+       XAML compile/design-time pass. Restore and Build are deliberately separate
+       MSBuild evaluations. -->
+  <PropertyGroup>
+    <CoreProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Core\Shadowsocks.Core.csproj'))</CoreProject>
+    <WindowsProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows\Shadowsocks.Windows.csproj'))</WindowsProject>
+    <WindowsWinUIProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj'))</WindowsWinUIProject>
+    <CoreAssetsFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Core\obj\project.assets.json'))</CoreAssetsFile>
+    <WindowsAssetsFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows\obj\project.assets.json'))</WindowsAssetsFile>
+    <WindowsWinUIAssetsFile>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows.WinUI\obj\project.assets.json'))</WindowsWinUIAssetsFile>
+    <CoreXamlReferenceOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Core\bin\x64\$(Configuration)\net10.0\Shadowsocks.Core.dll'))</CoreXamlReferenceOutput>
+    <WindowsXamlReferenceOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows\bin\x64\$(Configuration)\net10.0-windows10.0.19041.0\Shadowsocks.Windows.dll'))</WindowsXamlReferenceOutput>
+    <WindowsWinUIXamlReferenceOutput>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.Windows.WinUI\bin\x64\$(Configuration)\net10.0-windows10.0.26100.0\Shadowsocks.Windows.WinUI.dll'))</WindowsWinUIXamlReferenceOutput>
+  </PropertyGroup>
+
+  <Target Name="PrepareWinUIXamlProjectReferences"
+          BeforeTargets="DesignTimeMarkupCompilation;MarkupCompilePass1;XamlPreCompile"
+          Condition="!Exists('$(CoreXamlReferenceOutput)') or !Exists('$(WindowsXamlReferenceOutput)') or !Exists('$(WindowsWinUIXamlReferenceOutput)')">
+    <Message Importance="Low"
+             Text="Preparing Core/Windows assemblies before WinUI XAML compilation." />
+    <MSBuild Projects="$(CoreProject)"
+             Targets="Restore"
+             BuildInParallel="false"
+             Condition="!Exists('$(CoreAssetsFile)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false" />
+    <MSBuild Projects="$(WindowsProject)"
+             Targets="Restore"
+             BuildInParallel="false"
+             Condition="!Exists('$(WindowsAssetsFile)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false" />
+    <MSBuild Projects="$(WindowsWinUIProject)"
+             Targets="Restore"
+             BuildInParallel="false"
+             Condition="!Exists('$(WindowsWinUIAssetsFile)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false" />
+    <MSBuild Projects="$(CoreProject)"
+             Targets="Build"
+             BuildInParallel="false"
+             Condition="!Exists('$(CoreXamlReferenceOutput)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false;BuildProjectReferences=true" />
+    <MSBuild Projects="$(WindowsProject)"
+             Targets="Build"
+             BuildInParallel="false"
+             Condition="!Exists('$(WindowsXamlReferenceOutput)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false;BuildProjectReferences=true" />
+    <MSBuild Projects="$(WindowsWinUIProject)"
+             Targets="Build"
+             BuildInParallel="false"
+             Condition="!Exists('$(WindowsWinUIXamlReferenceOutput)')"
+             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSelfContained;PublishSingleFile;WindowsAppSDKSelfContained;DesignTimeBuild"
+             Properties="Configuration=$(Configuration);Platform=x64;DesignTimeBuild=false;BuildProjectReferences=true" />
+    <Error Condition="!Exists('$(CoreXamlReferenceOutput)')"
+           Text="WinUI XAML prerequisite was not built: $(CoreXamlReferenceOutput)" />
+    <Error Condition="!Exists('$(WindowsXamlReferenceOutput)')"
+           Text="WinUI XAML prerequisite was not built: $(WindowsXamlReferenceOutput)" />
+    <Error Condition="!Exists('$(WindowsWinUIXamlReferenceOutput)')"
+           Text="WinUI XAML prerequisite was not built: $(WindowsWinUIXamlReferenceOutput)" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2526" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
+    <!-- Keep the direct WinUI component on the latest stable servicing package compatible
+         with the Windows App SDK 2.4.0 dependency graph. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.6" />
+    <PackageReference Include="NLog" Version="6.1.4" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Manifest Include="$(ApplicationManifest)" />
+    <None Update="shadowsocks.ico"
+          CopyToOutputDirectory="Never"
+          CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <!-- Keep Visual Studio's WinUI/MSIX project capabilities available even though
+       the application itself is intentionally unpackaged. -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+
+  <!-- NetworkService remains an isolated executable project rather than a ProjectReference.
+       Development builds copy its framework-dependent output beside the WinUI development EXE.
+       Product single-file publish builds a self-contained helper first and embeds that EXE as a
+       manifest resource; the release directory therefore contains only Shadowsocks.exe. -->
+  <PropertyGroup>
+    <NetworkServiceProject>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj'))</NetworkServiceProject>
+    <NetworkServiceBuildDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\bin\x64\$(Configuration)\net10.0-windows10.0.19041.0\win-x64\'))</NetworkServiceBuildDir>
+    <NetworkServiceProductPublishDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Shadowsocks.NetworkService\bin\ProductPublish\$(Configuration)\win-x64\'))</NetworkServiceProductPublishDir>
+  </PropertyGroup>
+
+  <Target Name="BuildNetworkServiceForWinUIBootstrap"
+          Condition="'$(PublishSingleFile)' != 'true' and !Exists('$(NetworkServiceBuildDir)Shadowsocks.NetworkService.exe')">
+    <Message Importance="Low"
+             Text="Building framework-dependent Shadowsocks.NetworkService for WinUI development output." />
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Restore"
+             BuildInParallel="false"
+             RemoveProperties="TargetFramework;TargetFrameworks;PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained;WindowsPackageType;UseWinUI;EnableMsixTooling;IncludeAllContentForSelfExtract;WindowsAppSDKSelfContained"
+             Properties="Configuration=$(Configuration);Platform=x64;RuntimeIdentifier=win-x64;NetworkServiceProductPublish=false;SelfContained=false;PublishSelfContained=false;PublishSingleFile=false" />
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Build"
+             BuildInParallel="false"
+             RemoveProperties="TargetFramework;TargetFrameworks;PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained;WindowsPackageType;UseWinUI;EnableMsixTooling;IncludeAllContentForSelfExtract;WindowsAppSDKSelfContained"
+             Properties="Configuration=$(Configuration);Platform=x64;RuntimeIdentifier=win-x64;NetworkServiceProductPublish=false;SelfContained=false;PublishSelfContained=false;PublishSingleFile=false" />
+  </Target>
+
+  <Target Name="CopyNetworkServiceForWinUIBootstrap"
+          AfterTargets="Build"
+          DependsOnTargets="BuildNetworkServiceForWinUIBootstrap"
+          Condition="'$(PublishSingleFile)' != 'true'">
+    <ItemGroup>
+      <NetworkServiceDevelopmentOutput Include="$(NetworkServiceBuildDir)Shadowsocks.NetworkService.*" />
+    </ItemGroup>
+    <Error Condition="'@(NetworkServiceDevelopmentOutput)' == ''"
+           Text="Shadowsocks.NetworkService build output was not found at $(NetworkServiceBuildDir)." />
+    <Copy SourceFiles="@(NetworkServiceDevelopmentOutput)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CleanWinUIPublishDirectory"
+          BeforeTargets="PrepareForPublish"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <RemoveDir Directories="$(PublishDir)" Condition="Exists('$(PublishDir)')" />
+  </Target>
+
+  <Target Name="ValidateWinUISingleFilePublish"
+          BeforeTargets="PrepareForPublish"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <Error Condition="'$(WindowsPackageType)' != 'None'"
+           Text="WinUI single-file publish requires WindowsPackageType=None." />
+    <Error Condition="'$(WindowsAppSDKSelfContained)' != 'true'"
+           Text="WinUI single-file publish requires WindowsAppSDKSelfContained=true." />
+    <Error Condition="'$(SelfContained)' != 'true'"
+           Text="WinUI single-file publish requires SelfContained=true." />
+    <Error Condition="'$(EnableMsixTooling)' != 'true'"
+           Text="WinUI single-file publish requires EnableMsixTooling=true." />
+    <Error Condition="'$(IncludeAllContentForSelfExtract)' != 'true'"
+           Text="WinUI single-file publish requires IncludeAllContentForSelfExtract=true." />
+  </Target>
+
+
+  <ItemGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <EmbeddedResource Include="$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.exe"
+                      LogicalName="Shadowsocks.WinUI.Embedded.Shadowsocks.NetworkService.exe" />
+  </ItemGroup>
+
+  <Target Name="PrepareEmbeddedNetworkService"
+          BeforeTargets="PrepareResourceNames;CreateManifestResourceNames"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <Message Importance="High"
+             Text="Publishing and embedding Shadowsocks.NetworkService into the single-file product." />
+    <RemoveDir Directories="$(NetworkServiceProductPublishDir)" />
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Restore"
+             BuildInParallel="false"
+             RemoveProperties="TargetFramework;TargetFrameworks;PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained;RuntimeIdentifier;Platform;PlatformTarget;WindowsPackageType;UseWinUI;EnableMsixTooling;IncludeAllContentForSelfExtract;WindowsAppSDKSelfContained"
+             Properties="Configuration=$(Configuration);Platform=x64;RuntimeIdentifier=win-x64;NetworkServiceProductPublish=true;SelfContained=true;PublishSelfContained=true;PublishSingleFile=true" />
+    <MSBuild Projects="$(NetworkServiceProject)"
+             Targets="Publish"
+             BuildInParallel="false"
+             RemoveProperties="TargetFramework;TargetFrameworks;PublishProfile;PublishProfileFullPath;PublishDir;PublishUrl;PublishSingleFile;PublishSelfContained;SelfContained;RuntimeIdentifier;Platform;PlatformTarget;WindowsPackageType;UseWinUI;EnableMsixTooling;IncludeAllContentForSelfExtract;WindowsAppSDKSelfContained"
+             Properties="Configuration=$(Configuration);Platform=x64;RuntimeIdentifier=win-x64;NetworkServiceProductPublish=true;SelfContained=true;PublishSelfContained=true;PublishSingleFile=true" />
+    <Error Condition="!Exists('$(NetworkServiceProductPublishDir)Shadowsocks.NetworkService.exe')"
+           Text="Shadowsocks.NetworkService product publish did not produce its single-file executable." />
+  </Target>
+
+  <Target Name="RemoveFinalPublishDebugSymbols"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <FinalPublishDebugSymbols Include="$(PublishDir)**\*.pdb"
+                                Condition="Exists('$(PublishDir)')" />
+    </ItemGroup>
+    <Delete Files="@(FinalPublishDebugSymbols)" />
+    <Message Importance="High"
+             Condition="'@(FinalPublishDebugSymbols)' != ''"
+             Text="Removed debug symbols from final single-file publish: @(FinalPublishDebugSymbols, ', ')" />
+  </Target>
+
+  <Target Name="ValidateFinalSingleFileLayout"
+          AfterTargets="Publish"
+          DependsOnTargets="RemoveFinalPublishDebugSymbols"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <Error Condition="!Exists('$(PublishDir)Shadowsocks.exe')"
+           Text="Single-file publish did not produce Shadowsocks.exe." />
+    <ItemGroup>
+      <UnexpectedPublishFiles Include="$(PublishDir)*"
+                              Exclude="$(PublishDir)Shadowsocks.exe"
+                              Condition="Exists('$(PublishDir)')" />
+    </ItemGroup>
+    <Error Condition="'@(UnexpectedPublishFiles)' != ''"
+           Text="Final product publish must contain only Shadowsocks.exe. Unexpected: @(UnexpectedPublishFiles, ', ')" />
+    <Message Importance="High" Text="Final product layout: $(PublishDir)Shadowsocks.exe" />
+  </Target>
+
+</Project>

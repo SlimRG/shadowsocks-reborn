@@ -1,21 +1,39 @@
-﻿# Security Policy
+﻿# Security policy
 
 ## Reporting a vulnerability
 
-Please do not publish an exploitable vulnerability, credentials or private proxy configuration in a public GitHub issue.
+Do not publish an exploitable vulnerability, credentials or private proxy configuration in a public issue.
 
-For a suspected security problem, open a minimal report without secrets and clearly mark it as security-related, or use GitHub's private vulnerability reporting feature if it is enabled for the repository.
+Use GitHub private vulnerability reporting when available. Otherwise open the smallest safe public report possible, mark it as security-related, and omit sensitive values.
 
-Include enough information to reproduce the issue safely:
+A useful report includes:
 
 - affected version/commit;
-- Windows version;
-- whether User Mode or Admin Mode is involved;
+- Windows version/build;
+- whether User Mode, Admin Mode or Game Mode is involved;
 - reproduction steps;
-- relevant logs with passwords, server addresses, subscription URLs, PAC secrets and tokens removed.
+- sanitized logs.
 
-## Scope notes
+Remove passwords, server addresses, subscription URLs, PAC secrets, tokens and full private configuration before sharing diagnostics.
 
-WinDivert is optional and is downloaded only when Admin Mode is enabled. User Mode must remain functional without WinDivert installed.
+## Security-sensitive areas
 
-The project does not provide or operate proxy servers. Provider availability, account access and server-side policy are outside the client security scope.
+Changes deserve additional review when they touch:
+
+- configuration migration/rollback or file-storage durability;
+- startup executable copying and HKCU Run registration;
+- NetworkService embedding/materialization;
+- SHA-256 verification, extraction mutex or helper guard handle;
+- UAC/elevation and named-pipe authentication/version handshake;
+- WinDivert installation/runtime cleanup;
+- update download/extraction;
+- SIP003 executable discovery/launch;
+- secret display/import behavior.
+
+User Mode must remain usable without extracting or launching the elevated NetworkService helper.
+
+Product settings belong in `%LOCALAPPDATA%\Shadowsocks\settings.json` in normal mode or the Clean Mode Temp session. Mutable data never belongs beside the release EXE. Registry writes are reserved for explicit Windows integration such as autostart/protocol/system-proxy behavior.
+
+## Scope
+
+This repository provides a client application. It does not operate proxy servers. Provider availability, account access, server-side configuration and third-party service policy are outside the client security scope.

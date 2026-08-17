@@ -13,7 +13,8 @@ $artifactsRoot = Join-Path $repoRoot 'artifacts'
 $publishDir = Join-Path $artifactsRoot 'publish'
 $releaseDir = Join-Path $artifactsRoot 'release'
 $solution = Join-Path $repoRoot 'shadowsocks-reborn.sln'
-$project = Join-Path $repoRoot 'Shadowsocks.UI\Shadowsocks.UI.csproj'
+$project = Join-Path $repoRoot 'Shadowsocks.WinUI\Shadowsocks.WinUI.csproj'
+$coreProject = Join-Path $repoRoot 'Shadowsocks.Core\Shadowsocks.Core.csproj'
 $testProject = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
 
 $normalizedVersion = $Version.Trim() -replace '^[vV]', ''
@@ -41,26 +42,18 @@ if ($requestedVersion.Major -ne $declaredVersion.Major -or
     throw "Release label '$Version' does not match project version '$declaredProjectVersion'. Update version metadata before tagging."
 }
 
-$updateCheckerPath = Join-Path $repoRoot 'Shadowsocks.Engine\Controller\Service\UpdateChecker.cs'
-$updateCheckerSource = Get-Content -LiteralPath $updateCheckerPath -Raw
-if ($updateCheckerSource -notmatch 'public const string Version = "(?<version>[0-9]+(?:\.[0-9]+){1,3})";') {
-    throw 'Unable to read UpdateChecker.Version.'
+$applicationInfoPath = Join-Path $repoRoot 'Shadowsocks.Core\ApplicationInfo.cs'
+$applicationInfoSource = Get-Content -LiteralPath $applicationInfoPath -Raw
+if ($applicationInfoSource -notmatch 'public const string Version = "(?<version>[0-9]+(?:\.[0-9]+){1,3})";') {
+    throw 'Unable to read ApplicationInfo.Version.'
 }
-$updateCheckerVersion = [Version]$Matches['version']
-if ($updateCheckerVersion.Major -ne $declaredVersion.Major -or
-    $updateCheckerVersion.Minor -ne $declaredVersion.Minor -or
-    $updateCheckerVersion.Build -ne $declaredVersion.Build) {
-    throw "UpdateChecker.Version '$updateCheckerVersion' does not match project version '$declaredProjectVersion'."
+$applicationVersion = [Version]$Matches['version']
+if ($applicationVersion.Major -ne $declaredVersion.Major -or
+    $applicationVersion.Minor -ne $declaredVersion.Minor -or
+    $applicationVersion.Build -ne $declaredVersion.Build) {
+    throw "ApplicationInfo.Version '$applicationVersion' does not match project version '$declaredProjectVersion'."
 }
 
-$assemblyInfoPath = Join-Path $repoRoot 'Shadowsocks.UI\Properties\AssemblyInfo.cs'
-$assemblyInfoSource = Get-Content -LiteralPath $assemblyInfoPath -Raw
-if ($assemblyInfoSource -notmatch 'AssemblyInformationalVersion\("(?<version>[^"]+)"\)') {
-    throw 'Unable to read AssemblyInformationalVersion.'
-}
-if ($Matches['version'] -ne $baseVersion) {
-    throw "AssemblyInformationalVersion '$($Matches['version'])' does not match release version '$baseVersion'."
-}
 
 function Invoke-DotNet {
     param([Parameter(Mandatory)][string[]]$Arguments)
@@ -88,6 +81,8 @@ try {
 
     & (Join-Path $PSScriptRoot 'Validate-Repository.ps1')
 
+    Invoke-DotNet -Arguments @('restore', $coreProject)
+    Invoke-DotNet -Arguments @('build', $coreProject, '-c', 'Release', '--no-restore')
     Invoke-DotNet -Arguments @('restore', $solution, '-p:Platform=x64', '-r', 'win-x64')
     Invoke-DotNet -Arguments @('build', $solution, '-c', 'Release', '-p:Platform=x64', '-m:1', '--no-restore')
     Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '-p:Platform=x64', '--no-build')
@@ -103,19 +98,24 @@ try {
         '-p:Platform=x64',
         '-p:PublishProfile=FolderProfile',
         '-r', 'win-x64',
-        '--no-self-contained',
+        '--self-contained', 'true',
         '-o', $publishDir,
         '--no-restore'
     )
 
-    Assert-Exists (Join-Path $publishDir 'shadowsocks-reborn.exe')
-    Assert-Exists (Join-Path $publishDir 'Shadowsocks.NetworkService.exe')
+    Assert-Exists (Join-Path $publishDir 'Shadowsocks.exe')
+
+    $publishEntries = @(Get-ChildItem -LiteralPath $publishDir -Force)
+    if ($publishEntries.Count -ne 1 -or $publishEntries[0].PSIsContainer -or $publishEntries[0].Name -ne 'Shadowsocks.exe') {
+        throw "Product publish must contain exactly Shadowsocks.exe. Found: $($publishEntries.Name -join ', ')"
+    }
 
     $forbiddenNames = @(
         'Shadowsocks.NetworkService.dll',
         'Shadowsocks.NetworkService.deps.json',
         'Shadowsocks.NetworkService.runtimeconfig.json',
-        'shadowsocks-reborn.pdb',
+        'Shadowsocks.pdb',
+        'Shadowsocks.NetworkService.exe',
         'privoxy.exe',
         'privoxy.exe.gz',
         'sysproxy.exe',
@@ -130,17 +130,25 @@ try {
         }
     }
 
-    Copy-Item (Join-Path $repoRoot 'LICENSE.txt') $publishDir -Force
-    Copy-Item (Join-Path $repoRoot 'README.md') $publishDir -Force
-    Copy-Item (Join-Path $repoRoot 'README.ru.md') $publishDir -Force
-    Copy-Item (Join-Path $repoRoot 'CHANGELOG.md') $publishDir -Force
 
     $safeVersion = $Version -replace '[^0-9A-Za-z._-]', '-'
     $zipName = "shadowsocks-reborn-$safeVersion-win-x64.zip"
     $zipPath = Join-Path $releaseDir $zipName
     $hashPath = "$zipPath.sha256"
 
-    Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+    Compress-Archive -Path (Join-Path $publishDir 'Shadowsocks.exe') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+    try {
+        $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) })
+        if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Shadowsocks.exe') {
+            throw "Release ZIP must contain exactly Shadowsocks.exe. Found: $($entries.FullName -join ', ')"
+        }
+    }
+    finally {
+        $zip.Dispose()
+    }
 
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath $hashPath -Value "$hash  $zipName" -Encoding ascii -NoNewline

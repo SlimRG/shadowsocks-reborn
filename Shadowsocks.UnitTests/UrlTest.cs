@@ -196,6 +196,18 @@ namespace Shadowsocks.UnitTests
 
 
         [TestMethod]
+        public void ParsedUrlServersAreMarkedAsUrlImports()
+        {
+            Server legacy = Server.ParseURL(server1CanonUrl);
+            Server sip002 = Server.ParseURL("ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/");
+
+            Assert.IsNotNull(legacy);
+            Assert.IsNotNull(sip002);
+            Assert.IsTrue(legacy.importedFromUrl);
+            Assert.IsTrue(sip002.importedFromUrl);
+        }
+
+        [TestMethod]
         public void TestUrlGenerate()
         {
             var generateUrlCases = new Dictionary<string, Server>
@@ -245,4 +257,6 @@ namespace Shadowsocks.UnitTests
         }
 
     }
+
+
 }
