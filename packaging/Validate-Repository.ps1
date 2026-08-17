@@ -95,6 +95,9 @@ function Get-ProjectTargets {
 function Get-ProjectReferences {
     param([Parameter(Mandatory)][xml]$Project)
 
+    # PowerShell enumerates arrays returned from functions. Callers that need
+    # collection semantics must materialize the result with @(...), especially
+    # under Set-StrictMode where $null.Count is an error.
     return @(
         Get-ProjectItems -Project $Project -Name 'ProjectReference' |
             ForEach-Object { Get-XmlAttributeText -Node $_ -Name 'Include' } |
@@ -376,7 +379,7 @@ foreach ($forbiddenPackage in @('System.Management', 'System.Drawing.Common')) {
         throw "Windows-only package leaked into Shadowsocks.Core: $forbiddenPackage"
     }
 }
-$coreReferences = Get-ProjectReferences -Project $coreProject
+$coreReferences = @(Get-ProjectReferences -Project $coreProject)
 if ($coreReferences.Count -ne 0) {
     throw "Shadowsocks.Core must not reference platform or presentation projects: $($coreReferences -join ', ')"
 }
@@ -409,7 +412,7 @@ $windowsAppendRid = Get-ProjectPropertyValue -Project $windowsProject -Name 'App
 if ($windowsAppendRid -ne 'false') {
     throw "Shadowsocks.Windows must keep AppendRuntimeIdentifierToOutputPath=false so all ProjectReference consumers use a stable library output path; found '$windowsAppendRid'."
 }
-$windowsReferences = Get-ProjectReferences -Project $windowsProject
+$windowsReferences = @(Get-ProjectReferences -Project $windowsProject)
 if ($windowsReferences -notcontains '..\Shadowsocks.Core\Shadowsocks.Core.csproj') {
     throw 'Shadowsocks.Windows must reference Shadowsocks.Core.'
 }
@@ -511,7 +514,7 @@ if ($winUiXamlReferenceMsBuild.Count -ne 6 -or
     throw 'WinUI XAML prerequisite handling must keep Restore and Build as separate MSBuild evaluations for Core, Windows, and Windows.WinUI.'
 }
 
-$winUiReferences = Get-ProjectReferences -Project $winUiProject
+$winUiReferences = @(Get-ProjectReferences -Project $winUiProject)
 foreach ($requiredReference in @('..\Shadowsocks.Core\Shadowsocks.Core.csproj', '..\Shadowsocks.Windows\Shadowsocks.Windows.csproj', '..\Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj')) {
     if ($winUiReferences -notcontains $requiredReference) {
         throw "Shadowsocks.WinUI is missing required reference: $requiredReference"
@@ -626,13 +629,13 @@ if ($windowsWinUiPackages -notcontains 'ZXing.Net|0.16.11') {
 if ($windowsWinUiPackages | Where-Object { $_ -like 'ZXing.Net.Bindings.Windows.Compatibility|*' }) {
     throw 'Shadowsocks.Windows.WinUI must not reference ZXing.Net.Bindings.Windows.Compatibility because its net9 WindowsBase reference conflicts with the .NET 10 desktop reference set.'
 }
-$windowsWinUiReferences = Get-ProjectReferences -Project $windowsWinUiProject
+$windowsWinUiReferences = @(Get-ProjectReferences -Project $windowsWinUiProject)
 if ($windowsWinUiReferences.Count -ne 0) {
     throw "Shadowsocks.Windows.WinUI tray adapter must not pull Core/controller dependencies; found: $($windowsWinUiReferences -join ', ')"
 }
 
 [xml]$networkServiceProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj') -Raw
-$networkServiceReferences = Get-ProjectReferences -Project $networkServiceProject
+$networkServiceReferences = @(Get-ProjectReferences -Project $networkServiceProject)
 if ($networkServiceReferences.Count -ne 0) {
     throw "Shadowsocks.NetworkService must stay isolated from desktop projects; found: $($networkServiceReferences -join ', ')"
 }

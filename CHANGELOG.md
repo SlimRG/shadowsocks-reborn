@@ -1,4 +1,6 @@
-﻿# Changelog
+﻿- Fixed repository validation under PowerShell StrictMode when a project has zero or one ProjectReference; collection-returning helpers are now explicitly materialized before `.Count` checks.
+
+# Changelog
 
 Fork-specific changes are tracked here. Historical upstream Shadowsocks for Windows changes remain in `CHANGES`.
 
