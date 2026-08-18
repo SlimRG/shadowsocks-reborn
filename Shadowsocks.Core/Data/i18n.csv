@@ -551,3 +551,21 @@ Validate and save the forward-proxy configuration.,Проверить и сох�
 "View logs, traffic history and logging options.","Просматривать журналы, историю трафика и параметры журналирования.",查看日志、流量历史和日志选项。,檢視記錄、流量歷程與記錄選項。,ログ、トラフィック履歴、ログ設定を表示します。,"로그, 트래픽 기록 및 로깅 옵션을 봅니다.","Afficher les journaux, l’historique du trafic et les options de journalisation."
 View version information and configure update checks.,Просматривать информацию о версии и настраивать проверку обновлений.,查看版本信息并配置更新检查。,檢視版本資訊並設定更新檢查。,バージョン情報を表示し、更新確認を設定します。,버전 정보를 보고 업데이트 확인을 구성합니다.,Afficher les informations de version et configurer la vérification des mises à jour.
 Wrap long log lines instead of requiring horizontal scrolling.,Переносить длинные строки журнала вместо горизонтальной прокрутки.,自动换行长日志行，而不是要求水平滚动。,自動換行較長的記錄行，而不是要求水平捲動。,長いログ行を折り返し、横スクロールを不要にします。,긴 로그 줄을 줄 바꿈하여 가로 스크롤이 필요 없게 합니다.,Renvoyer à la ligne les longues lignes de journal au lieu d’imposer un défilement horizontal.
+Plugins,Плагины,插件,外掛程式,プラグイン,플러그인,Plugins
+Plugin,Плагин,插件,外掛程式,プラグイン,플러그인,Plugin
+None,Нет,无,無,なし,없음,Aucun
+Add plugin,Добавить плагин,添加插件,新增外掛程式,プラグインを追加,플러그인 추가,Ajouter un plugin
+Choose a plugin,Выберите плагин,选择插件,選擇外掛程式,プラグインを選択,플러그인 선택,Choisir un plugin
+Install,Установить,安装,安裝,インストール,설치,Installer
+Import ZIP/TAR.GZ,Импорт ZIP/TAR.GZ,导入 ZIP/TAR.GZ,匯入 ZIP/TAR.GZ,ZIP/TAR.GZ をインポート,ZIP/TAR.GZ 가져오기,Importer ZIP/TAR.GZ
+Installed plugins,Установленные плагины,已安装插件,已安裝外掛程式,インストール済みプラグイン,설치된 플러그인,Plugins installés
+No plugins installed.,Плагины не установлены.,未安装插件。,尚未安裝外掛程式。,プラグインはインストールされていません。,설치된 플러그인이 없습니다.,Aucun plugin installé.
+Plugin removed.,Плагин удалён.,插件已删除。,外掛程式已移除。,プラグインを削除しました。,플러그인이 제거되었습니다.,Plugin supprimé.
+Install and manage SIP003 plugins.,Установка и управление плагинами SIP003.,安装和管理 SIP003 插件。,安裝和管理 SIP003 外掛程式。,SIP003 プラグインをインストールして管理します。,SIP003 플러그인을 설치하고 관리합니다.,Installer et gérer les plugins SIP003.
+Install SIP003 plugins from the built-in list or import a plugin ZIP or TAR.GZ package.,Установите SIP003-плагин из списка или импортируйте пакет плагина ZIP или TAR.GZ.,从内置列表安装 SIP003 插件，或导入 ZIP 或 TAR.GZ 插件包。,從內建清單安裝 SIP003 外掛程式，或匯入 ZIP 或 TAR.GZ 外掛套件。,組み込みリストから SIP003 プラグインをインストールするか、ZIP または TAR.GZ パッケージをインポートします。,기본 목록에서 SIP003 플러그인을 설치하거나 ZIP 또는 TAR.GZ 패키지를 가져옵니다.,Installez un plugin SIP003 depuis la liste intégrée ou importez un paquet ZIP ou TAR.GZ.
+Optional SIP003 plugin installed on the Plugins page.,"Необязательный SIP003-плагин, установленный на странице «Плагины».",可选的 SIP003 插件，可在“插件”页面安装。,可選的 SIP003 外掛程式，可在「外掛程式」頁面安裝。,「プラグイン」ページでインストールした任意の SIP003 プラグイン。,플러그인 페이지에서 설치한 선택적 SIP003 플러그인입니다.,Plugin SIP003 facultatif installé depuis la page Plugins.
+Choose a supported Windows x64 SIP003 plugin to install.,Выберите поддерживаемый SIP003-плагин для Windows x64.,选择要安装的受支持 Windows x64 SIP003 插件。,選擇要安裝的受支援 Windows x64 SIP003 外掛程式。,インストールする Windows x64 対応 SIP003 プラグインを選択します。,설치할 지원되는 Windows x64 SIP003 플러그인을 선택합니다.,Choisissez un plugin SIP003 Windows x64 pris en charge.
+Download the latest Windows x64 release archive and install the selected plugin.,Скачать последний архив Windows x64 и установить выбранный плагин.,下载最新的 Windows x64 版本归档并安装所选插件。,下載最新的 Windows x64 版本封存檔並安裝所選外掛程式。,最新の Windows x64 リリースアーカイブをダウンロードして選択したプラグインをインストールします。,최신 Windows x64 릴리스 아카이브를 다운로드하고 선택한 플러그인을 설치합니다.,Télécharger la dernière archive Windows x64 et installer le plugin sélectionné.
+Import a local ZIP or TAR.GZ package containing a Windows plugin executable.,Импортировать локальный пакет ZIP или TAR.GZ с исполняемым файлом плагина Windows.,导入包含 Windows 插件可执行文件的本地 ZIP 或 TAR.GZ 包。,匯入包含 Windows 外掛程式執行檔的本機 ZIP 或 TAR.GZ 套件。,Windows プラグイン実行ファイルを含むローカル ZIP または TAR.GZ パッケージをインポートします。,Windows 플러그인 실행 파일이 포함된 로컬 ZIP 또는 TAR.GZ 패키지를 가져옵니다.,Importer un paquet ZIP ou TAR.GZ local contenant un exécutable de plugin Windows.
+Remove this installed plugin from Shadowsocks storage.,Удалить установленный плагин из хранилища Shadowsocks.,从 Shadowsocks 存储中删除此已安装插件。,從 Shadowsocks 儲存空間中移除此已安裝外掛程式。,インストール済みプラグインを Shadowsocks ストレージから削除します。,설치된 플러그인을 Shadowsocks 저장소에서 제거합니다.,Supprimer ce plugin installé du stockage Shadowsocks.
+{0} installed.,{0} установлен.,{0} 已安装。,{0} 已安裝。,{0} をインストールしました。,{0} 설치됨.,{0} installé.

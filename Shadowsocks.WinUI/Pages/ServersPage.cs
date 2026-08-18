@@ -4,12 +4,18 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Shadowsocks.Model;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.WinUI.UI;
 
 namespace Shadowsocks.WinUI.Pages;
 
 public sealed class ServersPage : Page, IRefreshablePage
 {
+    private sealed record PluginChoice(string Id, string DisplayName)
+    {
+        public override string ToString() => DisplayName;
+    }
+
     private static readonly string[] SupportedMethods =
     [
         "none",
@@ -27,7 +33,7 @@ public sealed class ServersPage : Page, IRefreshablePage
     private readonly PasswordBox _password;
     private readonly CheckBox _showPassword;
     private readonly ComboBox _method;
-    private readonly TextBox _plugin;
+    private readonly ComboBox _plugin;
     private readonly TextBox _pluginOptions;
     private readonly CheckBox _pluginArgumentsEnabled;
     private readonly TextBox _pluginArguments;
@@ -128,6 +134,9 @@ public sealed class ServersPage : Page, IRefreshablePage
         editorStack.Children.Add(WinUIStyles.CreateSectionTitle("Server"));
         var form = CreateFormGrid();
 
+        _remarks = new TextBox { MaxLength = 128, PlaceholderText = "Optional display name" };
+        _context.SetToolTip(_remarks, "Friendly name shown in server lists. If left empty, Shadowsocks assigns a unique Server N name.");
+        AddFormRow(form, "Server Name", _remarks);
         _host = new TextBox { MaxLength = 512, PlaceholderText = "example.com or 203.0.113.10" };
         _context.SetToolTip(_host, "Hostname or IP address of the Shadowsocks server.");
         AddFormRow(form, "Server IP", _host);
@@ -149,9 +158,10 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
         _context.SetToolTip(_method, "Encryption method negotiated with the selected Shadowsocks server.");
         AddFormRow(form, "Encryption", _method);
-        _plugin = new TextBox { MaxLength = 256 };
-        _context.SetToolTip(_plugin, "Optional SIP003 plugin executable name or absolute path.");
-        AddFormRow(form, "Plugin Program", _plugin);
+        _plugin = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
+        _context.SetToolTip(_plugin, "Optional SIP003 plugin installed on the Plugins page.");
+        RefreshPluginChoices(null);
+        AddFormRow(form, "Plugin", _plugin);
         _pluginOptions = new TextBox { MaxLength = 256 };
         _context.SetToolTip(_pluginOptions, "Options passed to the SIP003 plugin through SS_PLUGIN_OPTIONS.");
         AddFormRow(form, "Plugin Options", _pluginOptions);
@@ -171,9 +181,6 @@ public sealed class ServersPage : Page, IRefreshablePage
         _pluginArguments = new TextBox { MaxLength = 512 };
         _context.SetToolTip(_pluginArguments, "Additional command-line arguments passed directly to the plugin process.");
         _pluginArgumentsLabel = AddFormRow(form, "Plugin Arguments", _pluginArguments)!;
-        _remarks = new TextBox { MaxLength = 128, PlaceholderText = "Optional display name" };
-        _context.SetToolTip(_remarks, "Friendly name shown in server lists. If left empty, Shadowsocks assigns a unique Server N name.");
-        AddFormRow(form, "Server Name", _remarks);
         _timeout = CreateNumberBox(1, Server.MaxServerTimeoutSec, 5);
         _context.SetToolTip(_timeout, "Connection timeout for this server, in seconds.");
         AddFormRow(form, "Timeout (Sec)", _timeout);
@@ -220,7 +227,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         _serverPort.ValueChanged += (_, _) => MarkDirty();
         _password.PasswordChanged += (_, _) => MarkDirty();
         _method.SelectionChanged += (_, _) => MarkDirty();
-        _plugin.TextChanged += (_, _) => MarkDirty();
+        _plugin.SelectionChanged += (_, _) => MarkDirty();
         _pluginOptions.TextChanged += (_, _) => MarkDirty();
         _pluginArguments.TextChanged += (_, _) => MarkDirty();
         _remarks.TextChanged += (_, _) => MarkDirty();
@@ -232,6 +239,7 @@ public sealed class ServersPage : Page, IRefreshablePage
 
     public void Refresh()
     {
+        RefreshPluginChoices((_plugin.SelectedItem as PluginChoice)?.Id);
         Configuration? configuration = _context.Controller?.GetCurrentConfiguration();
         if (_loadedOnce && _dirty)
         {
@@ -531,6 +539,48 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
     }
 
+
+    private void RefreshPluginChoices(string? currentPlugin)
+    {
+        bool wasLoading = _loading;
+        _loading = true;
+        try
+        {
+            string selected = currentPlugin ?? string.Empty;
+            _plugin.Items.Clear();
+            _plugin.Items.Add(new PluginChoice(string.Empty, _context.L("None")));
+            foreach (InstalledPlugin plugin in PluginManager.GetInstalledPlugins())
+            {
+                _plugin.Items.Add(new PluginChoice(plugin.Id, plugin.DisplayName));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selected)
+                && !_plugin.Items.OfType<PluginChoice>().Any(item => string.Equals(item.Id, selected, StringComparison.OrdinalIgnoreCase)))
+            {
+                _plugin.Items.Add(new PluginChoice(selected, selected));
+            }
+
+            SelectPlugin(selected);
+        }
+        finally
+        {
+            _loading = wasLoading;
+        }
+    }
+
+    private void SelectPlugin(string? plugin)
+    {
+        string value = plugin?.Trim() ?? string.Empty;
+        PluginChoice? match = _plugin.Items.OfType<PluginChoice>().FirstOrDefault(item =>
+            string.Equals(item.Id, value, StringComparison.OrdinalIgnoreCase));
+        if (match is null && !string.IsNullOrWhiteSpace(value))
+        {
+            match = new PluginChoice(value, value);
+            _plugin.Items.Add(match);
+        }
+        _plugin.SelectedItem = match ?? _plugin.Items.OfType<PluginChoice>().FirstOrDefault();
+    }
+
     private void LoadSelectedIntoEditor()
     {
         if (_selectedIndex < 0 || _selectedIndex >= _servers.Count)
@@ -551,7 +601,7 @@ public sealed class ServersPage : Page, IRefreshablePage
             _method.SelectedItem = SupportedMethods.Contains(server.method, StringComparer.OrdinalIgnoreCase)
                 ? server.method
                 : Server.DefaultMethod;
-            _plugin.Text = server.plugin ?? string.Empty;
+            SelectPlugin(server.plugin);
             _pluginOptions.Text = server.plugin_opts ?? string.Empty;
             _pluginArguments.Text = server.plugin_args ?? string.Empty;
             _pluginArgumentsEnabled.IsChecked = !string.IsNullOrWhiteSpace(server.plugin_args);
@@ -585,7 +635,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         server.server_port = double.IsNaN(_serverPort.Value) ? Server.DefaultPort : checked((int)_serverPort.Value);
         server.password = _password.Password ?? string.Empty;
         server.method = _method.SelectedItem?.ToString() ?? Server.DefaultMethod;
-        server.plugin = _plugin.Text?.Trim() ?? string.Empty;
+        server.plugin = (_plugin.SelectedItem as PluginChoice)?.Id ?? string.Empty;
         server.plugin_opts = _pluginOptions.Text?.Trim() ?? string.Empty;
         server.plugin_args = _pluginArgumentsEnabled.IsChecked == true ? (_pluginArguments.Text?.Trim() ?? string.Empty) : string.Empty;
         server.remarks = _remarks.Text?.Trim() ?? string.Empty;

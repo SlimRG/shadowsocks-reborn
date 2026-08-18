@@ -20,6 +20,7 @@ public sealed class MainWindow : Window
 {
     private const string OverviewTag = "overview";
     private const string ServersTag = "servers";
+    private const string PluginsTag = "plugins";
     private const string TrafficTag = "traffic";
     private const string GamesTag = "games";
     private const string PacTag = "pac";
@@ -149,6 +150,7 @@ public sealed class MainWindow : Window
 
     public void NavigateToOverview() => NavigateAndSelect(OverviewTag);
     public void NavigateToServers() => NavigateAndSelect(ServersTag);
+    public void NavigateToPlugins() => NavigateAndSelect(PluginsTag);
     public void NavigateToTraffic() => NavigateAndSelect(TrafficTag);
     public void NavigateToPac() => NavigateAndSelect(PacTag);
     public void NavigateToForwardProxy() => NavigateAndSelect(ForwardProxyTag);
@@ -422,6 +424,7 @@ public sealed class MainWindow : Window
 
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Overview"], OverviewTag, Symbol.Home, "Open the connection overview and current runtime status."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Servers"], ServersTag, Symbol.World, "Manage Shadowsocks servers and local client connection settings."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Plugins"], PluginsTag, Symbol.Add, "Install and manage SIP003 plugins."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Traffic"], TrafficTag, Symbol.Sync, "Configure capture mode, Windows proxy settings and per-application routing."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Game Mode"], GamesTag, Symbol.Play, "Manage applications that automatically suspend WinDivert while they are running."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["PAC / GeoSite"], PacTag, Symbol.Globe, "Configure PAC behavior, local PAC security and GeoSite sources."));
@@ -471,6 +474,7 @@ public sealed class MainWindow : Window
         Type pageType = tag switch
         {
             ServersTag => typeof(ServersPage),
+            PluginsTag => typeof(PluginsPage),
             TrafficTag => typeof(TrafficPage),
             GamesTag => typeof(GamesPage),
             PacTag => typeof(PacGeositePage),
@@ -508,6 +512,7 @@ public sealed class MainWindow : Window
 
         Page page = pageType == typeof(OverviewPage) ? new OverviewPage(_pageContext)
             : pageType == typeof(ServersPage) ? new ServersPage(_pageContext)
+            : pageType == typeof(PluginsPage) ? new PluginsPage(_pageContext)
             : pageType == typeof(TrafficPage) ? new TrafficPage(_pageContext)
             : pageType == typeof(GamesPage) ? new GamesPage(_pageContext)
             : pageType == typeof(PacGeositePage) ? new PacGeositePage(_pageContext)

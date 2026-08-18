@@ -27,12 +27,15 @@ Changes deserve additional review when they touch:
 - UAC/elevation and named-pipe authentication/version handshake;
 - WinDivert installation/runtime cleanup;
 - update download/extraction;
+- SIP003 catalog downloads, ZIP/TAR extraction and managed plugin storage;
 - SIP003 executable discovery/launch;
 - secret display/import behavior.
 
 User Mode must remain usable without extracting or launching the elevated NetworkService helper.
 
 Product settings belong in `%LOCALAPPDATA%\Shadowsocks\settings.json` in normal mode or the Clean Mode Temp session. Mutable data never belongs beside the release EXE. Registry writes are reserved for explicit Windows integration such as autostart/protocol/system-proxy behavior.
+
+Managed SIP003 plugins are third-party executables. Manual import accepts ZIP and TAR.GZ packages, and archive extraction must reject paths escaping the staging directory as well as TAR links/special entries. Installing a package must not silently move mutable files beside `Shadowsocks.exe`; managed packages remain under the active `Plugins` storage directory.
 
 ## Scope
 

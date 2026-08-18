@@ -4,7 +4,7 @@ Use this checklist for every `shadowsocks-reborn` 5.x release.
 
 ## Source and metadata
 
-- [ ] Release version matches `Shadowsocks.WinUI.csproj`, `Shadowsocks.NetworkService.csproj` and `ApplicationInfo.Version`.
+- [ ] Release version matches all versioned projects, `ApplicationInfo.Version`, WinUI/NetworkService manifests and the dated `CHANGELOG.md` release heading.
 - [ ] `CHANGELOG.md` describes user-visible changes and known limitations.
 - [ ] `packaging\Validate-Repository.ps1` passes.
 - [ ] Validator confirms the root `appsettings.json` is embedded in `Shadowsocks.Core` as `Shadowsocks.Core.appsettings.json`.
@@ -20,11 +20,11 @@ dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
 dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 
-.\packaging\Build-Release.ps1 -Version v5.0.0
+.\packaging\Build-Release.ps1 -Version v5.1.0
 ```
 
 - [ ] Restore/build/test succeeds on Windows x64 with .NET 10 SDK.
-- [ ] Storage/rollback tests pass.
+- [ ] Storage/rollback and PluginManager tests pass.
 - [ ] Release packaging succeeds without manual file copying.
 
 ## Release layout
@@ -75,7 +75,7 @@ Use a clean Windows test account or remove test-only state:
 
 - [ ] Rename the release to `Shadowsocksp.exe` (or another stem ending in `p`) and launch it.
 - [ ] The active data root is a unique `%TEMP%\Shadowsocks\Clean\...` directory.
-- [ ] `settings.json`, PAC/cache, GeoSite, logs, WinDivert runtime and helper/update working files remain below that Temp session.
+- [ ] `settings.json`, PAC/cache, GeoSite, installed plugin packages, logs, WinDivert runtime and helper/update working files remain below that Temp session.
 - [ ] Normal `%LOCALAPPDATA%\Shadowsocks` configuration is not read, copied or modified.
 - [ ] Old Shadowsocks application Registry configuration is ignored.
 - [ ] Start on Boot is disabled in Settings and tray; backend enable attempts fail.
@@ -94,13 +94,17 @@ Use a clean Windows test account or remove test-only state:
 - [ ] Admin capture restores when the trigger exits.
 - [ ] Broker shutdown removes the current helper run directory best-effort.
 
-## Game discovery and server UI
+## Game discovery, server UI and plugins
 
 - [ ] Games page can discover available Steam/Epic Games/GOG/Xbox candidates.
 - [ ] Discovery adds nothing until the user explicitly chooses Add/Save.
 - [ ] Manual game/application rules remain available alongside suggestions.
 - [ ] `ss://`/online-config servers do not expose Show password.
 - [ ] Manually configured servers retain Show password.
+- [ ] Server Name is shown above Server IP and the Plugin field is a dropdown containing `None`, installed plugins and any preserved legacy value.
+- [ ] Plugins page lists `xray-plugin`, `v2ray-plugin` and `qtun` and can install a supported Windows x64 catalog package.
+- [ ] Manual plugin import accepts ZIP and TAR.GZ, rejects unsafe archive paths/packages without a selectable EXE, rejects TAR links/special entries, and installs below the active `Plugins` directory.
+- [ ] Removing a managed plugin removes its package and it disappears from new server plugin selections.
 - [ ] Logs toolbar is always visible and has no Font or Show toolbar command.
 
 ## Start with Windows
@@ -125,7 +129,7 @@ Use a clean Windows test account or remove test-only state:
 - [ ] Repeat from a removable drive.
 - [ ] Server edits, theme changes, PAC generation, GeoSite download, logs and updates still work.
 - [ ] No writable sidecar appears beside the EXE.
-- [ ] SIP003 plugins configured by absolute path/PATH launch with working data under the active root (`%LOCALAPPDATA%\Shadowsocks\Temp\Working` in normal mode).
+- [ ] Managed SIP003 plugins resolve from `%LOCALAPPDATA%\Shadowsocks\Plugins` in normal mode; legacy absolute path/PATH plugins still launch with working data under the active root (`%LOCALAPPDATA%\Shadowsocks\Temp\Working` in normal mode).
 
 ## Cleanup
 

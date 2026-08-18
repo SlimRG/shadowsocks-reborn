@@ -17,7 +17,7 @@ dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:P
 For deployment/storage changes, also run:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.0.0
+.\packaging\Build-Release.ps1 -Version v5.1.0
 ```
 
 ## Architecture rules
@@ -39,6 +39,7 @@ Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 - Persistent configuration goes through `ISettingsStore` / `JsonFileSettingsStore` under the active storage root.
 - Persistent mutable files go below `%LOCALAPPDATA%\Shadowsocks`.
 - All application-owned writable files go below the active storage root: LocalAppData in normal mode, the Clean Mode Temp session in Clean Mode.
+- Managed SIP003 packages belong under `Plugins\<plugin-id>` in that active root. Manual plugin import accepts ZIP and TAR.GZ packages and must keep path-traversal rejection covered by tests for both formats.
 - Start with Windows uses `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe` in normal mode and must remain unavailable in Clean Mode.
 - Product code must not write configuration, PAC/cache/log/helper/localization files beside the release EXE.
 - Executable-directory reads are only for legacy migration or explicit development compatibility.
@@ -46,7 +47,7 @@ Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 ## WinUI and localization
 
 - Use native WinUI/Fluent controls and existing shell patterns; see [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md).
-- Preserve behavior already recorded in [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) unless intentionally redesigning it.
+- Preserve established WinUI behavior covered by tests and repository validation unless it is being intentionally redesigned.
 - User-visible strings use `ILocalizationService` / the CSV localization path.
 - Keep stable enum/configuration values separate from localized display text.
 - Preserve the seven-column localization schema: `en,ru-RU,zh-CN,zh-TW,ja,ko,fr`.

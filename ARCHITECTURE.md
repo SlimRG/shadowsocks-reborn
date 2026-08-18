@@ -24,7 +24,7 @@ Shadowsocks.NetworkService
 Projects:
 
 - `Shadowsocks.Core` (`net10.0`) — protocol, encryption, configuration model, PAC/GeoSite logic, localization, routing models, logging configuration and storage abstractions.
-- `Shadowsocks.Windows` — file-storage bootstrap, legacy migration, WinINet/system proxy, startup, hotkeys, SIP003 process hosting, UAC/Admin capture, WinDivert runtime and NetworkService coordination.
+- `Shadowsocks.Windows` — file-storage bootstrap, legacy migration, WinINet/system proxy, startup, hotkeys, SIP003 package management/process hosting, UAC/Admin capture, WinDivert runtime and NetworkService coordination.
 - `Shadowsocks.Windows.WinUI` — WinUI-specific Windows shell/tray integration.
 - `Shadowsocks.WinUI` — unpackaged WinUI 3 application and product publish project. Release assembly name is `Shadowsocks`.
 - `Shadowsocks.NetworkService` — isolated elevated x64 helper that owns transparent WinDivert capture/routing.
@@ -96,6 +96,7 @@ Normal mode:
   settings.backup.json
   Cache\...
   Data\...
+  Plugins\...
   Logs\...
   Runtime\...
 ```
@@ -119,6 +120,7 @@ Default application resources are embedded. Mutable state is externalized:
 - PAC/user data → `%LOCALAPPDATA%\Shadowsocks\Data\PAC`;
 - Online PAC cache → `%LOCALAPPDATA%\Shadowsocks\Cache\PAC`;
 - GeoSite cache/runtime → `%LOCALAPPDATA%\Shadowsocks\Cache\GeoSite` and `Runtime\WinDivert` as applicable;
+- SIP003 plugin packages → `%LOCALAPPDATA%\Shadowsocks\Plugins` (or the active Clean Mode storage root);
 - localization → embedded `Shadowsocks.Core.Data.i18n.csv` only;
 - logs → `%LOCALAPPDATA%\Shadowsocks\Logs`.
 

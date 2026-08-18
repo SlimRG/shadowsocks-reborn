@@ -21,7 +21,8 @@
 - Transparent TCP/UDP capture в Admin Mode через WinDivert.
 - Автоматический Game Mode временно останавливает Admin capture при запуске заданного приложения.
 - Страница игр предлагает найденные Steam, Epic Games, GOG и Xbox игры; ручное добавление правил сохранено.
-- SIP003 plugins, UDP relay, QR import/export, hotkeys и единственный embedded CSV-каталог локализации.
+- Менеджер SIP003-плагинов со встроенным выбором `xray-plugin`, `v2ray-plugin`, `qtun` и ручным импортом ZIP/TAR.GZ; установленные пакеты хранятся под активным storage-root.
+- UDP relay, QR import/export, hotkeys и единственный embedded CSV-каталог локализации.
 
 ## Режимы трафика
 
@@ -73,7 +74,7 @@ dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platfo
 Либо release ZIP + SHA-256:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.0.0
+.\packaging\Build-Release.ps1 -Version v5.1.0
 ```
 
 Финальный publish directory и release ZIP должны содержать ровно:
@@ -92,11 +93,11 @@ DLL, PDB, runtime JSON, ICO и отдельный `Shadowsocks.NetworkService.ex
 %LOCALAPPDATA%\Shadowsocks
 ```
 
-Основной backend конфигурации — `%LOCALAPPDATA%\Shadowsocks\settings.json`, резервный документ — `settings.backup.json`. Старые значения `HKCU\Software\Shadowsocks Reborn\Settings` игнорируются. Локализация использует только `i18n.csv`, встроенный внутрь `Shadowsocks.exe`; второй файл больше не распаковывается.
+Основной backend конфигурации — `%LOCALAPPDATA%\Shadowsocks\settings.json`, резервный документ — `settings.backup.json`. SIP003-плагины со страницы «Плагины» устанавливаются в `%LOCALAPPDATA%\Shadowsocks\Plugins` и выбираются для сервера по идентификатору. Старые значения `HKCU\Software\Shadowsocks Reborn\Settings` игнорируются. Локализация использует только `i18n.csv`, встроенный внутрь `Shadowsocks.exe`; второй файл больше не распаковывается.
 
 В Settings показывается активный путь хранилища и одна кнопка **Открыть**, которая открывает этот каталог как в обычном режиме, так и в Clean Mode.
 
-Если имя EXE заканчивается на `p` перед `.exe`, например `Shadowsocksp.exe` или `Shadowsocks-5.0p.exe`, включается **Clean Mode**. В нём настройки, кэши, PAC, логи, runtime, helper и update/working-файлы пишутся в уникальный `%TEMP%\Shadowsocks\Clean\...` сеанс и удаляются best-effort при Quit. Автозагрузка в Clean Mode недоступна.
+Если имя EXE заканчивается на `p` перед `.exe`, например `Shadowsocksp.exe` или `Shadowsocks-5.0p.exe`, включается **Clean Mode**. В нём настройки, кэши, PAC, логи, установленные плагины, runtime, helper и update/working-файлы пишутся в уникальный `%TEMP%\Shadowsocks\Clean\...` сеанс и удаляются best-effort при Quit. Автозагрузка в Clean Mode недоступна.
 
 В обычном режиме Start with Windows копирует проверенный EXE в `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; Windows Run integration указывает только на эту стабильную копию.
 
@@ -132,14 +133,13 @@ Local PAC использует заданные GeoSite sources и persistent ca
 
 `ManagedHttpProxyService` поддерживает HTTP/1.1 и HTTPS `CONNECT`. HTTPS идёт как byte tunnel, поэтому HTTP/2 внутри TLS не требует отдельного HTTP/2 parser в локальном proxy. FTP gateway не реализован.
 
-В configuration contract есть DNS policy `System`, `Direct`, `Proxy`, `CustomDoh`, но transparent DNS interception/routing в 5.0.0 пока не реализован.
+В configuration contract есть DNS policy `System`, `Direct`, `Proxy`, `CustomDoh`, но transparent DNS interception/routing в 5.1.0 пока не реализован.
 
 ## Документация
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — архитектура проектов и runtime flow.
 - [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp и migration.
 - [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — актуальные правила WinUI.
-- [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) — зафиксированный результат миграции UI.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — правила разработки.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — проверки перед релизом.
 - [SECURITY.md](SECURITY.md) — security reporting и чувствительные компоненты.

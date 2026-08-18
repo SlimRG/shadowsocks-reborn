@@ -21,7 +21,8 @@
 - Transparent TCP/UDP capture in Admin Mode through WinDivert.
 - Automatic Game Mode that suspends Admin capture while configured applications are running.
 - Game discovery suggestions for Steam, Epic Games, GOG and Xbox libraries; manual rules remain available.
-- SIP003 plugins, UDP relay, QR import/export, hotkeys and a single embedded CSV localization catalog.
+- SIP003 plugin manager with built-in `xray-plugin`, `v2ray-plugin` and `qtun` choices plus manual ZIP/TAR.GZ import; installed packages live under the active storage root.
+- UDP relay, QR import/export, hotkeys and a single embedded CSV localization catalog.
 
 ## Traffic modes
 
@@ -73,7 +74,7 @@ dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platfo
 Or build the release ZIP and SHA-256 file:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.0.0
+.\packaging\Build-Release.ps1 -Version v5.1.0
 ```
 
 The final publish directory and release ZIP must contain exactly:
@@ -92,11 +93,11 @@ Normal mode stores all persistent application-owned state under:
 %LOCALAPPDATA%\Shadowsocks
 ```
 
-The configuration backend is `%LOCALAPPDATA%\Shadowsocks\settings.json` with an atomic `settings.backup.json`. Old `HKCU\Software\Shadowsocks Reborn\Settings` values are ignored. Localization uses only the `i18n.csv` embedded inside `Shadowsocks.exe`; no second catalog is extracted.
+The configuration backend is `%LOCALAPPDATA%\Shadowsocks\settings.json` with an atomic `settings.backup.json`. SIP003 packages installed from the Plugins page are stored in `%LOCALAPPDATA%\Shadowsocks\Plugins` and resolved by plugin id when a server starts. Old `HKCU\Software\Shadowsocks Reborn\Settings` values are ignored. Localization uses only the `i18n.csv` embedded inside `Shadowsocks.exe`; no second catalog is extracted.
 
 The Settings page shows the active storage path and provides a single **Open** button that opens that directory in either normal or Clean Mode.
 
-Rename the executable so its file name ends in `p` before `.exe` to start **Clean Mode**, for example `Shadowsocksp.exe` or `Shadowsocks-5.0p.exe`. Clean Mode redirects settings, caches, PAC data, logs, runtime files and helper/update working data to a unique `%TEMP%\Shadowsocks\Clean\...` session and removes that session best-effort on Quit. Start with Windows is unavailable in Clean Mode.
+Rename the executable so its file name ends in `p` before `.exe` to start **Clean Mode**, for example `Shadowsocksp.exe` or `Shadowsocks-5.0p.exe`. Clean Mode redirects settings, caches, PAC data, logs, installed plugin packages, runtime files and helper/update working data to a unique `%TEMP%\Shadowsocks\Clean\...` session and removes that session best-effort on Quit. Start with Windows is unavailable in Clean Mode.
 
 In normal mode, Start with Windows copies the verified product EXE to `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; the Windows Run integration points to that stable copy.
 
@@ -132,14 +133,13 @@ Local PAC uses configured GeoSite sources and persistent cache data. Online PAC 
 
 `ManagedHttpProxyService` handles HTTP/1.1 and HTTPS `CONNECT`. HTTPS is tunneled as bytes, so HTTP/2 negotiated inside TLS does not require a local HTTP/2 parser. FTP gatewaying is not implemented.
 
-The configuration contract includes `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy values, but transparent DNS interception/routing is not implemented in 5.0.0.
+The configuration contract includes `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy values, but transparent DNS interception/routing is not implemented in 5.1.0.
 
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — project boundaries and runtime architecture.
 - [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp rules and migration.
 - [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — current WinUI design/implementation rules.
-- [UI_PARITY_MATRIX.md](UI_PARITY_MATRIX.md) — completed WinUI migration parity record.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development rules.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — release validation.
 - [SECURITY.md](SECURITY.md) — security reporting and sensitive areas.

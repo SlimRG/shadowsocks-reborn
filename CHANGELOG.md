@@ -4,33 +4,27 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-08-18
+
 ### Storage
 
+- Added managed SIP003 plugin storage below the active `Plugins` directory; normal mode uses `%LOCALAPPDATA%\Shadowsocks\Plugins` and Clean Mode uses its disposable Temp session.
 - Replaced the application Registry settings backend with atomic `settings.json` / `settings.backup.json` under `%LOCALAPPDATA%\Shadowsocks`; old Shadowsocks Registry configuration is intentionally ignored.
 - Localization now uses only the embedded `i18n.csv`; external LocalAppData overrides are no longer loaded or migrated.
 - Added Rufus-style Clean Mode: an executable stem ending in `p` redirects all writable application state to a disposable `%TEMP%\Shadowsocks\Clean\...` session and cleans it on Quit.
 - Added explicit LocalAppData/Clean Mode folder actions to Settings and disabled Start with Windows in Clean Mode at UI, tray, and backend levels.
 
 ### Fixed
-- Made the tray localization release check reuse the already validated embedded catalog instead of re-importing `i18n.csv`, avoiding a redundant PowerShell/StrictMode failure on valid translations such as `System Proxy`.
 
-- Fixed Phase-7 repository validation after NavigationView tooltips were added: the Game Mode assertion now validates the localized navigation contract without depending on the old three-argument `CreateNavigationItem` signature.
-- Fixed the storage bootstrap validator to recognize the explicit `AppRuntimeEnvironment.Initialize` alias introduced to avoid the `System.Runtime.InteropServices.RuntimeEnvironment` ambiguity.
-- Fixed repository validation under PowerShell StrictMode when a project has zero or one ProjectReference; collection-returning helpers are now explicitly materialized before `.Count` checks.
-- Fixed repository validation of MSBuild item metadata so attribute-form `LogicalName`/`Version` values are recognized for embedded `appsettings.json`, embedded NetworkService, and package references under PowerShell StrictMode.
-- Fixed `Validate-Repository.ps1` under `Set-StrictMode -Version Latest`: optional MSBuild XML properties such as `UseWPF`/`UseWindowsForms` are now read through strict-safe XPath helpers instead of dynamic property access.
 - Replaced the legacy second-launch Win32 MessageBox with a localized Fluent WinUI `ContentDialog` owned by the already-running instance; the existing window is restored/foregrounded first, with an InfoBar fallback if another modal dialog is active.
-- Added Pass-3 regression validation for tray localization/focus, ss:// server-list refresh, logging event synchronization and the pure WinUI projection graph.
-- Removed the legacy Windows.UI.Core hotkey-state projection from the WinUI frontend; modifier detection now uses Win32 GetKeyState so .NET 10 no longer requires conflicting UWP XAML projections.
+- Fixed global hotkey modifier detection on the WinUI/.NET 10 frontend by using the Win32 key-state path.
 - Main-window User/Admin traffic controls now apply immediately like tray commands; Administrator mode carries the UAC shield affordance.
-- Fixed the remaining controller reference to removed executable-side `Configuration.ConfigFilePath` after the storage migration.
-- Fixed the `RuntimeEnvironment` namespace ambiguity in `AutoStartup` by explicitly binding the application runtime environment type.
-- Fixed the same `RuntimeEnvironment` namespace ambiguity in the WinUI custom `Program.Main` bootstrap and added repository validation to prevent the conflict from returning.
 - Product single-file publish removes PDB files copied from referenced projects before validating the one-EXE release layout; normal build symbols remain unchanged.
 - Restored historical lower-case percent escapes when generating SIP002 `ss://` links for compatibility with existing URL tests/links.
 
 ### Changed
 
+- Added a Plugins page with built-in `xray-plugin`, `v2ray-plugin` and `qtun` installation plus manual ZIP/TAR.GZ import; Servers now selects installed plugins from a dropdown and shows Server Name above Server IP.
 - Added localized WinUI tooltips and matching accessibility help text across navigation, server management, traffic, Game Mode, PAC/GeoSite, online configuration, hotkeys, sharing, logs, settings and update controls.
 - Completed all six non-English localization columns (`ru-RU`, `zh-CN`, `zh-TW`, `ja`, `ko`, `fr`) for every active embedded UI key and added release validation that rejects missing translations or placeholder mismatches.
 - Moved `Verbose Logging` and `Show Plugin Output` to the Logs page, and `Check for Updates at Startup` to About & updates.
@@ -41,6 +35,10 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 - Password reveal is hidden for servers imported from `ss://` links or online configuration sources; manual server entries retain the option.
 - Logs toolbar is always visible; the Font command and Show toolbar preference were removed.
 - Tray colors were refined for clearer/professional state separation: graphite (Disabled), bronze (Local PAC), forest teal (Online PAC), navy (Global), with muted activity accents.
+
+### Known limitation
+
+- DNS policy values exist in configuration/IPC, but transparent DNS interception/routing is not implemented in 5.1.0.
 
 ## [5.0.0] - 2026-08-15
 

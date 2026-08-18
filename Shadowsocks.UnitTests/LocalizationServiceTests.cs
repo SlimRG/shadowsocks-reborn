@@ -117,6 +117,31 @@ public class LocalizationServiceTests
         }
     }
 
+
+    [TestMethod]
+    public void EmbeddedRussianCatalogCoversPluginManagement()
+    {
+        var service = new CsvLocalizationService(Shadowsocks.Core.EmbeddedResources.I18nCsv, CultureInfo.GetCultureInfo("ru-RU"));
+        string[] pluginKeys =
+        [
+            "Plugins", "Plugin", "Add plugin", "Choose a plugin", "Install", "Import ZIP/TAR.GZ",
+            "Installed plugins", "No plugins installed.", "Plugin removed.",
+            "Install and manage SIP003 plugins.",
+            "Install SIP003 plugins from the built-in list or import a plugin ZIP or TAR.GZ package.",
+            "Optional SIP003 plugin installed on the Plugins page.",
+            "Choose a supported Windows x64 SIP003 plugin to install.",
+            "Download the latest Windows x64 release archive and install the selected plugin.",
+            "Import a local ZIP or TAR.GZ package containing a Windows plugin executable.",
+            "Remove this installed plugin from Shadowsocks storage.",
+            "{0} installed.",
+        ];
+
+        foreach (string key in pluginKeys)
+        {
+            Assert.AreNotEqual(key, service[key], $"Missing Russian plugin translation for '{key}'.");
+        }
+    }
+
     [TestMethod]
     public void EmbeddedRussianCatalogCoversTrayCommands()
     {

@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version label, for example v5.0.0
+        description: Package version label, for example v5.1.0
         required: true
-        default: v5.0.0
+        default: v5.1.0
 
 permissions:
   contents: write

@@ -22,6 +22,8 @@ namespace Shadowsocks.UnitTests
             Assert.IsTrue(AppStoragePaths.TempRoot.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(AppStoragePaths.CleanSessionsRoot.StartsWith(temp, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(AppStoragePaths.SettingsFile.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
+            Assert.IsTrue(AppStoragePaths.PluginsDirectory.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
+            Assert.AreEqual(Path.Combine(AppStoragePaths.StorageRoot, "Plugins"), AppStoragePaths.PluginsDirectory);
             Assert.IsTrue(AppStoragePaths.StartupExecutableFile.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.AreEqual("Shadowsocks.exe", Path.GetFileName(AppStoragePaths.StartupExecutableFile));
         }

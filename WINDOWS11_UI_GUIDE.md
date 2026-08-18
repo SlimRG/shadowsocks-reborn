@@ -46,8 +46,13 @@ Code-only pages are constructed explicitly and hosted in the shell. Avoid introd
 - Game Mode keeps manual executable/path/wildcard rules and may offer best-effort game suggestions from Steam, Epic Games, GOG and Xbox.
 - Discovery never adds or enables a game without explicit user action.
 
-## Servers and secrets
+## Servers, plugins and secrets
 
+- Server Name appears before Server IP in the editor.
+- The server plugin field is a `ComboBox`: `None`, installed managed plugins, and any existing legacy value needed to preserve configuration compatibility.
+- Plugin Options and optional Plugin Arguments remain per-server settings.
+- The Plugins page owns installation/removal. Built-in entries are `xray-plugin`, `v2ray-plugin` and `qtun`; manual import accepts ZIP and TAR.GZ packages.
+- Plugin packages are stored below the active storage root so Clean Mode automatically uses its Temp session.
 - Validate the current server before changing selection when edits could be lost.
 - Keep an explicit discard path for an unconfigured/new entry.
 - Password reveal is available for manually configured servers.

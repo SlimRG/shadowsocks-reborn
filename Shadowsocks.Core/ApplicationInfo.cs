@@ -6,7 +6,7 @@
     /// </summary>
     public static class ApplicationInfo
     {
-        public const string Version = "5.0.0.0";
+        public const string Version = "5.1.0.0";
         public const string RepositoryUrl = "https://github.com/SlimRG/shadowsocks-reborn";
         public const string IssuesUrl = RepositoryUrl + "/issues";
         public const string ReleasesApiUrl = "https://api.github.com/repos/SlimRG/shadowsocks-reborn/releases";

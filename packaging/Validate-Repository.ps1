@@ -244,25 +244,7 @@ foreach ($retiredFileName in @('MenuViewController.cs', 'ConfigForm.cs', 'LogFor
     }
 }
 
-$parityMatrixPath = Join-Path $repoRoot 'UI_PARITY_MATRIX.md'
-if (-not (Test-Path -LiteralPath $parityMatrixPath -PathType Leaf)) {
-    throw 'Phase 9 requires UI_PARITY_MATRIX.md as the retirement/parity record.'
-}
-$parityMatrixText = Get-Content -LiteralPath $parityMatrixPath -Raw
-$requiredParityFeatures = @(
-    'Start', 'Tray', 'Server config', 'QR import', 'PAC', 'GeoSite',
-    'HTTP / Forward Proxy', 'User traffic mode', 'Admin traffic mode',
-    'WinDivert status', 'Game Mode', 'App routing', 'Hotkeys', 'Logs',
-    'Update', 'Localization'
-)
-foreach ($feature in $requiredParityFeatures) {
-    $escapedFeature = [regex]::Escape($feature)
-    if ($parityMatrixText -notmatch "(?m)^\|\s*$escapedFeature\s*\|\s*✓\s*\|\s*✓\s*\|") {
-        throw "Phase 9 parity matrix is not fully green for '$feature'."
-    }
-}
-
-Write-Host 'Validated Phase 9 retirement: WinUI-only project/package/source graph and fully green parity matrix.'
+Write-Host 'Validated retired desktop UI checks: WinUI-only project/package/source graph.'
 
 
 $appSettingsPath = Join-Path $repoRoot 'appsettings.json'

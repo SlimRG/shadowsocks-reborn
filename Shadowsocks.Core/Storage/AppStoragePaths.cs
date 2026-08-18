@@ -54,6 +54,8 @@ namespace Shadowsocks.Core.Storage
         public static string UserRuleFile => Path.Combine(PacDataDirectory, "user-rule.txt");
         public static string UserAbpFile => Path.Combine(PacDataDirectory, "abp.txt");
 
+        public static string PluginsDirectory => Path.Combine(StorageRoot, "Plugins");
+
         public static string LogsDirectory => Path.Combine(StorageRoot, "Logs");
         public static string LogFile => Path.Combine(LogsDirectory, "shadowsocks.log");
         public static string MigrationDirectory => Path.Combine(StorageRoot, "Migration");
@@ -123,6 +125,7 @@ namespace Shadowsocks.Core.Storage
             Directory.CreateDirectory(GeositeCacheDirectory);
             Directory.CreateDirectory(DataRoot);
             Directory.CreateDirectory(PacDataDirectory);
+            Directory.CreateDirectory(PluginsDirectory);
             Directory.CreateDirectory(LogsDirectory);
             Directory.CreateDirectory(MigrationDirectory);
             Directory.CreateDirectory(RuntimeRoot);

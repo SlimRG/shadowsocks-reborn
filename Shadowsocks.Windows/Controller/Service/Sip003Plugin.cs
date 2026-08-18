@@ -55,7 +55,7 @@ namespace Shadowsocks.Controller.Service
                 throw new ArgumentOutOfRangeException("serverPort");
             }
 
-            string resolvedPlugin = ResolvePluginPath(plugin);
+            string resolvedPlugin = PluginManager.ResolveExecutable(plugin) ?? ResolvePluginPath(plugin);
             string pluginWorkingDirectory = AppStoragePaths.EnsureTempDirectory(
                 Path.Combine(AppStoragePaths.TempWorkingRoot, "Plugins"));
 

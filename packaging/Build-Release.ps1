@@ -2,7 +2,7 @@
 param(
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$Version = 'v5.0.0'
+    [string]$Version = 'v5.1.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,14 +19,14 @@ $testProject = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.
 
 $normalizedVersion = $Version.Trim() -replace '^[vV]', ''
 if ($normalizedVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
-    throw "Invalid release version '$Version'. Use a stable tag such as v5.0.0."
+    throw "Invalid release version '$Version'. Use a stable tag such as v5.1.0."
 }
 $baseVersion = $normalizedVersion
 try {
     $requestedVersion = [Version]$baseVersion
 }
 catch {
-    throw "Invalid release version '$Version'. Expected a stable tag such as v5.0.0."
+    throw "Invalid release version '$Version'. Expected a stable tag such as v5.1.0."
 }
 
 $projectXml = [xml](Get-Content -LiteralPath $project -Raw)
@@ -52,6 +52,59 @@ if ($applicationVersion.Major -ne $declaredVersion.Major -or
     $applicationVersion.Minor -ne $declaredVersion.Minor -or
     $applicationVersion.Build -ne $declaredVersion.Build) {
     throw "ApplicationInfo.Version '$applicationVersion' does not match project version '$declaredProjectVersion'."
+}
+
+$versionedProjects = @(
+    'Shadowsocks.Core\Shadowsocks.Core.csproj',
+    'Shadowsocks.Windows\Shadowsocks.Windows.csproj',
+    'Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj'
+)
+foreach ($relativeProjectPath in $versionedProjects) {
+    $versionedProjectPath = Join-Path $repoRoot $relativeProjectPath
+    $versionedProjectXml = [xml](Get-Content -LiteralPath $versionedProjectPath -Raw)
+    $versionedProjectVersionText = @($versionedProjectXml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+    if ([string]::IsNullOrWhiteSpace($versionedProjectVersionText)) {
+        throw "Release project '$relativeProjectPath' does not declare <Version>."
+    }
+
+    $versionedProjectVersion = [Version]$versionedProjectVersionText
+    if ($versionedProjectVersion.Major -ne $declaredVersion.Major -or
+        $versionedProjectVersion.Minor -ne $declaredVersion.Minor -or
+        $versionedProjectVersion.Build -ne $declaredVersion.Build) {
+        throw "Release project '$relativeProjectPath' version '$versionedProjectVersionText' does not match '$declaredProjectVersion'."
+    }
+}
+
+$versionedManifests = @(
+    'Shadowsocks.WinUI\app.manifest',
+    'Shadowsocks.NetworkService\app.manifest'
+)
+foreach ($relativeManifestPath in $versionedManifests) {
+    $manifestPath = Join-Path $repoRoot $relativeManifestPath
+    $manifestXml = [xml](Get-Content -LiteralPath $manifestPath -Raw)
+    $manifestIdentity = $manifestXml.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
+    if ($null -eq $manifestIdentity) {
+        throw "Release manifest '$relativeManifestPath' does not contain assemblyIdentity."
+    }
+
+    $manifestVersionText = [string]$manifestIdentity.GetAttribute('version')
+    if ([string]::IsNullOrWhiteSpace($manifestVersionText)) {
+        throw "Release manifest '$relativeManifestPath' does not declare assemblyIdentity version."
+    }
+
+    $manifestVersion = [Version]$manifestVersionText
+    if ($manifestVersion.Major -ne $declaredVersion.Major -or
+        $manifestVersion.Minor -ne $declaredVersion.Minor -or
+        $manifestVersion.Build -ne $declaredVersion.Build) {
+        throw "Release manifest '$relativeManifestPath' version '$manifestVersionText' does not match '$declaredProjectVersion'."
+    }
+}
+
+$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
+$changelogText = Get-Content -LiteralPath $changelogPath -Raw
+$escapedReleaseVersion = [regex]::Escape($normalizedVersion)
+if ($changelogText -notmatch "(?m)^## \[$escapedReleaseVersion\] - \d{4}-\d{2}-\d{2}\s*$") {
+    throw "CHANGELOG.md does not contain a dated release heading for $normalizedVersion."
 }
 
 
