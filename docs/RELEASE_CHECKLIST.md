@@ -5,7 +5,7 @@ Use this checklist for every `shadowsocks-reborn` 5.x release.
 ## Source and metadata
 
 - [ ] Release version matches all versioned projects, `ApplicationInfo.Version`, WinUI/NetworkService manifests and the dated `CHANGELOG.md` release heading.
-- [ ] `CHANGELOG.md` describes user-visible changes and known limitations.
+- [ ] `CHANGELOG.md`, README EN/RU, architecture/security/storage/UI guidance and this checklist reflect the current release behavior when the corresponding subsystem changed.
 - [ ] `packaging\Validate-Repository.ps1` passes.
 - [ ] Validator confirms the root `appsettings.json` is embedded in `Shadowsocks.Core` as `Shadowsocks.Core.appsettings.json`.
 - [ ] No WinForms/WPF project, package, namespace or build flag has returned.
@@ -153,6 +153,7 @@ Use a clean Windows test account or remove test-only state:
 - [ ] Enable **Associate ss:// Links** while running the product from a directory whose path contains spaces; verify the registered shell command is `"<full path>\Shadowsocks.exe" --open-url "%1"` and opening an `ss://` link activates/imports through the existing instance.
 - [ ] Invoke Servers, Logs, About/Updates and other window-opening commands from the tray while another application is in front; the existing Shadowsocks window restores and comes to the foreground.
 - [ ] `Logs` contains `Verbose Logging` and `Show Plugin Output`; these preferences do not appear in Settings or tray menus.
+- [ ] Logs use the selectable `RichTextBlock` viewer (`IsTextSelectionEnabled = true`) with horizontal scrolling, styled WARN/ERROR/FATAL output and multiline continuation; no `ListViewSelectionMode` dependency has returned.
 - [ ] `About & updates` contains `Automatically install updates` and the pre-release option; automatic install is enabled by default for a new configuration.
 - [ ] A clean restore/build uses Windows App SDK 2.4.0 / WinUI 2.3.6 without `UseUwp`, `Windows.UI.Core` or unsafe mixed XAML projections.
 - [ ] Smoke-test the final x64 artifact on Windows 10 2004 / build 19041: startup, tray, main window, server import and proxy enable/disable work without a newer-OS API failure.
@@ -164,6 +165,7 @@ Use a clean Windows test account or remove test-only state:
 - [ ] Only exact assets `Shadowsocks-win-x64.zip` and `Shadowsocks-win-x64.zip.sha256` from this repository's GitHub release-download path are accepted.
 - [ ] Missing/invalid SHA-256, wrong sidecar filename, wrong payload version, extra ZIP entries or a non-root executable fail without closing the running app.
 - [ ] With automatic updates enabled, a newer release downloads/verifies/stages automatically and launches `%TEMP%\Shadowsocks\Updates\<transaction>\Shadowsocks.Update.exe --update`; only a successful handoff triggers application shutdown.
+- [ ] Before UAC/process handoff, the staged updater is SHA-256 hashed and held without write/delete sharing; tampering with the staged file after verification is detected, and the updater re-verifies its own image against the internal handoff digest before replacement.
 - [ ] The temporary new EXE waits for the old PID, preserves rollback state, replaces the old product EXE and launches the installed new copy.
 - [ ] The installed new copy waits for the updater PID and removes the temporary transaction/rollback files.
 - [ ] If replacement or launch fails, the previous executable is restored and restarted where possible.

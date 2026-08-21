@@ -145,12 +145,12 @@ Application updates use the canonical GitHub assets `Shadowsocks-win-x64.zip` an
 The single-file handoff is:
 
 1. download and verify the release into `%TEMP%\Shadowsocks\Updates\<transaction>`;
-2. extract the new payload as `Shadowsocks.Update.exe`;
-3. start that new payload with the internal `--update` command and only then shut down the current instance;
-4. the temporary new payload waits for the old PID, keeps a rollback copy, replaces the product EXE and starts the installed new copy;
+2. extract the new payload as `Shadowsocks.Update.exe`, calculate its SHA-256 and retain a read-only/non-deletable handle across process creation/UAC;
+3. start that payload with the internal `--update` handoff plus the expected updater digest, and only then shut down the current instance;
+4. the temporary payload re-verifies its own staged image against the handoff digest before replacement, waits for the old PID, keeps a rollback copy, replaces the product EXE and starts the installed new copy;
 5. the installed new copy waits for the temporary updater to exit and removes the transaction/rollback files.
 
-If the running process is the stable Start-with-Windows copy, its Run command carries the original product EXE path via an internal startup-origin argument so updates replace the user-facing product binary rather than only the LocalAppData startup copy. Clean Mode executables are updated under their current `...p.exe` name while the self-update transaction itself stays outside the disposable Clean Mode session.
+If the running process is the stable Start-with-Windows copy, its Run command carries the original product EXE path via an internal startup-origin argument so updates replace the user-facing product binary rather than only the LocalAppData startup copy. Clean Mode executables are updated under their current `...p.exe` name while the self-update transaction itself stays outside the disposable Clean Mode session. Release packaging additionally verifies that the published `Shadowsocks.exe` FileVersion exactly matches the requested release version before ZIP creation.
 
 ## Embedded NetworkService
 

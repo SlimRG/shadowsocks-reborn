@@ -62,8 +62,10 @@ Code-only pages are constructed explicitly and hosted in the shell. Avoid introd
 
 - The Logs toolbar is always visible.
 - Do not restore the removed Font or Show toolbar commands.
-- Keep the viewer bounded and scrollable, with compact timestamp/severity/message presentation.
-- WARN/ERROR/FATAL state must remain visually distinguishable.
+- The current viewer is a selectable `RichTextBlock` (`IsTextSelectionEnabled = true`), not the retired `ListView` implementation.
+- Keep the viewer bounded and vertically/horizontally scrollable; long log lines must not force page re-layout.
+- Preserve styled severity rendering through the current paragraph/run pipeline, including multiline continuation handling.
+- WARN/ERROR/FATAL state must remain visually distinguishable with WinUI theme brushes.
 - Top Most uses the WinUI/AppWindow presenter path, not WinForms/WPF APIs.
 
 ## PAC and GeoSite

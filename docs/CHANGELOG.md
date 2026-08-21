@@ -6,6 +6,8 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [5.2.22] - 2026-08-21
 
+- Synchronized the living Markdown documentation with the final 5.2.22 implementation: updater integrity/UAC handoff, release security gates, current selectable `RichTextBlock` Logs contract, storage architecture and release verification are now documented consistently.
+- Fixed the release validator after the Logs viewer migration from `ListView` to selectable `RichTextBlock`: validation now enforces `IsTextSelectionEnabled = true` instead of the retired `ListViewSelectionMode.None` implementation token.
 - Fixed a release-blocking self-updater compilation regression: `UpdateChecker` now resolves `SelfUpdater` from the service namespace, and launching the installed updated executable uses a valid explicit `Process.Start` null check instead of an invalid standalone null-coalescing expression.
 - Fixed the DNSCrypt TOML test so `odoh_servers = false` is no longer mistaken for a `doh_servers = false` line, and added the missing resolver-filter translation in every shipped locale.
 - Kept the automatic updater contract release-safe: canonical `Shadowsocks-win-x64.zip`/`.sha256` verification, PID handoff, rollback, replacement of the primary product EXE, relaunch, and cleanup remain required by repository validation.

@@ -8,7 +8,7 @@
 - [Windows 11 / WinUI guide](WINDOWS11_UI_GUIDE.md)
 - [Contributing](CONTRIBUTING.md)
 - [Release checklist](RELEASE_CHECKLIST.md)
-- [Changelog](CHANGELOG.md)
+- [Changelog / 5.2.22](CHANGELOG.md)
 - [Security](SECURITY.md)
 - [License](LICENSE.md)
 - [Third-party notices](THIRD-PARTY-NOTICES.md)

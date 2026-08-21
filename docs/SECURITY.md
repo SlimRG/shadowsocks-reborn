@@ -26,7 +26,8 @@ Changes deserve additional review when they touch:
 - SHA-256 verification, extraction mutex or helper guard handle;
 - UAC/elevation and named-pipe authentication/version handshake;
 - WinDivert installation/runtime cleanup, pinned runtime hashes and FLOW/NETWORK ownership mapping;
-- application self-update download/checksum/version validation, temporary updater handoff, rollback, UAC and cleanup;
+- application self-update download/checksum/version validation, staged-updater digest/handle protection, temporary updater handoff, rollback, UAC and cleanup;
+- release supply-chain gates: serviced .NET SDK/runtime baseline, fail-closed NuGet vulnerability audit and final EXE version verification;
 - fragmented-packet handling and mandatory fail-closed DNSCrypt enforcement;
 - active DNSCrypt runtimes disable plaintext bootstrap/system-DNS fallback; Automatic mode must resolve and pin a concrete resolver set from the signed catalog after applying DNSSEC, no-log, unfiltered and address-family constraints; resolver geography comes only from endpoint-IP GeoIP;
 - SIP003 catalog downloads, ZIP/TAR extraction and managed plugin storage;
@@ -35,7 +36,9 @@ Changes deserve additional review when they touch:
 
 User Mode must remain usable without extracting or launching the elevated NetworkService helper.
 
-Application self-update is fail-closed. It accepts only the canonical GitHub release ZIP and matching SHA-256 sidecar from this repository, verifies the ZIP contains exactly one root `Shadowsocks.exe`, validates the payload version, and starts a staged new executable before the current process shuts down. The staged updater waits for the old PID, preserves a rollback copy while replacing the target, then starts the installed new copy; only that installed copy removes the updater transaction. If Start with Windows launched the LocalAppData copy, the update target is the recorded original product EXE rather than the startup copy.
+Application self-update is fail-closed. It accepts only the canonical GitHub release ZIP and matching SHA-256 sidecar from this repository, verifies the ZIP contains exactly one root `Shadowsocks.exe`, and validates the payload version. The source process hashes the staged updater, holds it open without write/delete sharing across process creation/UAC, and passes the expected digest through the internal handoff; the updater verifies its own staged image again before touching the installed product. It then waits for the old PID, preserves a rollback copy while replacing the target, and starts the installed new copy; only that installed copy removes the updater transaction. If Start with Windows launched the LocalAppData copy, the update target is the recorded original product EXE rather than the startup copy.
+
+Release restore is also fail-closed: `NU1900`-`NU1904` are release-blocking when `NuGetAudit=true`, so either a known vulnerability or an unavailable vulnerability feed prevents packaging. Release builds require .NET SDK 10.0.303 or newer (the .NET 10.0.11 servicing baseline), and packaging verifies the final `Shadowsocks.exe` FileVersion against the requested release version.
 
 Product settings belong in `%LOCALAPPDATA%\Shadowsocks\settings.json` in normal mode or the Clean Mode Temp session. Mutable data never belongs beside the release EXE. Registry writes are reserved for explicit Windows integration such as autostart/protocol/system-proxy behavior.
 

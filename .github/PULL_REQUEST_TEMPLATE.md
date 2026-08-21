@@ -12,7 +12,7 @@ Describe what changed and why.
 - [ ] Tested Admin Mode and automatic Game Mode if WinDivert/routing code changed.
 - [ ] Opened and runtime-tested affected WinUI pages/views.
 - [ ] Added/updated localization for user-visible strings.
-- [ ] Updated README/CHANGELOG when behavior or requirements changed.
+- [ ] Updated the relevant README/CHANGELOG/architecture/security/storage/UI/release-checklist Markdown when behavior, requirements or validator invariants changed.
 - [ ] Confirmed no passwords, server addresses, tokens or private configs are included.
 
 ## Notes

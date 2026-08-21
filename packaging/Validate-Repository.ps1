@@ -946,18 +946,22 @@ foreach ($logsParityToken in @(
     'SaveLogViewerConfig',
     'MaxVisibleLogLines',
     'LogViewerHeight',
-    'ListViewSelectionMode.None',
+    'IsTextSelectionEnabled = true',
     'SystemFillColorCautionBrush',
     'SystemFillColorCriticalBrush',
-    'TryGetLogLineSeverity',
-    'TryParseLogLine',
-    'CompactTimestamp',
-    'ColumnSpacing = 12',
-    'CornerRadius = new CornerRadius(9)'
+    'new RichTextBlock',
+    'HorizontalScrollMode = ScrollMode.Enabled',
+    'AppendStyledLogLine',
+    'GetSeverity',
+    'CreateRun',
+    'new LineBreak()'
 )) {
     if ($logsPageSource -notmatch [regex]::Escape($logsParityToken)) {
-        throw "Phase-7 Logs parity is missing required legacy workflow token: $logsParityToken"
+        throw "Phase-7 Logs parity is missing required viewer workflow invariant: $logsParityToken"
     }
+}
+if ($logsPageSource -match '\bListViewSelectionMode\b') {
+    throw 'LogsPage must keep the selectable RichTextBlock viewer; the retired ListView-based log viewer must not return.'
 }
 if ($logsPageSource -match [regex]::Escape('Content = "Show toolbar"') -or
     $logsPageSource -match [regex]::Escape('Content = "Font…"')) {
@@ -1879,6 +1883,42 @@ foreach ($requiredDoc in @(
         throw "Required docs/Wiki source is missing: $requiredDoc"
     }
 }
+
+# Living release documentation must move with the product version. Keep these
+# checks contract-oriented so documentation validation does not become coupled
+# to private method names or retired UI implementation details.
+foreach ($versionedDoc in @(
+    'docs\README.md',
+    'docs\README.ru.md',
+    'docs\Home.md',
+    'docs\CHANGELOG.md',
+    'docs\RELEASE_CHECKLIST.md',
+    'docs\THIRD-PARTY-NOTICES.md')) {
+    $versionedDocText = Get-Content -LiteralPath (Join-Path $repoRoot $versionedDoc) -Raw
+    if ($versionedDocText -notmatch [regex]::Escape($winUiVersion)) {
+        throw "Living release documentation does not mention current product version $winUiVersion: $versionedDoc"
+    }
+}
+
+$architectureDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\ARCHITECTURE.md') -Raw
+$securityDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\SECURITY.md') -Raw
+$storageDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\STORAGE_POLICY.md') -Raw
+$uiGuideText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\WINDOWS11_UI_GUIDE.md') -Raw
+$contributingDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\CONTRIBUTING.md') -Raw
+foreach ($docContract in @(
+    @{ Name = 'ARCHITECTURE.md'; Text = $architectureDocText; Tokens = @('Shadowsocks.Update.exe', 'SHA-256', 'UAC', 'FileVersion') },
+    @{ Name = 'SECURITY.md'; Text = $securityDocText; Tokens = @('staged updater', 'NU1900', '10.0.303', 'FileVersion') },
+    @{ Name = 'STORAGE_POLICY.md'; Text = $storageDocText; Tokens = @('Shadowsocks.Update.exe', 'SHA-256', 'write/delete', 'internal argument') },
+    @{ Name = 'WINDOWS11_UI_GUIDE.md'; Text = $uiGuideText; Tokens = @('RichTextBlock', 'IsTextSelectionEnabled', 'horizontal', 'theme brushes') },
+    @{ Name = 'CONTRIBUTING.md'; Text = $contributingDocText; Tokens = @('10.0.303', 'NuGetAudit=true', 'Markdown', 'release validation') }
+)) {
+    foreach ($documentationToken in $docContract.Tokens) {
+        if ($docContract.Text -notmatch [regex]::Escape($documentationToken)) {
+            throw "Living documentation is stale: $($docContract.Name) is missing release contract '$documentationToken'."
+        }
+    }
+}
+Write-Host "Validated living Markdown documentation for release $winUiVersion."
 
 $licenseText = Get-Content -LiteralPath (Join-Path $repoRoot 'LICENSE.txt') -Raw
 $thirdPartyNoticesText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\THIRD-PARTY-NOTICES.md') -Raw

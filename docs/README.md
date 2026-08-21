@@ -8,6 +8,12 @@
 
 > This is an independent fork, not the upstream `shadowsocks/shadowsocks-windows` repository.
 
+## Current release: 5.2.22
+
+Release 5.2.22 consolidates the DNSCrypt/DoH management work, keeps ODoH disabled, fixes release-blocking updater/test/localization regressions, hardens staged self-update integrity across UAC handoff, and tightens CI/release gates around .NET servicing, NuGet vulnerability auditing, Windows 10 build 19041 compatibility and published EXE version metadata. The Logs viewer is the current selectable `RichTextBlock` implementation; retired `ListView` parity tokens are no longer part of the UI contract.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
+
 ## Highlights
 
 - Native WinUI 3 desktop interface; WinForms and WPF are no longer part of the product UI.
@@ -107,7 +113,7 @@ See [STORAGE_POLICY.md](STORAGE_POLICY.md) for the complete layout and cleanup r
 
 ## Application updates
 
-Application updates are automatic by default. After startup, the app checks GitHub Releases, selects an eligible newer version, requires the exact `Shadowsocks-win-x64.zip` plus `.sha256` sidecar, verifies the SHA-256, ZIP layout and payload file version, then stages the new single-file EXE under `%TEMP%\Shadowsocks\Updates`. The staged new EXE runs with the internal `--update` command, waits for the current process to exit, replaces the product EXE with rollback protection and starts the installed new copy. That installed copy removes the temporary updater transaction. If Start with Windows launched the LocalAppData startup copy, the recorded primary EXE is updated instead of only the startup copy.
+Application updates are automatic by default. After startup, the app checks GitHub Releases, selects an eligible newer version, requires the exact `Shadowsocks-win-x64.zip` plus `.sha256` sidecar, verifies the SHA-256, ZIP layout and payload file version, then stages the new single-file EXE under `%TEMP%\Shadowsocks\Updates`. Before launch, the staged updater receives its own SHA-256; the source process keeps that staged file open without write/delete sharing across `Process.Start`/UAC and passes the digest through the internal update handoff. The updater re-verifies its own staged image before replacing the installed product. It then waits for the current process to exit, preserves rollback state, replaces the product EXE and starts the installed new copy. That installed copy removes the temporary updater transaction. If Start with Windows launched the LocalAppData startup copy, the recorded primary EXE is updated instead of only the startup copy.
 
 ## Embedded NetworkService
 

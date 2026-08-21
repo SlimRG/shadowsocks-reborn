@@ -1,6 +1,6 @@
 ﻿# Contributing
 
-`shadowsocks-reborn` targets .NET 10, WinUI 3, Windows 10 build 19041+ and x64 only.
+`shadowsocks-reborn` targets .NET 10, WinUI 3, Windows 10 build 19041+ and x64 only. Release validation currently requires .NET SDK 10.0.303 or newer so self-contained artifacts include the .NET 10.0.11 servicing/security baseline.
 
 ## Required validation
 
@@ -9,7 +9,7 @@ Before submitting changes, run on Windows:
 ```powershell
 .\packaging\Validate-Repository.ps1
 
-dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
+dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64 -p:NuGetAudit=true -p:NuGetAuditMode=all
 dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
 dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
 ```
@@ -47,7 +47,7 @@ Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 ## WinUI and localization
 
 - Use native WinUI/Fluent controls and existing shell patterns; see [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md).
-- Preserve established WinUI behavior covered by tests and repository validation unless it is being intentionally redesigned.
+- Preserve established WinUI behavior covered by tests and repository validation unless it is being intentionally redesigned. When implementation primitives change (for example `ListView` → selectable `RichTextBlock`), update validator tokens and the corresponding Markdown guidance together.
 - User-visible strings use `ILocalizationService` / the CSV localization path.
 - Keep stable enum/configuration values separate from localized display text.
 - Preserve the seven-column localization schema: `en,ru-RU,zh-CN,zh-TW,ja,ko,fr`.
@@ -66,7 +66,7 @@ Publish with the supplied profile/script. Do not add helper EXEs, DLLs, runtime 
 
 ## Pull requests
 
-Changes to networking, storage, startup, Admin capture or deployment should state:
+Changes to networking, storage, startup, Admin capture, deployment or release validation should update the relevant living Markdown (`README`, `ARCHITECTURE`, `SECURITY`, `STORAGE_POLICY`, `WINDOWS11_UI_GUIDE`, `RELEASE_CHECKLIST`, `CHANGELOG`) in the same change and state:
 
 - user-visible behavior changed;
 - User/Admin/Game Mode paths tested;

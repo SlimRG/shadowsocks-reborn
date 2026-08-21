@@ -71,7 +71,7 @@ Application self-update is intentionally outside `StorageRoot` and outside a Cle
   Shadowsocks.Update.exe
 ```
 
-This location must survive shutdown/cleanup of the running application while `Shadowsocks.Update.exe` waits for the old PID and replaces the product EXE. The installed new copy receives internal cleanup arguments, waits for the temporary updater to exit, and deletes the transaction. Stale transactions are pruned best-effort. DNSCrypt/component update staging remains below the active storage root (`Temp\Updates\...`) because it is runtime component state rather than application self-replacement.
+This location must survive shutdown/cleanup of the running application while `Shadowsocks.Update.exe` waits for the old PID and replaces the product EXE. Before handoff the staged updater is SHA-256 hashed and held open without write/delete sharing across process creation/UAC; the expected digest is carried as an internal argument and the staged updater re-verifies its own image before replacement. The installed new copy receives internal cleanup arguments, waits for the temporary updater to exit, and deletes the transaction. Stale transactions are pruned best-effort. DNSCrypt/component update staging remains below the active storage root (`Temp\Updates\...`) because it is runtime component state rather than application self-replacement.
 
 ## Registry boundary
 

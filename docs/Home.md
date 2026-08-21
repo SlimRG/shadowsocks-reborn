@@ -2,6 +2,10 @@
 
 This directory is the canonical Markdown documentation source for the repository and can be synchronized to GitHub Wiki.
 
+## Current release
+
+**5.2.22** (2026-08-21) is the current release line. It includes DNSCrypt/DoH resolver management, hardened single-file self-update handoff, Windows 10 build 19041+ compatibility, selectable `RichTextBlock` log viewing, and stricter release/security validation. See [Changelog](CHANGELOG.md) and [Release checklist](RELEASE_CHECKLIST.md).
+
 ## User documentation
 
 - [Project overview](README.md)
