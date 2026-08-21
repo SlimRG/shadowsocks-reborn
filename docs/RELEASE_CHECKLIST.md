@@ -165,7 +165,7 @@ Use a clean Windows test account or remove test-only state:
 - [ ] A release check sends the required GitHub API headers and ignores drafts; prereleases are included only when enabled, and stable wins over prerelease at the same numeric version.
 - [ ] Only exact assets `Shadowsocks-win-x64.zip` and `Shadowsocks-win-x64.zip.sha256` from this repository's GitHub release-download path are accepted.
 - [ ] Missing/invalid SHA-256, wrong sidecar filename, wrong payload version, extra ZIP entries or a non-root executable fail without closing the running app.
-- [ ] Test a real 5.2.21 -> 5.2.22 update on Windows: both ZIP and `.sha256` download, each `.download` file is closed before promotion, and no `File.Move` sharing violation occurs.
+- [ ] Test a real 5.2.21 -> 5.2.22 update on Windows: both ZIP and `.sha256` download, `DownloadedAssetIsClosedBeforePromotion` passes, each `.download` file is closed before promotion, and no `File.Move` sharing violation occurs.
 - [ ] With automatic updates enabled, a newer release downloads/verifies/stages automatically and launches `%TEMP%\Shadowsocks\Updates\<transaction>\Shadowsocks.Update.exe --update`; only a successful handoff triggers application shutdown.
 - [ ] Before UAC/process handoff, the staged updater is SHA-256 hashed and held without write/delete sharing; tampering with the staged file after verification is detected, and the updater re-verifies its own image against the internal handoff digest before replacement.
 - [ ] The temporary new EXE waits for the old PID, preserves rollback state, replaces the old product EXE and launches the installed new copy.

@@ -1645,9 +1645,10 @@ if ($updateCheckerTestsSource -notmatch 'DownloadedAssetIsClosedBeforePromotion'
     $updateCheckerTestsSource -notmatch 'WriteDownloadedAssetAsync') {
     throw 'UpdateChecker tests must guard Windows download promotion after the .download stream is disposed.'
 }
-if ($updateCheckerSource -notmatch '(?s)await using \(FileStream output.*?\}\s*File\.Move\(partialPath, destination, overwrite: true\)') {
-    throw 'UpdateChecker must dispose the partial download stream before promoting it with File.Move on Windows.'
-}
+# The Windows sharing-violation regression is enforced behaviorally by
+# DownloadedAssetIsClosedBeforePromotion. Keep repository validation focused on
+# the public/update contract instead of the exact formatting between the using
+# block and File.Move (comments or harmless refactors must not break the gate).
 
 if ($updateCheckerSource -match 'explorer\.exe' -or
     $updateCheckerSource -match 'continuing for backward compatibility' -or

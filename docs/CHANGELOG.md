@@ -6,6 +6,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [5.2.22] - 2026-08-21
 
+- Fixed the final false-positive updater release-validator regex: automatic update stream disposal is now guarded by the Windows regression test instead of brittle source formatting. A real 5.2.21 -> 5.2.22 self-update was verified successfully.
 - Fixed automatic update download promotion on Windows: the temporary `.download` stream is fully disposed before `File.Move`, eliminating the sharing violation observed during 5.2.21 -> 5.2.22 update tests. SHA-256 sidecars now accept both standard `sha256sum` format and a plain 64-hex digest.
 - Fixed DNSCrypt loopback-port allocation on Windows/GitHub Actions hosts where TCP and UDP dynamic/excluded ranges differ: allocation is now UDP-first, verifies the same numeric port over TCP, falls back to a dual-bind application-port candidate when needed, and preserves the last socket failure for diagnostics.
 - Relaxed the Bouncy Castle Bzip2 notice validator to verify the legal contract (`modified Bzip2` + `Apache License 2.0`) instead of one obsolete wording.
