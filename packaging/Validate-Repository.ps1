@@ -711,10 +711,27 @@ if (-not $traySource.TrimStart([char]0xFEFF).StartsWith('#nullable enable') -or
     throw 'New Windows shell files that use nullable annotations must opt into nullable context locally.'
 }
 if ($winUiProgramSource -notmatch 'AppInstance\.FindOrRegisterForKey' -or $winUiProgramSource -notmatch 'RedirectActivationToAsync') {
-    throw 'Phase-5 WinUI shell must use Windows App SDK AppInstance for single-instance activation redirection.'
+    throw 'Phase-5 WinUI shell must use Windows App SDK AppInstance for same-identity activation redirection.'
 }
 if ($winUiProgramSource -match '\bMutex\b') {
-    throw 'Phase-5 WinUI shell must not reintroduce the legacy Mutex single-instance mechanism.'
+    throw 'Program.cs must keep raw synchronization primitives out of the WinUI bootstrap; use ProcessSingleInstanceGuard instead.'
+}
+$processSingleInstanceGuardPath = Join-Path $repoRoot 'Shadowsocks.Windows\Controller\System\ProcessSingleInstanceGuard.cs'
+$processSingleInstanceTestPath = Join-Path $repoRoot 'Shadowsocks.UnitTests\ProcessSingleInstanceGuardTests.cs'
+if (-not (Test-Path -LiteralPath $processSingleInstanceGuardPath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $processSingleInstanceTestPath -PathType Leaf)) {
+    throw 'Start-with-Windows requires the identity-independent ProcessSingleInstanceGuard and its regression test.'
+}
+$processSingleInstanceGuardSource = Get-Content -LiteralPath $processSingleInstanceGuardPath -Raw
+$processSingleInstanceTestSource = Get-Content -LiteralPath $processSingleInstanceTestPath -Raw
+foreach ($singleInstanceToken in @('Local\Shadowsocks.Reborn.WinUI.Process', 'WaitOne(0', 'AbandonedMutexException', 'ReleaseMutex')) {
+    if ($processSingleInstanceGuardSource -notmatch [regex]::Escape($singleInstanceToken)) {
+        throw "ProcessSingleInstanceGuard is missing required invariant: $singleInstanceToken"
+    }
+}
+if ($winUiProgramSource -notmatch 'ProcessSingleInstanceGuard\.TryAcquire\(\)' -or
+    $processSingleInstanceTestSource -notmatch 'NamedGateRejectsSecondThreadUntilOwnerReleasesIt') {
+    throw 'WinUI startup must acquire the process-wide guard before controller startup and keep the regression test.'
 }
 if ($traySource -notmatch 'WinUIEx' -or
     $traySource -notmatch 'new TrayIcon\(' -or
@@ -795,6 +812,16 @@ if ($winUiWindowSource -notmatch 'args\.Cancel = true') {
 if ($winUiAppSource -notmatch 'AutoStartup\.RegisterForRestart\(true\)' -or $winUiAppSource -notmatch 'AutoStartup\.Set\(') {
     throw 'Phase-5 WinUI shell must wire the existing Windows startup infrastructure.'
 }
+$autoStartupSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\System\AutoStartup.cs') -Raw
+foreach ($startupDedupToken in @('RemoveDuplicateStartupEntries', 'HasLegacyStartupEntry', 'CommandTargetsExecutable', 'WindowsCommandLine.ParseArguments')) {
+    if ($autoStartupSource -notmatch [regex]::Escape($startupDedupToken)) {
+        throw "Start with Windows must remove stale duplicate Run entries: $startupDedupToken"
+    }
+}
+$storagePolicyTestSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\StoragePolicyTest.cs') -Raw
+if ($storagePolicyTestSource -notmatch 'StartupCommandMatcherRecognizesCanonicalAndLegacyRunEntries') {
+    throw 'Start-with-Windows duplicate Run-entry cleanup must keep its command-matching regression test.'
+}
 if ($winUiAppSource -notmatch '--start-hidden') {
     throw 'Phase-5 Start with Windows must preserve the hidden-start compatibility argument.'
 }
@@ -813,7 +840,12 @@ if ($winUiProgramSource -match 'ShowAlreadyRunningMessage' -or
 }
 if ($winUiProgramSource -notmatch 'return RedirectActivation\(activationArguments, keyInstance\);' -or
     $winUiProgramSource -notmatch 'internal static bool IsPlainLaunch') {
-    throw 'A second launch must redirect activation to the existing WinUI instance.'
+    throw 'A second same-identity launch must redirect activation to the existing WinUI instance.'
+}
+foreach ($backgroundLaunchToken in @('--start-hidden', 'AutoStartup.StartupOriginOption')) {
+    if ($winUiProgramSource -notmatch [regex]::Escape($backgroundLaunchToken)) {
+        throw "Hidden Start-with-Windows activation must not be treated as a user-visible duplicate launch: $backgroundLaunchToken"
+    }
 }
 if ($winUiAppSource -notmatch 'Program\.IsPlainLaunch' -or
     $winUiAppSource -notmatch 'ShowAlreadyRunningDialogAsync') {
@@ -852,8 +884,7 @@ $phase7RequiredSources = @(
     'Shadowsocks.WinUI\Pages\LogsPage.cs',
     'Shadowsocks.WinUI\Pages\AboutPage.cs',
     'Shadowsocks.WinUI\Pages\OnlineConfigPage.cs',
-    'Shadowsocks.WinUI\UI\WinUIStyles.cs',
-    'docs\WINDOWS11_UI_GUIDE.md'
+    'Shadowsocks.WinUI\UI\WinUIStyles.cs'
 )
 foreach ($relativePath in $phase7RequiredSources) {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $relativePath) -PathType Leaf)) {
@@ -1169,6 +1200,22 @@ if ($allowUnsafeBlocks -ne 'true') {
 }
 
 Write-Host 'Validated .NET 10 style baseline: analyzer level pinned, deprecated MSTest attribute removed, Ras uses LibraryImport.'
+
+$directoryBuildPropsText = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw
+$gitIgnoreText = Get-Content -LiteralPath (Join-Path $repoRoot '.gitignore') -Raw
+if ($directoryBuildPropsText -notmatch '<FodyGenerateXsd>false</FodyGenerateXsd>' -or
+    $gitIgnoreText -notmatch '(?m)^FodyWeavers\.xsd\s*$') {
+    throw 'FodyWeavers.xsd is generated IntelliSense metadata and must stay disabled/ignored to avoid recurring XSD/XML source-tree churn.'
+}
+foreach ($fodyConfigPath in @(
+    (Join-Path $repoRoot 'Shadowsocks.Core\FodyWeavers.xml'),
+    (Join-Path $repoRoot 'Shadowsocks.Windows\FodyWeavers.xml'))) {
+    $fodyConfigText = Get-Content -LiteralPath $fodyConfigPath -Raw
+    if ($fodyConfigText -match 'noNamespaceSchemaLocation' -or $fodyConfigText -match 'FodyWeavers\.xsd') {
+        throw "Fody configuration must not reference the generated FodyWeavers.xsd schema: $fodyConfigPath"
+    }
+}
+Write-Host 'Validated Fody XML configuration without generated or referenced FodyWeavers.xsd churn.'
 
 
 $nativeInteractionPath = Join-Path $repoRoot 'Shadowsocks.Windows\Shell\NativeUserInteractionService.cs'
@@ -1879,65 +1926,33 @@ foreach ($dohPresetToken in @(
 
 $rootMarkdown = @(Get-ChildItem -LiteralPath $repoRoot -File -Filter '*.md')
 if ($rootMarkdown.Count -ne 0) {
-    throw "Repository Markdown documentation must live in docs for Wiki synchronization. Root Markdown found: $($rootMarkdown.Name -join ', ')"
+    throw "Long-form Markdown documentation must live in the separate GitHub Wiki. Root Markdown found: $($rootMarkdown.Name -join ', ')"
 }
-foreach ($requiredDoc in @(
-    'docs\README.md',
-    'docs\README.ru.md',
-    'docs\Home.md',
-    'docs\_Sidebar.md',
-    'docs\ARCHITECTURE.md',
-    'docs\CHANGELOG.md',
-    'docs\CONTRIBUTING.md',
-    'docs\RELEASE_CHECKLIST.md',
-    'docs\SECURITY.md',
-    'docs\LICENSE.md',
-    'docs\STORAGE_POLICY.md',
-    'docs\THIRD-PARTY-NOTICES.md',
-    'docs\WINDOWS11_UI_GUIDE.md')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $requiredDoc) -PathType Leaf)) {
-        throw "Required docs/Wiki source is missing: $requiredDoc"
+# Long-form Markdown documentation lives in the separate GitHub Wiki repository.
+# Keep the application repository free of duplicated docs so release documentation has
+# a single source of truth. GitHub issue/PR templates under .github intentionally remain.
+$docsDirectory = Join-Path $repoRoot 'docs'
+if (Test-Path -LiteralPath $docsDirectory) {
+    $repositoryDocs = @(Get-ChildItem -LiteralPath $docsDirectory -Recurse -File -Filter '*.md' -ErrorAction Stop)
+    if ($repositoryDocs.Count -ne 0) {
+        throw 'Long-form Markdown documentation must live in the GitHub Wiki repository, not under docs/ in the application repository.'
     }
 }
 
-# Living release documentation must move with the product version. Keep these
-# checks contract-oriented so documentation validation does not become coupled
-# to private method names or retired UI implementation details.
-foreach ($versionedDoc in @(
-    'docs\README.md',
-    'docs\README.ru.md',
-    'docs\Home.md',
-    'docs\CHANGELOG.md',
-    'docs\RELEASE_CHECKLIST.md',
-    'docs\THIRD-PARTY-NOTICES.md')) {
-    $versionedDocText = Get-Content -LiteralPath (Join-Path $repoRoot $versionedDoc) -Raw
-    if ($versionedDocText -notmatch [regex]::Escape($winUiVersion)) {
-        throw "Living release documentation does not mention current product version ${winUiVersion}: $versionedDoc"
-    }
+$changesText = Get-Content -LiteralPath (Join-Path $repoRoot 'CHANGES') -Raw
+if ($changesText -notmatch [regex]::Escape($winUiVersion) -or
+    $changesText -notmatch [regex]::Escape('https://github.com/SlimRG/shadowsocks-reborn/wiki/')) {
+    throw 'CHANGES must mention the current product version and point readers to the canonical GitHub Wiki.'
 }
 
-$architectureDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\ARCHITECTURE.md') -Raw
-$securityDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\SECURITY.md') -Raw
-$storageDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\STORAGE_POLICY.md') -Raw
-$uiGuideText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\WINDOWS11_UI_GUIDE.md') -Raw
-$contributingDocText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\CONTRIBUTING.md') -Raw
-foreach ($docContract in @(
-    @{ Name = 'ARCHITECTURE.md'; Text = $architectureDocText; Tokens = @('Shadowsocks.Update.exe', 'SHA-256', 'UAC', 'FileVersion') },
-    @{ Name = 'SECURITY.md'; Text = $securityDocText; Tokens = @('staged updater', 'NU1900', '10.0.303', 'FileVersion') },
-    @{ Name = 'STORAGE_POLICY.md'; Text = $storageDocText; Tokens = @('Shadowsocks.Update.exe', 'SHA-256', 'write/delete', 'internal argument') },
-    @{ Name = 'WINDOWS11_UI_GUIDE.md'; Text = $uiGuideText; Tokens = @('RichTextBlock', 'IsTextSelectionEnabled', 'horizontal', 'theme brushes') },
-    @{ Name = 'CONTRIBUTING.md'; Text = $contributingDocText; Tokens = @('10.0.303', 'NuGetAudit=true', 'Markdown', 'release validation') }
-)) {
-    foreach ($documentationToken in $docContract.Tokens) {
-        if ($docContract.Text -notmatch [regex]::Escape($documentationToken)) {
-            throw "Living documentation is stale: $($docContract.Name) is missing release contract '$documentationToken'."
-        }
-    }
+$thirdPartyNoticesPath = Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt'
+if (-not (Test-Path -LiteralPath $thirdPartyNoticesPath -PathType Leaf)) {
+    throw 'THIRD-PARTY-NOTICES.txt is required in the application repository because legal notices are embedded into the one-file product.'
 }
-Write-Host "Validated living Markdown documentation for release $winUiVersion."
+Write-Host "Validated repository/Wiki documentation split for release $winUiVersion."
 
 $licenseText = Get-Content -LiteralPath (Join-Path $repoRoot 'LICENSE.txt') -Raw
-$thirdPartyNoticesText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\THIRD-PARTY-NOTICES.md') -Raw
+$thirdPartyNoticesText = Get-Content -LiteralPath (Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt') -Raw
 $coreEmbeddedResourcesSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\EmbeddedResources.cs') -Raw
 $aboutPageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\AboutPage.cs') -Raw
 foreach ($requiredLicenseToken in @('Shadowsocks Reborn', 'GPL-3.0-or-later', 'GNU GENERAL PUBLIC LICENSE', 'Version 3, 29 June 2007')) {
@@ -1947,7 +1962,7 @@ foreach ($requiredLicenseToken in @('Shadowsocks Reborn', 'GPL-3.0-or-later', 'G
 }
 foreach ($obsoleteLicenseToken in @('Privoxy', 'mbed TLS', 'libsodium')) {
     if ($licenseText -match [regex]::Escape($obsoleteLicenseToken)) {
-        throw "LICENSE.txt contains obsolete third-party material that belongs in docs/THIRD-PARTY-NOTICES.md: $obsoleteLicenseToken"
+        throw "LICENSE.txt contains obsolete third-party material that belongs in THIRD-PARTY-NOTICES.txt: $obsoleteLicenseToken"
     }
 }
 foreach ($requiredNoticeToken in @(
@@ -1965,7 +1980,7 @@ foreach ($requiredNoticeToken in @(
     'ByteCircularBuffer',
     'Adblock Plus-derived PAC helper')) {
     if ($thirdPartyNoticesText -notmatch [regex]::Escape($requiredNoticeToken)) {
-        throw "docs/THIRD-PARTY-NOTICES.md is missing current component: $requiredNoticeToken"
+        throw "THIRD-PARTY-NOTICES.txt is missing current component: $requiredNoticeToken"
     }
 }
 if ($coreEmbeddedResourcesSource -notmatch 'ProductLicense\s*=>\s*ReadRequiredText' -or

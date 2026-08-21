@@ -1,5 +1,6 @@
 ﻿<Project>
   <PropertyGroup>
+    <FodyGenerateXsd>false</FodyGenerateXsd>
     <!-- Pin analyzer behavior to the .NET 10 ruleset and enforce configured style diagnostics during builds. -->
     <AnalysisLevel>10.0</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

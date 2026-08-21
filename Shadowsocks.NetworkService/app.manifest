@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="5.2.22.0" name="Shadowsocks.NetworkService"/>
+  <assemblyIdentity version="2.2.31.0" name="Shadowsocks.NetworkService"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

@@ -26,7 +26,7 @@ $controllerDnsSource = Read-RepoText 'Shadowsocks.Windows\Controller\Shadowsocks
 $controllerSource = Read-RepoText 'Shadowsocks.Windows\Controller\ShadowsocksController.cs'
 $storageSource = Read-RepoText 'Shadowsocks.Core\Storage\AppStoragePaths.cs'
 $trafficModelsSource = Read-RepoText 'Shadowsocks.Core\Controller\Traffic\TrafficModels.cs'
-$notices = Read-RepoText 'docs\THIRD-PARTY-NOTICES.md'
+$notices = Read-RepoText 'THIRD-PARTY-NOTICES.txt'
 $coreProjectText = Read-RepoText 'Shadowsocks.Core\Shadowsocks.Core.csproj'
 $windowsProjectText = Read-RepoText 'Shadowsocks.Windows\Shadowsocks.Windows.csproj'
 $testsProjectText = Read-RepoText 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
@@ -241,17 +241,17 @@ foreach ($projectText in @($windowsProjectText, $testsProjectText)) {
 }
 foreach ($noticeToken in @('Bouncy Castle Cryptography for .NET', 'dnscrypt-proxy', 'License: ISC', 'WinDivert', 'Windows App SDK')) {
     if ($notices -notmatch [regex]::Escape($noticeToken)) {
-        throw "THIRD-PARTY-NOTICES.md is missing: $noticeToken"
+        throw "THIRD-PARTY-NOTICES.txt is missing: $noticeToken"
     }
 }
-if ($coreProjectText -notmatch 'Shadowsocks\.Core\.THIRD-PARTY-NOTICES\.md') {
-    throw 'The one-file product must embed THIRD-PARTY-NOTICES.md so the bundled Bouncy Castle notice ships inside Shadowsocks.exe.'
+if ($coreProjectText -notmatch 'Shadowsocks\.Core\.THIRD-PARTY-NOTICES\.txt') {
+    throw 'The one-file product must embed THIRD-PARTY-NOTICES.txt so the bundled Bouncy Castle notice ships inside Shadowsocks.exe.'
 }
 if ($coreProjectText -notmatch 'Shadowsocks\.Core\.LICENSE\.txt') {
     throw 'The one-file product must embed LICENSE.txt so the product license remains accessible from Shadowsocks.exe.'
 }
 if ($notices -notmatch 'modified Bzip2' -or $notices -notmatch 'Apache License 2\.0') {
-    throw 'THIRD-PARTY-NOTICES.md must preserve the Bouncy Castle modified-Bzip2 Apache-2.0 notice.'
+    throw 'THIRD-PARTY-NOTICES.txt must preserve the Bouncy Castle modified-Bzip2 Apache-2.0 notice.'
 }
 
 if ($coordinatorSource -notmatch 'SuspendAndExecuteAsync' -or

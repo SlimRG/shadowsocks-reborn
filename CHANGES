@@ -1,4 +1,9 @@
-﻿5.2.22.0 2026-08-21
+﻿2.2.31.0 2026-08-21
+- Added synchronized English/Russian/Simplified-Chinese README pages in the Wiki and corrected stale DNS documentation: current Administrator Mode implements transparent UDP/TCP 53 routing for System/Direct/Proxy/CustomDoh/DnsCrypt; the 5.0.0/5.1.0 limitation remains historical only.
+- Moved long-form Markdown documentation out of the application repository into the dedicated GitHub Wiki; functional .github issue/PR templates stay in the main repository, and embedded legal notices now use THIRD-PARTY-NOTICES.txt.
+- Added a current Simplified Chinese usage guide and language navigation in the Wiki, based on the classic Shadowsocks Windows Chinese guide structure but updated for Reborn 2.2.31.
+- Fixed duplicate Start-with-Windows launches by combining stale HKCU Run-entry cleanup with an executable-identity-independent process gate; legacy-only Run entries are migrated, disabling autostart removes stale entries too, and hidden startup activations no longer show an already-running dialog.
+- Disabled generated FodyWeavers.xsd IntelliSense schemas, removed stale generated copies and removed schemaLocation references from FodyWeavers.xml to stop recurring XSD/XML IDE/source-tree churn.
 - Fixed a false-positive release-validator regex around the updater download promotion; the real Windows stream-disposal contract remains covered by DownloadedAssetIsClosedBeforePromotion and has been manually verified in a 5.2.21 -> 5.2.22 update.
 - Fixed automatic update downloads on Windows: the .download stream is now disposed before File.Move promotion; SHA-256 sidecars accept both canonical sha256sum format and a plain 64-hex digest
 - Fixed DNSCrypt loopback-port allocation on Windows hosts with transport-specific dynamic/excluded port ranges by selecting UDP-first, verifying the same port over TCP, and using a dual-bind fallback below the default dynamic range.
@@ -6,16 +11,16 @@
 - Fixed the Phase 10 NetworkService version release-validator check after version response ownership moved from `Program.cs` to `NetworkServiceResponses.cs`; validation now also requires the versioned-ping regression test.
 - Fixed invalid multiline PowerShell boolean expressions in `Validate-DnsCrypt.ps1` that were caught by the release parser gate.
 - Fixed a release-validator PowerShell interpolation parser error and added a CI/release PowerShell parser gate for every `packaging/*.ps1` script.
-- Synchronized README/Wiki architecture, security, storage, WinUI and release-checklist documentation with the final 5.2.22 contracts
+- Synchronized README/Wiki architecture, security, storage, WinUI and release-checklist documentation with the final 2.2.31 contracts
 - Fixed the release validator to match the current selectable RichTextBlock Logs viewer instead of retired ListView implementation tokens
 - Fixed release-blocking SelfUpdater compile errors in UpdateChecker/SelfUpdater
 - Fixed DNSCrypt TOML regression test false-positive and completed resolver-filter localization across all shipped locales
-- Synchronized product, helper and WinUI version metadata for the 5.2.22 release
+- Synchronized product, helper and WinUI version metadata for the 2.2.31 release
 - Hardened release validation for updater, ss:// registration, Windows 10 19041 compatibility and one-file packaging
 - Pinned release builds to .NET SDK 10.0.303+ / runtime 10.0.11 security baseline and made NuGet audit unavailability and vulnerability findings release-blocking
 - Hardened updater handoff against staged-payload tampering across the UAC launch window and verify the published EXE FileVersion before packaging
 - Refreshed GitHub release defaults, release checklist and legal metadata
-- See docs/CHANGELOG.md for complete release notes
+- Full release notes: https://github.com/SlimRG/shadowsocks-reborn/wiki/Changelog
 
 5.2.21.0 2026-08-21
 - Fixed SOCKS5 forward-proxy authentication and fragmented/domain reply handling (RFC 1928/1929)
@@ -26,27 +31,27 @@
 - Prepared dnscrypt-proxy updates now verify the candidate version first, resolve an eligible server from its signed catalog, and health-check that concrete runtime before activation
 - Resolver country metadata is now derived only from endpoint IP GeoIP; text/city/Anycast heuristics are not used
 - Completed release documentation and localization validation
-- See docs/CHANGELOG.md for complete release notes
+- Full release notes: https://github.com/SlimRG/shadowsocks-reborn/wiki/Changelog
 
 5.2.0.0 2026-08-18
 - Added managed DNSCrypt Proxy with signed downloads, automatic updates and resolver selection
 - Added Admin Mode UDP/TCP DNS interception with fail-closed and Game Mode integration
 - Added final DNSCrypt lifecycle, Clean Mode, bootstrap-recursion and release hardening
 - Pinned WinDivert x64 payload hashes and added fragment-safe routing plus FLOW-layer PID attribution
-- See docs/CHANGELOG.md for complete release notes
+- Full release notes: https://github.com/SlimRG/shadowsocks-reborn/wiki/Changelog
 
 5.1.0.0 2026-08-18
 - Added managed SIP003 plugin catalog/install/update flow and manual ZIP/TAR.GZ import
 - Servers UI now shows Server Name above IP and selects installed plugins from a dropdown
 - Finalized LocalAppData/Clean Mode storage, localization, WinUI polish and release validation
-- See docs/CHANGELOG.md for complete release notes
+- Full release notes: https://github.com/SlimRG/shadowsocks-reborn/wiki/Changelog
 
 5.0.0.0 2026-08-15
 - Reborn fork: .NET 10 / Windows 10 19041+ / x64-only
 - Managed HTTP proxy replaces Privoxy; WinINet replaces sysproxy helpers
 - Admin Mode adds transparent TCP/UDP routing through WinDivert
 - Game Mode is automatic and temporarily disables WinDivert for configured applications
-- See docs/CHANGELOG.md for the complete Reborn release notes
+- Full release notes: https://github.com/SlimRG/shadowsocks-reborn/wiki/Changelog
 
 4.4.1.0 2022-02-08
 - Add plain/none ciphers

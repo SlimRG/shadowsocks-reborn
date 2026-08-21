@@ -2,7 +2,7 @@
 param(
     [Parameter()]
     [ValidateNotNullOrEmpty()]
-    [string]$Version = '5.2.22'
+    [string]$Version = '2.2.31'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,7 +19,7 @@ $testProject = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.
 
 $normalizedVersion = $Version.Trim() -replace '^[vV]', ''
 if ($normalizedVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
-    throw "Invalid release version '$Version'. Use a stable tag such as 5.2.22."
+    throw "Invalid release version '$Version'. Use a stable tag such as 2.2.31."
 }
 $baseVersion = $normalizedVersion
 $expectedFourPartVersion = [Version]("$normalizedVersion.0")
@@ -28,7 +28,7 @@ try {
     $requestedVersion = [Version]$baseVersion
 }
 catch {
-    throw "Invalid release version '$Version'. Expected a stable tag such as 5.2.22."
+    throw "Invalid release version '$Version'. Expected a stable tag such as 2.2.31."
 }
 
 $projectXml = [xml](Get-Content -LiteralPath $project -Raw)
@@ -101,11 +101,12 @@ foreach ($relativeManifestPath in $versionedManifests) {
     }
 }
 
-$changelogPath = Join-Path $repoRoot 'docs\CHANGELOG.md'
-$changelogText = Get-Content -LiteralPath $changelogPath -Raw
-$escapedReleaseVersion = [regex]::Escape($normalizedVersion)
-if ($changelogText -notmatch "(?m)^## \[$escapedReleaseVersion\] - \d{4}-\d{2}-\d{2}\s*$") {
-    throw "docs\CHANGELOG.md does not contain a dated release heading for $normalizedVersion."
+$changesPath = Join-Path $repoRoot 'CHANGES'
+$changesText = Get-Content -LiteralPath $changesPath -Raw
+$releaseFourPartVersion = $expectedFourPartVersion.ToString(4)
+$escapedReleaseFourPartVersion = [regex]::Escape($releaseFourPartVersion)
+if ($changesText -notmatch "(?m)^$escapedReleaseFourPartVersion \d{4}-\d{2}-\d{2}\s*$") {
+    throw "CHANGES does not contain a dated release heading for $releaseFourPartVersion."
 }
 
 

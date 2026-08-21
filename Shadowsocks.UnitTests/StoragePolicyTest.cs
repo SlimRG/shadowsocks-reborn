@@ -205,5 +205,15 @@ namespace Shadowsocks.UnitTests
             Assert.AreEqual(Path.GetFullPath(startup), resolved);
         }
 
+        [TestMethod]
+        public void StartupCommandMatcherRecognizesCanonicalAndLegacyRunEntries()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "Shadowsocks Tests", "Shadowsocks.exe");
+
+            Assert.IsTrue(AutoStartup.CommandTargetsExecutable($"\"{path}\" --start-hidden", path));
+            Assert.IsTrue(AutoStartup.CommandTargetsExecutable($"{path} --start-hidden", path));
+            Assert.IsFalse(AutoStartup.CommandTargetsExecutable($"\"{path}.other\" --start-hidden", path));
+        }
+
     }
 }

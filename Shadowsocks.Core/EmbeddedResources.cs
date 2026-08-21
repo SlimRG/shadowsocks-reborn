@@ -12,7 +12,7 @@ namespace Shadowsocks.Core
         public static string AppSettingsJson => ReadText("Shadowsocks.Core.appsettings.json", Encoding.UTF8);
         public static string UserRule => ReadText("Shadowsocks.Core.Data.user-rule.txt", Encoding.UTF8);
         public static string ProductLicense => ReadRequiredText("Shadowsocks.Core.LICENSE.txt", Encoding.UTF8);
-        public static string ThirdPartyNotices => ReadRequiredText("Shadowsocks.Core.THIRD-PARTY-NOTICES.md", Encoding.UTF8);
+        public static string ThirdPartyNotices => ReadRequiredText("Shadowsocks.Core.THIRD-PARTY-NOTICES.txt", Encoding.UTF8);
 
         private static string ReadText(string resourceName, Encoding encoding)
         {

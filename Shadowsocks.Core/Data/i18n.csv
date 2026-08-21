@@ -582,7 +582,6 @@ Latest version,Последняя версия,最新版本,最新版本,最新�
 Local port,Локальный порт,本地端口,本機連接埠,ローカルポート,로컬 포트,Port local
 Coverage,Охват,覆盖范围,涵蓋範圍,適用範囲,적용 범위,Couverture
 Not installed,Не установлен,未安装,未安裝,未インストール,설치되지 않음,Non installé
-Runtime ready; transparent DNS routing is pending NetworkService integration.,Runtime готов; прозрачная маршрутизация DNS ожидает интеграции с NetworkService.,运行时已就绪；透明 DNS 路由等待 NetworkService 集成。,執行階段已就緒；透明 DNS 路由等待 NetworkService 整合。,ランタイムは準備済みです。透過 DNS ルーティングは NetworkService 統合待ちです。,런타임이 준비되었습니다. 투명 DNS 라우팅은 NetworkService 통합 대기 중입니다.,Runtime prêt ; le routage DNS transparent attend l’intégration NetworkService.
 Full DNS interception requires Administrator Mode.,Полный перехват DNS требует режима администратора.,完整 DNS 拦截需要管理员模式。,完整 DNS 攔截需要系統管理員模式。,完全な DNS インターセプトには管理者モードが必要です。,전체 DNS 가로채기에는 관리자 모드가 필요합니다.,L’interception DNS complète nécessite le mode administrateur.
 System DNS is unchanged.,Системный DNS не изменён.,系统 DNS 未更改。,系統 DNS 未變更。,システム DNS は変更されていません。,시스템 DNS는 변경되지 않았습니다.,Le DNS système reste inchangé.
 Transparent DNS interception is active for captured applications.,Прозрачный перехват DNS активен для перехваченных приложений.,已对捕获的应用启用透明 DNS 拦截。,已對擷取的應用程式啟用透明 DNS 攔截。,キャプチャ対象アプリケーションで透過 DNS インターセプトが有効です。,캡처된 애플리케이션에 투명 DNS 가로채기가 활성화되었습니다.,L’interception DNS transparente est active pour les applications capturées.

@@ -10,6 +10,7 @@ using Shadowsocks.Core;
 using AppRuntimeEnvironment = Shadowsocks.Core.RuntimeEnvironment;
 using Shadowsocks.Core.Storage;
 using Shadowsocks.Util;
+using Shadowsocks.Windows.Shell;
 
 namespace Shadowsocks.Controller
 {
@@ -48,10 +49,15 @@ namespace Shadowsocks.Controller
                     }
 
                     runKey.SetValue(Key, BuildStartupCommand(arguments));
+                    RemoveDuplicateStartupEntries(runKey);
                 }
                 else
                 {
                     runKey.DeleteValue(Key, throwOnMissingValue: false);
+                    // Disabling Start with Windows must also remove legacy Shadowsocks
+                    // Run values. Otherwise an obsolete key can continue launching a
+                    // second process even though the current UI reports autostart off.
+                    RemoveDuplicateStartupEntries(runKey);
                     TryDeleteUnusedStartupCopy();
                 }
 
@@ -90,7 +96,28 @@ namespace Shadowsocks.Controller
                 string command = runKey.GetValue(Key)?.ToString();
                 if (!IsStartupExecutableCommand(command))
                 {
-                    return false;
+                    string primaryExecutable = GetPrimaryExecutablePath();
+                    string currentExecutable = AppRuntimeEnvironment.ExecutablePath;
+                    bool canonicalTargetsProduct = CommandTargetsExecutable(command, primaryExecutable)
+                        || CommandTargetsExecutable(command, currentExecutable);
+                    bool legacyTargetsProduct = HasLegacyStartupEntry(
+                        runKey,
+                        AppStoragePaths.StartupExecutableFile,
+                        primaryExecutable,
+                        currentExecutable);
+                    if (!canonicalTargetsProduct && !legacyTargetsProduct)
+                    {
+                        return false;
+                    }
+
+                    if (!EnsureStartupExecutable())
+                    {
+                        return false;
+                    }
+
+                    command = BuildStartupCommand(StartupArguments);
+                    runKey.SetValue(Key, command);
+                    Logger.Info("Migrated legacy Start with Windows command to the stable LocalAppData startup executable.");
                 }
 
                 // A user may update Shadowsocks from a USB drive/download folder while autostart
@@ -110,6 +137,7 @@ namespace Shadowsocks.Controller
                 {
                     runKey.SetValue(Key, canonical);
                 }
+                RemoveDuplicateStartupEntries(runKey);
                 return true;
             }
             catch (Exception exception)
@@ -276,6 +304,82 @@ namespace Shadowsocks.Controller
                 }
             }
             return null;
+        }
+
+        private static bool HasLegacyStartupEntry(RegistryKey runKey, params string[] executablePaths)
+        {
+            foreach (string valueName in runKey.GetValueNames())
+            {
+                if (valueName.Equals(Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string command = runKey.GetValue(valueName)?.ToString();
+                if (executablePaths.Any(path => CommandTargetsExecutable(command, path)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void RemoveDuplicateStartupEntries(RegistryKey runKey)
+        {
+            string startupExecutable = AppStoragePaths.StartupExecutableFile;
+            string primaryExecutable = GetPrimaryExecutablePath();
+            string currentExecutable = AppRuntimeEnvironment.ExecutablePath;
+
+            foreach (string valueName in runKey.GetValueNames())
+            {
+                if (valueName.Equals(Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string command = runKey.GetValue(valueName)?.ToString();
+                if (CommandTargetsExecutable(command, startupExecutable)
+                    || CommandTargetsExecutable(command, primaryExecutable)
+                    || CommandTargetsExecutable(command, currentExecutable))
+                {
+                    runKey.DeleteValue(valueName, throwOnMissingValue: false);
+                    Logger.Info("Removed duplicate Start with Windows registry entry '{0}'.", valueName);
+                }
+            }
+        }
+
+        internal static bool CommandTargetsExecutable(string command, string executablePath)
+        {
+            if (string.IsNullOrWhiteSpace(command) || string.IsNullOrWhiteSpace(executablePath))
+            {
+                return false;
+            }
+
+            string target;
+            try
+            {
+                target = Path.GetFullPath(executablePath);
+            }
+            catch
+            {
+                return false;
+            }
+
+            string[] parsed = WindowsCommandLine.ParseArguments(command);
+            if (parsed.Length > 0 && PathsEqual(parsed[0], target))
+            {
+                return true;
+            }
+
+            // Older Shadowsocks versions could persist an unquoted executable path.
+            // Preserve compatibility long enough to remove that stale Run entry.
+            string trimmed = command.Trim();
+            string quotedTarget = $"\"{target}\"";
+            return trimmed.Equals(target, StringComparison.OrdinalIgnoreCase)
+                || trimmed.Equals(quotedTarget, StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(quotedTarget + " ", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(target + " ", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsStartupExecutableCommand(string command)
