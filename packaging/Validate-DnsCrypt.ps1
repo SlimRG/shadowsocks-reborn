@@ -169,14 +169,14 @@ foreach ($forbiddenCountryInferenceToken in @(
     'InferCountryFromText',
     'KnownLocationCountries',
     'HasCountryHint')) {
-    if ($dnsCryptControllerSource -match [regex]::Escape($forbiddenCountryInferenceToken)
-        -or $dnsCryptCountrySelectorSource -match [regex]::Escape($forbiddenCountryInferenceToken)
-        -or $ipCountrySource -match [regex]::Escape($forbiddenCountryInferenceToken)) {
+    if ($dnsCryptControllerSource -match [regex]::Escape($forbiddenCountryInferenceToken) -or
+        $dnsCryptCountrySelectorSource -match [regex]::Escape($forbiddenCountryInferenceToken) -or
+        $ipCountrySource -match [regex]::Escape($forbiddenCountryInferenceToken)) {
         throw "DNSCrypt resolver country selection must not infer geography from resolver text: $forbiddenCountryInferenceToken"
     }
 }
-if ($dnsCryptControllerSource -match 'CountryName\s*=\s*"Anycast"'
-    -or $dnsPageSource -match 'CountryName\s*==\s*"Anycast"') {
+if ($dnsCryptControllerSource -match 'CountryName\s*=\s*"Anycast"' -or
+    $dnsPageSource -match 'CountryName\s*==\s*"Anycast"') {
     throw 'Anycast must not be represented as a pseudo-country in DNSCrypt resolver metadata.'
 }
 if ($dnsCryptTomlSource -notmatch 'doh_servers = true' -or $dnsCryptTomlSource -notmatch 'odoh_servers = false') {

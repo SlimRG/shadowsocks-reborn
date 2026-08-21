@@ -6,6 +6,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [5.2.22] - 2026-08-21
 
+- Fixed invalid multiline PowerShell boolean expressions in `Validate-DnsCrypt.ps1`; the release parser gate now passes this DNSCrypt validation block instead of stopping before repository validation.
 - Fixed a release-validator PowerShell interpolation parser error and added a CI/release PowerShell parser gate for every `packaging/*.ps1` script.
 - Synchronized the living Markdown documentation with the final 5.2.22 implementation: updater integrity/UAC handoff, release security gates, current selectable `RichTextBlock` Logs contract, storage architecture and release verification are now documented consistently.
 - Fixed the release validator after the Logs viewer migration from `ListView` to selectable `RichTextBlock`: validation now enforces `IsTextSelectionEnabled = true` instead of the retired `ListViewSelectionMode.None` implementation token.
