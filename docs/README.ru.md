@@ -1,6 +1,6 @@
 ﻿# shadowsocks-reborn для Windows
 
-<img src="docs/assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
+<img src="assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
 
 [English](README.md) | **Русский**
 
@@ -39,7 +39,7 @@
 
 - Windows 10 2004 / build 19041 или новее, либо Windows 11;
 - x64 Windows;
-- .NET 10 SDK нужен только для сборки из исходников.
+- .NET 10 SDK 10.0.303 или новее нужен только для сборки из исходников (release build требует security baseline .NET 10.0.11).
 
 Опубликованный продукт self-contained и не требует отдельно установленного .NET runtime.
 
@@ -56,7 +56,7 @@
 
 ## Сборка
 
-Нужен .NET 10 SDK под Windows:
+Нужен .NET SDK 10.0.303 или новее под Windows:
 
 ```powershell
 dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
@@ -74,8 +74,10 @@ dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platfo
 Либо release ZIP + SHA-256:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.1.0
+.\packaging\Build-Release.ps1 -Version 5.2.22
 ```
+
+Каноническое имя GitHub Release asset: `Shadowsocks-win-x64.zip` (рядом публикуется `Shadowsocks-win-x64.zip.sha256`).
 
 Финальный publish directory и release ZIP должны содержать ровно:
 
@@ -97,11 +99,15 @@ DLL, PDB, runtime JSON, ICO и отдельный `Shadowsocks.NetworkService.ex
 
 В Settings показывается активный путь хранилища и одна кнопка **Открыть**, которая открывает этот каталог как в обычном режиме, так и в Clean Mode.
 
-Если имя EXE заканчивается на `p` перед `.exe`, например `Shadowsocksp.exe` или `Shadowsocks-5.0p.exe`, включается **Clean Mode**. В нём настройки, кэши, PAC, логи, установленные плагины, runtime, helper и update/working-файлы пишутся в уникальный `%TEMP%\Shadowsocks\Clean\...` сеанс и удаляются best-effort при Quit. Автозагрузка в Clean Mode недоступна.
+Если имя EXE заканчивается на `p` перед `.exe`, например `Shadowsocksp.exe` или `Shadowsocks-5.0p.exe`, включается **Clean Mode**. В нём настройки, кэши, PAC, логи, установленные плагины, runtime, helper и component-update/working-файлы пишутся в уникальный `%TEMP%\Shadowsocks\Clean\...` сеанс и удаляются best-effort при Quit. Автозагрузка в Clean Mode недоступна.
 
 В обычном режиме Start with Windows копирует проверенный EXE в `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; Windows Run integration указывает только на эту стабильную копию.
 
 Полная схема — в [STORAGE_POLICY.md](STORAGE_POLICY.md).
+
+## Обновление приложения
+
+Обновление приложения по умолчанию автоматическое. После запуска клиент проверяет GitHub Releases, выбирает подходящую более новую версию, требует точные `Shadowsocks-win-x64.zip` и `.sha256`, проверяет SHA-256, структуру ZIP и версию EXE, затем размещает новый single-file EXE в `%TEMP%\Shadowsocks\Updates`. Новый временный EXE запускается с внутренней командой `--update`, ждёт завершения текущего процесса, с rollback-защитой заменяет основной EXE и запускает уже установленную новую копию. Установленная новая копия удаляет временный updater и transaction. Если приложение было запущено из копии автозагрузки в LocalAppData, обновляется записанный основной EXE, а не только startup-copy.
 
 ## Embedded NetworkService
 
@@ -133,18 +139,18 @@ Local PAC использует заданные GeoSite sources и persistent ca
 
 `ManagedHttpProxyService` поддерживает HTTP/1.1 и HTTPS `CONNECT`. HTTPS идёт как byte tunnel, поэтому HTTP/2 внутри TLS не требует отдельного HTTP/2 parser в локальном proxy. FTP gateway не реализован.
 
-В configuration contract есть DNS policy `System`, `Direct`, `Proxy`, `CustomDoh`, но transparent DNS interception/routing в 5.1.0 пока не реализован.
+Страница DNS управляет опциональным подписанным компонентом `dnscrypt-proxy`. В режиме `Automatic` приложение выбирает конкретный DNSCrypt/DoH-резолвер из подписанного публичного каталога с учётом настроек DNSSEC, no-log, отсутствия фильтрации и IPv4/IPv6, после чего фиксирует выбранный набор в `server_names`; активный runtime поэтому работает с `bootstrap_resolvers = []` и не откатывается на plaintext системный DNS. В режиме `Manual` доступны подписанные DNSCrypt- и DoH-резолверы с отдельным фильтром по протоколу; явное обновление каталога может однократно использовать bootstrap DNS только до появления подписанного кэша, но активный DNS runtime всегда генерируется с `bootstrap_resolvers = []` и `ignore_system_dns = true`. На странице DNS есть `Test DNSCrypt` для health-check локального listener и отдельная самопроверка конфиденциальности DNS, которая проверяет Admin interception, fail-closed/system-DNS isolation, upstream/transport и bootstrap-конфигурацию активного runtime. Начиная с 5.2.0, Admin Mode прозрачно перехватывает UDP/TCP порт 53 через WinDivert и передаёт запросы в динамический локальный listener DNSCrypt. Изменения PID/порта DNSCrypt применяются во время работы, Game Mode приостанавливает системный перехват, а DNSCrypt всегда работает fail-closed: plaintext DNS блокируется во время запуска, перезапуска, восстановления или сбоя runtime вместо скрытого отката на системный DNS. WinDivert 2.2.2 скачивается только с закреплённого официального release URL, а извлечённые x64 DLL/драйвер обязаны совпасть с закреплёнными SHA-256 до загрузки. Read-only FLOW observer WinDivert даёт NETWORK-маршрутизатору PID владельца endpoint; IP Helper остаётся fallback для существовавших ранее или неоднозначных flow. Фрагментированные datagram, которым потребовался бы transparent DNS/proxy rewrite, отбрасываются целиком, поэтому последующие фрагменты не могут обойти policy; direct-фрагменты остаются direct. `Direct`, `Proxy` и `CustomDoh` доступны как рабочие DNS-policy: Direct может сохранять исходный DNS destination либо прозрачно перенаправлять перехваченный UDP/TCP DNS на основной/резервный IPv4/IPv6-резолвер и при необходимости отправлять выбранные DNS endpoint через локальный SOCKS5 Shadowsocks; Proxy отправляет DNS через Shadowsocks, а Custom DoH передаёт DNS wire messages на заданный HTTPS endpoint со своей независимой опцией маршрутизации через Shadowsocks. В Automatic DNSCrypt сначала предпочитается совместимый резолвер в стране активного Shadowsocks-сервера, а при отсутствии совпадения выбирается лучший совместимый резолвер каталога. Страна резолвера определяется только через GeoIP по фактическому IP его endpoint: имя, город и description не используются как географические подсказки. Anycast не считается страной и не угадывается по текстовому описанию. В Manual можно выбирать DNSCrypt или DoH из подписанного каталога, а ODoH остаётся отключён. В ручном выборе доступны фильтры по протоколу, стране, семейству адресов, DNSSEC, no-log и отсутствию фильтрации; задержка резолверов измеряется асинхронно, а для активного резолвера при наличии используется фактический RTT dnscrypt-proxy. DNSCrypt также работает в User Mode для разрешения имён, которыми управляет Shadowsocks; прозрачный системный перехват DNS по-прежнему требует Administrator Mode. Прозрачный перехват охватывает классический DNS по UDP/TCP порту 53; внутренний DoH/DoT/DoQ приложений универсально не перехватывается. Автоматическая проверка обновлений компонента хранит время последней попытки и выполняется не чаще одного раза в 24 часа, включая восстановление после сильного сдвига системных часов; первичная установка всегда запускается пользователем вручную. При маршрутизации самого DNSCrypt через Shadowsocks адреса Shadowsocks-серверов и forward proxy должны быть IP-адресами, чтобы исключить рекурсивный DNS bootstrap.
 
 ## Документация
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — архитектура проектов и runtime flow.
-- [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp и migration.
+- [STORAGE_POLICY.md](STORAGE_POLICY.md) — правила LocalAppData, Clean Mode, staging компонентов и self-update приложения.
 - [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — актуальные правила WinUI.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — правила разработки.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — проверки перед релизом.
 - [SECURITY.md](SECURITY.md) — security reporting и чувствительные компоненты.
-- [CHANGELOG.md](CHANGELOG.md) — изменения fork; история upstream остаётся в `CHANGES`.
+- [CHANGELOG.md](CHANGELOG.md) — изменения fork; история upstream остаётся в [`CHANGES`](https://github.com/SlimRG/shadowsocks-reborn/blob/main/CHANGES).
 
 ## Лицензия
 
-`shadowsocks-reborn` распространяется по [GNU General Public License v3.0](LICENSE.txt). Сторонние компоненты сохраняют свои лицензии.
+`shadowsocks-reborn` распространяется по **GPL-3.0-or-later**. См. [страницу лицензии](LICENSE.md) и юридически значимый [LICENSE.txt](https://github.com/SlimRG/shadowsocks-reborn/blob/main/LICENSE.txt). Сторонние компоненты сохраняют собственные лицензии; см. [уведомления сторонних компонентов](THIRD-PARTY-NOTICES.md).

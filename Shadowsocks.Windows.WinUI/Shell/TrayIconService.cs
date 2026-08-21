@@ -30,11 +30,22 @@ public enum TrayTrafficMode
     Admin,
 }
 
+public enum TrayDnsMode
+{
+    System,
+    Direct,
+    Proxy,
+    CustomDoh,
+    DnsCrypt,
+}
+
 public enum TrayCommandKind
 {
     OpenOverview,
     OpenServers,
+    OpenPlugins,
     OpenTraffic,
+    OpenDns,
     OpenSharing,
     OpenPac,
     OpenForwardProxy,
@@ -47,6 +58,11 @@ public enum TrayCommandKind
     SetSystemProxyGlobal,
     SetTrafficUser,
     SetTrafficAdmin,
+    SetDnsSystem,
+    SetDnsDirect,
+    SetDnsProxy,
+    SetDnsDnsCrypt,
+    CheckDnsCryptUpdate,
     SelectServer,
     SelectStrategy,
     UseLocalPac,
@@ -73,6 +89,10 @@ public sealed record TrayMenuState(
     TraySystemProxyMode SystemProxyMode,
     TrayTrafficMode TrafficMode,
     string TrafficStatusText,
+    TrayDnsMode DnsMode,
+    string DnsStatusText,
+    bool DnsCryptInstalled,
+    bool DnsCryptUpdateAvailable,
     IReadOnlyList<TrayStrategyMenuItem> Strategies,
     IReadOnlyList<TrayServerMenuItem> Servers,
     bool UseOnlinePac,
@@ -204,6 +224,8 @@ public sealed class TrayIconService : IDisposable
         flyout.Items.Add(BuildSystemProxyMenu(state));
         flyout.Items.Add(BuildTrafficMenu(state));
         flyout.Items.Add(BuildServersMenu(state));
+        flyout.Items.Add(CreateItem("Plugins", TrayCommandKind.OpenPlugins));
+        flyout.Items.Add(BuildDnsMenu(state));
         flyout.Items.Add(BuildPacMenu(state));
         flyout.Items.Add(new MenuFlyoutSeparator());
         flyout.Items.Add(CreateItem("Forward Proxy", TrayCommandKind.OpenForwardProxy));
@@ -285,9 +307,36 @@ public sealed class TrayIconService : IDisposable
         return menu;
     }
 
+    private MenuFlyoutSubItem BuildDnsMenu(TrayMenuState state)
+    {
+        var menu = new MenuFlyoutSubItem { Text = L("DNS") };
+        menu.Items.Add(CreateToggleItem("System DNS", state.DnsMode == TrayDnsMode.System, TrayCommandKind.SetDnsSystem));
+        menu.Items.Add(CreateToggleItem("Direct DNS", state.DnsMode == TrayDnsMode.Direct, TrayCommandKind.SetDnsDirect));
+        menu.Items.Add(CreateToggleItem("DNS through Shadowsocks", state.DnsMode == TrayDnsMode.Proxy, TrayCommandKind.SetDnsProxy));
+        menu.Items.Add(CreateToggleItem("Custom DoH", state.DnsMode == TrayDnsMode.CustomDoh, TrayCommandKind.OpenDns));
+        menu.Items.Add(CreateToggleItem("DNSCrypt", state.DnsMode == TrayDnsMode.DnsCrypt, TrayCommandKind.SetDnsDnsCrypt));
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(new MenuFlyoutItem { Text = state.DnsStatusText, IsEnabled = false });
+        if (state.DnsCryptInstalled)
+        {
+            MenuFlyoutItem updateItem = CreateItem("Check DNSCrypt Update", TrayCommandKind.CheckDnsCryptUpdate);
+            if (state.DnsCryptUpdateAvailable)
+            {
+                updateItem.Icon = new FontIcon
+                {
+                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+                    Glyph = "\uE896",
+                };
+            }
+            menu.Items.Add(updateItem);
+        }
+        menu.Items.Add(CreateItem("DNS Settings", TrayCommandKind.OpenDns));
+        return menu;
+    }
+
     private MenuFlyoutSubItem BuildPacMenu(TrayMenuState state)
     {
-        // Match the legacy MenuViewController PAC state matrix exactly.
+        // Keep PAC menu actions consistent with the current Local/Online PAC state.
         bool localPac = !state.UseOnlinePac;
 
         var menu = new MenuFlyoutSubItem { Text = L("PAC") };

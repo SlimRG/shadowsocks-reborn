@@ -17,7 +17,7 @@ dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:P
 For deployment/storage changes, also run:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.1.0
+.\packaging\Build-Release.ps1 -Version 5.2.22
 ```
 
 ## Architecture rules
@@ -42,7 +42,7 @@ Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 - Managed SIP003 packages belong under `Plugins\<plugin-id>` in that active root. Manual plugin import accepts ZIP and TAR.GZ packages and must keep path-traversal rejection covered by tests for both formats.
 - Start with Windows uses `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe` in normal mode and must remain unavailable in Clean Mode.
 - Product code must not write configuration, PAC/cache/log/helper/localization files beside the release EXE.
-- Executable-directory reads are only for legacy migration or explicit development compatibility.
+- Do not add executable-side compatibility/migration reads. Product state and managed components come only from the current storage/services contracts.
 
 ## WinUI and localization
 
@@ -51,7 +51,7 @@ Follow [STORAGE_POLICY.md](STORAGE_POLICY.md).
 - User-visible strings use `ILocalizationService` / the CSV localization path.
 - Keep stable enum/configuration values separate from localized display text.
 - Preserve the seven-column localization schema: `en,ru-RU,zh-CN,zh-TW,ja,ko,fr`.
-- New user-visible keys require at least English and Russian text; other missing translations may fall back to English.
+- New user-visible keys require English plus complete `ru-RU`, `zh-CN`, `zh-TW`, `ja`, `ko` and `fr` translations; release validation rejects missing translated cells.
 
 ## Product publish
 
@@ -70,7 +70,7 @@ Changes to networking, storage, startup, Admin capture or deployment should stat
 
 - user-visible behavior changed;
 - User/Admin/Game Mode paths tested;
-- configuration migration/rollback impact;
+- settings schema/rollback impact;
 - LocalAppData/Clean-Mode/Temp path impact;
 - exact build/test/publish commands used;
 - known limitations or follow-up work.

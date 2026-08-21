@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
 using Newtonsoft.Json;
@@ -33,8 +32,8 @@ namespace Shadowsocks.Model
         public bool shareOverLan;
         public bool firstRun;
         public int localPort;
-        public bool portableMode;
         public bool showPluginOutput;
+        public bool showDnsLogs;
         public string pacUrl;
 
         public bool useOnlinePac;
@@ -48,15 +47,10 @@ namespace Shadowsocks.Model
 
         // hidden options
         public bool isIPv6Enabled; // for experimental ipv6 support
-        public bool generateLegacyUrl; // for pre-sip002 url compatibility
         // GeoSite sources are used only by Local PAC. Every source is cached independently
         // and all successfully loaded databases are merged. The checksum URL is derived as
         // <source>.sha256sum; checksum absence is non-fatal.
         public List<string> geositeUrls;
-
-        // Legacy single-source settings kept only for gui-config.json migration.
-        public string geositeUrl;
-        public string geositeSha256sumUrl;
 
         public List<string> geositeDirectGroups;  // groups of domains that we connect without the proxy
         public List<string> geositeProxiedGroups; // groups of domains that we connect via the proxy
@@ -88,8 +82,8 @@ namespace Shadowsocks.Model
             shareOverLan = false;
             firstRun = true;
             localPort = 1080;
-            portableMode = false;
             showPluginOutput = false;
+            showDnsLogs = false;
             pacUrl = "";
             useOnlinePac = false;
             secureLocalPac = true;
@@ -102,13 +96,10 @@ namespace Shadowsocks.Model
 
             // hidden options
             isIPv6Enabled = false;
-            generateLegacyUrl = false;
             geositeUrls = new List<string>()
             {
                 GeositeUpdater.DefaultSourceUrl,
             };
-            geositeUrl = "";
-            geositeSha256sumUrl = "";
             geositeDirectGroups = new List<string>()
             {
                 "private",
@@ -120,7 +111,7 @@ namespace Shadowsocks.Model
                 "geolocation-!cn",
             };
             geositePreferDirect = false;
-            userAgent = "ShadowsocksWindows/$version";
+            userAgent = "Shadowsocks-Reborn/$version";
 
             logViewer = new LogViewerConfig();
             proxy = new ForwardProxyConfig();
@@ -144,11 +135,7 @@ namespace Shadowsocks.Model
         public const string SettingsBackupValueName = "ConfigurationBackup";
         public const string SettingsSchemaVersionName = "SchemaVersion";
         public const int SettingsSchemaVersion = 1;
-        private const string LEGACY_CONFIG_FILE = "gui-config.json";
         private static ISettingsStore settingsStore;
-
-        [JsonIgnore]
-        public static string LegacyConfigFilePath => Path.Combine(Shadowsocks.Core.RuntimeEnvironment.WorkingDirectory, LEGACY_CONFIG_FILE);
 
         public static void ConfigureSettingsStore(ISettingsStore store)
         {
@@ -274,15 +261,29 @@ namespace Shadowsocks.Model
             config.onlineConfigSource ??= new List<string>();
             NormalizeGeositeSources(config);
             config.applicationRules ??= new List<ApplicationRouteRule>();
+            config.logViewer ??= new LogViewerConfig();
+            config.proxy ??= new ForwardProxyConfig();
+            config.hotkey ??= new HotkeyConfig();
+            config.userAgent ??= "Shadowsocks-Reborn/$version";
+            config.version ??= "0.0.0.0";
             config.dnsPolicy ??= new DnsPolicyConfig();
+            config.dnsPolicy.dnsCrypt ??= new DnsCryptConfig();
+            config.dnsPolicy.dnsCrypt.serverNames ??= new List<string>();
+            // DNSCrypt is a secure-DNS mode: never retain a fail-open setting.
+            // A plaintext system-DNS fallback would defeat the security contract and can
+            // leak queries while the runtime is starting, restarting, or recovering.
+            config.dnsPolicy.dnsCrypt.failClosed = true;
+            if (config.dnsPolicy.dnsCrypt.automaticResolvers)
+                config.dnsPolicy.dnsCrypt.serverNames.Clear();
             config.gameModeApplications ??= new List<string>();
             config.uiTheme = NormalizeUiThemePreference(config.uiTheme);
-            // Kept only for deserializing old gui-config.json files. Storage is no longer portable.
-            config.portableMode = false;
-
-            // Mark the first run of a new version.
+            // Mark the first run of a newer product version. Malformed/missing version
+            // metadata must never prevent the application from starting.
             var appVersion = new Version(ApplicationInfo.Version);
-            var configVersion = new Version(config.version);
+            if (!Version.TryParse(config.version, out Version configVersion))
+            {
+                configVersion = new Version(0, 0, 0, 0);
+            }
             if (appVersion.CompareTo(configVersion) > 0)
             {
                 config.firstRunOnNewVersion = true;
@@ -290,20 +291,6 @@ namespace Shadowsocks.Model
             // Add an empty server configuration
             if (config.configs.Count == 0)
                 config.configs.Add(GetDefaultServer());
-
-            // XChaCha20-Poly1305 depended on the removed native libsodium backend.
-            // Keep old gui-config.json files loadable, but the remote server must also
-            // be changed to the replacement method before the connection can succeed.
-            foreach (Server server in config.configs)
-            {
-                if (string.Equals(server.method, "xchacha20-ietf-poly1305", StringComparison.OrdinalIgnoreCase))
-                {
-                    logger.Warn(
-                        $"Encryption method 'xchacha20-ietf-poly1305' is no longer supported for {server.server}:{server.server_port}; " +
-                        $"using '{Server.DefaultMethod}' locally. The remote server must use the same method.");
-                    server.method = Server.DefaultMethod;
-                }
-            }
 
             EnsureServerNames(config.configs);
 
@@ -429,17 +416,7 @@ namespace Shadowsocks.Model
             if (config == null)
                 return;
 
-            var sources = config.geositeUrls ?? new List<string>();
-
-            // fix28 and older supported one custom URL that replaced the built-in source.
-            // Preserve that behavior during migration rather than silently adding v2fly as
-            // a second database. Checksum URLs are now discovered automatically.
-            if (!string.IsNullOrWhiteSpace(config.geositeUrl))
-                sources = new List<string> { config.geositeUrl };
-
-            config.geositeUrls = NormalizeGeositeSourceList(sources);
-            config.geositeUrl = "";
-            config.geositeSha256sumUrl = "";
+            config.geositeUrls = NormalizeGeositeSourceList(config.geositeUrls ?? new List<string>());
         }
 
         /// <summary>
@@ -482,7 +459,7 @@ namespace Shadowsocks.Model
 
         public static void ResetUserAgent(Configuration config)
         {
-            config.userAgent = "ShadowsocksWindows/$version";
+            config.userAgent = "Shadowsocks-Reborn/$version";
             config.userAgentString = config.userAgent.Replace("$version", config.version);
         }
 

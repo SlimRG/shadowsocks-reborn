@@ -13,6 +13,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Localization;
 using Windows.ApplicationModel.Activation;
 
@@ -28,7 +29,15 @@ internal static partial class Program
     [STAThread]
     public static int Main()
     {
-        InitializeProcessEnvironment();
+        string[] rawArguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (SelfUpdater.TryRunUpdaterMode(rawArguments, out int updaterExitCode))
+        {
+            return updaterExitCode;
+        }
+
+        SelfUpdater.CleanupCompletedUpdate(rawArguments);
+        string[] applicationArguments = SelfUpdater.RemoveInternalArguments(rawArguments);
+        InitializeProcessEnvironment(applicationArguments);
         _localization = CsvLocalizationService.CreateDefault();
         I18N.Configure(_localization);
 
@@ -64,13 +73,12 @@ internal static partial class Program
         return 0;
     }
 
-    private static void InitializeProcessEnvironment()
+    private static void InitializeProcessEnvironment(string[] commandLineArguments)
     {
         string executablePath = Environment.ProcessPath
             ?? Process.GetCurrentProcess().MainModule?.FileName
             ?? Path.Combine(AppContext.BaseDirectory, "Shadowsocks.exe");
         string workingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory;
-        string[] commandLineArguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
 
         AppRuntimeEnvironment.Initialize(executablePath, workingDirectory, commandLineArguments);
         AppStoragePaths.Initialize(executablePath);

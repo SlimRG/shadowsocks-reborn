@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <Version>5.1.0</Version>
+    <Version>5.2.22</Version>
     <Authors>Shadowsocks community</Authors>
     <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageReference Include="Caseless.Fody" Version="1.9.1" PrivateAssets="all" />
     <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

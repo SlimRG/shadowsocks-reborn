@@ -33,6 +33,8 @@ namespace Shadowsocks.Controller.Traffic
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly SemaphoreSlim _gate = new(1, 1);
         private readonly WinDivertInstaller _installer = new();
+        private readonly CancellationTokenSource _healthShutdown = new();
+        private readonly Task _healthLoop;
 
         private Process _brokerProcess;
         private NetworkServiceRuntime.HelperLease _helperLease;
@@ -44,19 +46,29 @@ namespace Shadowsocks.Controller.Traffic
         private bool _gameMode;
         private int _tcpRedirectPort;
         private int _udpRedirectPort;
+        private bool _dnsInterceptionActive;
+        private bool _dnsFailClosedActive;
         private bool _disposed;
+
+        public AdminCaptureManager()
+        {
+            _healthLoop = Task.Run(() => HealthLoopAsync(_healthShutdown.Token));
+        }
 
         public bool IsBrokerRunning => _brokerProcess is { HasExited: false } && _pipe is { IsConnected: true };
         public bool IsCaptureActive => _captureActive && IsBrokerRunning;
         public bool IsGameMode => _gameMode;
         public int TcpRedirectPort => IsCaptureActive ? _tcpRedirectPort : 0;
         public int UdpRedirectPort => IsCaptureActive ? _udpRedirectPort : 0;
+        public bool DnsInterceptionActive => IsCaptureActive && _dnsInterceptionActive;
+        public bool DnsFailClosedActive => IsCaptureActive && _dnsFailClosedActive;
 
         public event EventHandler StatusChanged;
 
         public async Task StartOrUpdateAsync(
             Configuration configuration,
             IEnumerable<int> excludedProcessIds,
+            DnsCaptureRuntimeState dnsRuntime,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(configuration);
@@ -69,7 +81,7 @@ namespace Shadowsocks.Controller.Traffic
                 string winDivertDirectory = await _installer
                     .EnsureInstalledAsync(configuration, cancellationToken)
                     .ConfigureAwait(false);
-                _lastStartRequest = BuildStartRequest(configuration, winDivertDirectory, excludedProcessIds);
+                _lastStartRequest = BuildStartRequest(configuration, winDivertDirectory, excludedProcessIds, dnsRuntime);
 
                 await EnsureBrokerAsync(cancellationToken).ConfigureAwait(false);
                 if (_gameMode)
@@ -77,7 +89,7 @@ namespace Shadowsocks.Controller.Traffic
                     // The configuration is remembered by the broker, but no driver/capture
                     // process is started until Game Mode ends.
                     JObject gameModeResponse = await SendRawAsync(
-                        BuildControlRequest("restart", configuration, winDivertDirectory, excludedProcessIds),
+                        BuildControlRequest("restart", configuration, winDivertDirectory, excludedProcessIds, dnsRuntime),
                         cancellationToken).ConfigureAwait(false);
                     EnsureSuccess(gameModeResponse, "Unable to update Admin Mode while Game Mode is active.");
                     _captureActive = false;
@@ -91,9 +103,10 @@ namespace Shadowsocks.Controller.Traffic
                     JObject response = await SendRawAsync(
                         command == "start"
                             ? _lastStartRequest
-                            : BuildControlRequest("restart", configuration, winDivertDirectory, excludedProcessIds),
+                            : BuildControlRequest("restart", configuration, winDivertDirectory, excludedProcessIds, dnsRuntime),
                         cancellationToken).ConfigureAwait(false);
                     EnsureSuccess(response, "Unable to activate Admin Mode.");
+                    EnsureCaptureActive(response, "WinDivert capture child did not become active.");
                     UpdateRedirectPorts(response);
                     LogCaptureConfirmed(response, command);
                     _captureActive = true;
@@ -153,6 +166,7 @@ namespace Shadowsocks.Controller.Traffic
 
                 JObject response = await SendCommandAsync("game-off", cancellationToken).ConfigureAwait(false);
                 EnsureSuccess(response, "Unable to restore Admin Mode after Game Mode.");
+                EnsureCaptureActive(response, "WinDivert capture child did not become active after Game Mode.");
                 UpdateRedirectPorts(response);
                 LogCaptureConfirmed(response, "game-off");
                 _gameMode = false;
@@ -317,6 +331,91 @@ namespace Shadowsocks.Controller.Traffic
             }
         }
 
+        private async Task HealthLoopAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                    await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                try
+                {
+                    if (_disposed || _gameMode)
+                    {
+                        continue;
+                    }
+
+                    if (!IsBrokerRunning)
+                    {
+                        if (_captureActive)
+                        {
+                            _captureActive = false;
+                            ClearRedirectPorts();
+                            RaiseStatusChanged();
+                        }
+                        continue;
+                    }
+
+                    if (!_captureActive && string.IsNullOrWhiteSpace(_lastStartRequest))
+                    {
+                        continue;
+                    }
+
+                    bool wasActive = _captureActive;
+                    int oldTcpPort = _tcpRedirectPort;
+                    int oldUdpPort = _udpRedirectPort;
+                    bool oldDnsInterception = _dnsInterceptionActive;
+                    bool oldDnsFailClosed = _dnsFailClosedActive;
+                    try
+                    {
+                        JObject response = await SendCommandAsync("ping", cancellationToken).ConfigureAwait(false);
+                        EnsureSuccess(response, "Unable to validate the active WinDivert capture child.");
+                        bool captureActive = response.Value<bool?>("captureActive") == true;
+                        if (captureActive)
+                        {
+                            UpdateRedirectPorts(response);
+                            _captureActive = true;
+                        }
+                        else
+                        {
+                            _captureActive = false;
+                            ClearRedirectPorts();
+                        }
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        break;
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.Warn(exception, "Elevated WinDivert capture health check failed.");
+                        _captureActive = false;
+                        ClearRedirectPorts();
+                    }
+
+                    if (wasActive != _captureActive
+                        || oldTcpPort != _tcpRedirectPort
+                        || oldUdpPort != _udpRedirectPort
+                        || oldDnsInterception != _dnsInterceptionActive
+                        || oldDnsFailClosed != _dnsFailClosedActive)
+                    {
+                        RaiseStatusChanged();
+                    }
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+            }
+        }
+
         private async Task<JObject> SendCommandAsync(string command, CancellationToken cancellationToken)
         {
             return await SendRawAsync(
@@ -365,17 +464,19 @@ namespace Shadowsocks.Controller.Traffic
             string command,
             Configuration configuration,
             string winDivertDirectory,
-            IEnumerable<int> excludedProcessIds)
+            IEnumerable<int> excludedProcessIds,
+            DnsCaptureRuntimeState dnsRuntime)
         {
-            JObject request = JObject.Parse(BuildStartRequest(configuration, winDivertDirectory, excludedProcessIds));
+            JObject request = JObject.Parse(BuildStartRequest(configuration, winDivertDirectory, excludedProcessIds, dnsRuntime));
             request["command"] = command;
             return request.ToString(Formatting.None);
         }
 
-        private static string BuildStartRequest(
+        internal static string BuildStartRequest(
             Configuration configuration,
             string winDivertDirectory,
-            IEnumerable<int> excludedProcessIds)
+            IEnumerable<int> excludedProcessIds,
+            DnsCaptureRuntimeState dnsRuntime)
         {
             int fallback = configuration.enabled && configuration.global
                 ? (int)TrafficRouteAction.Proxy
@@ -401,12 +502,24 @@ namespace Shadowsocks.Controller.Traffic
                 applicationRules = rules,
                 excludedProcessIds = (excludedProcessIds ?? [])
                     .Where(processId => processId > 0)
+                    .Append(dnsRuntime.ProcessId)
+                    .Where(processId => processId > 0)
                     .Distinct()
                     .ToArray(),
                 dnsPolicy = new
                 {
                     mode = (int)(configuration.dnsPolicy?.mode ?? DnsPolicyMode.System),
+                    directDnsServer = configuration.dnsPolicy?.directDnsServer ?? string.Empty,
+                    directDnsFallbackServer = configuration.dnsPolicy?.directDnsFallbackServer ?? string.Empty,
+                    directDnsRouteThroughShadowsocks = configuration.dnsPolicy?.directDnsRouteThroughShadowsocks ?? false,
                     customDohUrl = configuration.dnsPolicy?.customDohUrl ?? string.Empty,
+                    customDohRouteThroughShadowsocks = configuration.dnsPolicy?.customDohRouteThroughShadowsocks ?? false,
+                    dnsCryptPort = dnsRuntime.IsReady ? dnsRuntime.Port : 0,
+                    dnsCryptProcessId = dnsRuntime.IsReady ? dnsRuntime.ProcessId : 0,
+                    dnsCryptComponentRoot = AppStoragePaths.DnsCryptComponentDirectory,
+                    failClosed = (configuration.dnsPolicy?.mode ?? DnsPolicyMode.System) == DnsPolicyMode.DnsCrypt
+                        ? true
+                        : configuration.dnsPolicy?.dnsCrypt?.failClosed ?? true,
                 },
             };
             return JsonConvert.SerializeObject(request);
@@ -446,6 +559,16 @@ namespace Shadowsocks.Controller.Traffic
 
             string message = response.Value<string>("message");
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(message) ? prefix : $"{prefix} {message}");
+        }
+
+        private static void EnsureCaptureActive(JObject response, string message)
+        {
+            if (response.Value<bool?>("captureActive") == true)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(message);
         }
 
         private static void ValidateFrameworkDependentHelperFiles(string helperPath)
@@ -541,28 +664,36 @@ namespace Shadowsocks.Controller.Traffic
 
         private void UpdateRedirectPorts(JObject response)
         {
-            _tcpRedirectPort = response.Value<int?>("tcpRedirectPort") ?? 0;
-            _udpRedirectPort = response.Value<int?>("udpRedirectPort") ?? 0;
+            _tcpRedirectPort = Math.Max(0, response.Value<int?>("tcpRedirectPort") ?? 0);
+            _udpRedirectPort = Math.Max(0, response.Value<int?>("udpRedirectPort") ?? 0);
+            _dnsInterceptionActive = response.Value<bool?>("dnsInterceptionActive") == true;
+            _dnsFailClosedActive = response.Value<bool?>("dnsFailClosedActive") == true;
         }
 
         private void ClearRedirectPorts()
         {
             _tcpRedirectPort = 0;
             _udpRedirectPort = 0;
+            _dnsInterceptionActive = false;
+            _dnsFailClosedActive = false;
         }
 
         private static void LogCaptureConfirmed(JObject response, string operation)
         {
             int tcpPort = response.Value<int?>("tcpRedirectPort") ?? 0;
             int udpPort = response.Value<int?>("udpRedirectPort") ?? 0;
+            bool dnsIntercept = response.Value<bool?>("dnsInterceptionActive") == true;
+            bool dnsFailClosed = response.Value<bool?>("dnsFailClosedActive") == true;
             string message = response.Value<string>("message") ?? "capture-ready";
             Logger.Info(
-                "WinDivert capture confirmed ({0}): {1}; TCP redirect port={2}, UDP redirect port={3}. " +
-                "The elevated capture child returned success only after WinDivertOpen completed.",
+                "WinDivert capture confirmed ({0}): {1}; TCP redirect port={2}, UDP redirect port={3}, " +
+                "DNS intercept={4}, DNS fail-closed={5}. The elevated capture child returned success only after WinDivertOpen completed.",
                 operation,
                 message,
                 tcpPort,
-                udpPort);
+                udpPort,
+                dnsIntercept,
+                dnsFailClosed);
         }
 
         private void RaiseStatusChanged()
@@ -584,6 +715,15 @@ namespace Shadowsocks.Controller.Traffic
 
             await StopAsync().ConfigureAwait(false);
             _disposed = true;
+            _healthShutdown.Cancel();
+            try
+            {
+                await _healthLoop.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            _healthShutdown.Dispose();
             _gate.Dispose();
         }
     }

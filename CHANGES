@@ -1,15 +1,43 @@
-﻿5.1.0.0 2026-08-18
+﻿5.2.22.0 2026-08-21
+- Fixed release-blocking SelfUpdater compile errors in UpdateChecker/SelfUpdater
+- Fixed DNSCrypt TOML regression test false-positive and completed resolver-filter localization across all shipped locales
+- Synchronized product, helper and WinUI version metadata for the 5.2.22 release
+- Hardened release validation for updater, ss:// registration, Windows 10 19041 compatibility and one-file packaging
+- Pinned release builds to .NET SDK 10.0.303+ / runtime 10.0.11 security baseline and made NuGet audit unavailability and vulnerability findings release-blocking
+- Hardened updater handoff against staged-payload tampering across the UAC launch window and verify the published EXE FileVersion before packaging
+- Refreshed GitHub release defaults, release checklist and legal metadata
+- See docs/CHANGELOG.md for complete release notes
+
+5.2.21.0 2026-08-21
+- Fixed SOCKS5 forward-proxy authentication and fragmented/domain reply handling (RFC 1928/1929)
+- Hardened HTTP CONNECT forwarding against partial writes, fragmented headers and coalesced tunnel payload; product User-Agent replaces stale browser impersonation
+- Hardened UDP relay destination parsing/strategy selection, association recovery and resource disposal; removed the borrowed legacy LRU implementation
+- Fixed logging settings so verbose/plugin/DNS switches immediately affect runtime output and the live viewer
+- Fixed Automatic DNSCrypt resolver filtering and removed the legacy Cloudflare-only runtime fallback
+- Prepared dnscrypt-proxy updates now verify the candidate version first, resolve an eligible server from its signed catalog, and health-check that concrete runtime before activation
+- Resolver country metadata is now derived only from endpoint IP GeoIP; text/city/Anycast heuristics are not used
+- Completed release documentation and localization validation
+- See docs/CHANGELOG.md for complete release notes
+
+5.2.0.0 2026-08-18
+- Added managed DNSCrypt Proxy with signed downloads, automatic updates and resolver selection
+- Added Admin Mode UDP/TCP DNS interception with fail-closed and Game Mode integration
+- Added final DNSCrypt lifecycle, Clean Mode, bootstrap-recursion and release hardening
+- Pinned WinDivert x64 payload hashes and added fragment-safe routing plus FLOW-layer PID attribution
+- See docs/CHANGELOG.md for complete release notes
+
+5.1.0.0 2026-08-18
 - Added managed SIP003 plugin catalog/install/update flow and manual ZIP/TAR.GZ import
 - Servers UI now shows Server Name above IP and selects installed plugins from a dropdown
 - Finalized LocalAppData/Clean Mode storage, localization, WinUI polish and release validation
-- See CHANGELOG.md for complete release notes
+- See docs/CHANGELOG.md for complete release notes
 
 5.0.0.0 2026-08-15
 - Reborn fork: .NET 10 / Windows 10 19041+ / x64-only
 - Managed HTTP proxy replaces Privoxy; WinINet replaces sysproxy helpers
 - Admin Mode adds transparent TCP/UDP routing through WinDivert
 - Game Mode is automatic and temporarily disables WinDivert for configured applications
-- See CHANGELOG.md for the complete Reborn release notes
+- See docs/CHANGELOG.md for the complete Reborn release notes
 
 4.4.1.0 2022-02-08
 - Add plain/none ciphers

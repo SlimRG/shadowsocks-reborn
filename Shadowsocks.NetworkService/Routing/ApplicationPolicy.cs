@@ -4,10 +4,14 @@ namespace Shadowsocks.NetworkService.Routing;
 
 internal sealed class ApplicationPolicy
 {
+    private const string DnsCryptExecutableName = "dnscrypt-proxy.exe";
     private readonly IReadOnlyList<ApplicationRuleDto> _rules;
     private readonly int _mainProcessId;
     private readonly HashSet<int> _excludedProcessIds;
     private readonly RouteAction _defaultRoute;
+    private readonly string? _dnsCryptComponentRoot;
+    private readonly int _dnsCryptProcessId;
+    private readonly DnsPolicyMode _dnsPolicyMode;
 
     public ApplicationPolicy(StartRequest request)
     {
@@ -17,11 +21,47 @@ internal sealed class ApplicationPolicy
         _defaultRoute = request.DefaultRoute is RouteAction.Direct or RouteAction.Block
             ? request.DefaultRoute
             : RouteAction.Proxy;
+        _dnsCryptComponentRoot = NormalizeDirectory(request.DnsPolicy?.DnsCryptComponentRoot);
+        _dnsCryptProcessId = request.DnsPolicy?.DnsCryptProcessId ?? 0;
+        _dnsPolicyMode = request.DnsPolicy?.Mode ?? DnsPolicyMode.System;
+    }
+
+    public bool IsExcludedProcess(int processId, string? processPath = null)
+        => processId == Environment.ProcessId
+           || processId == _mainProcessId
+           || _excludedProcessIds.Contains(processId)
+           || IsManagedDnsCryptExecutable(processPath);
+
+    /// <summary>
+    /// Determines whether a process may bypass transparent port-53 policy. In DNSCrypt mode,
+    /// Shadowsocks and SIP003 remain excluded from generic traffic capture but their DNS/53 is
+    /// still intercepted; only NetworkService and the managed dnscrypt-proxy runtime are exempt
+    /// to prevent the local DNS bridge from recursively capturing itself.
+    /// </summary>
+    public bool IsDnsInterceptionExempt(int processId, string? processPath = null)
+    {
+        // In DNSCrypt mode, generic capture exclusions (Shadowsocks itself and SIP003
+        // plugins) must NOT become DNS exclusions. Otherwise their own UDP/TCP 53
+        // traffic can escape in plaintext while the rest of the system is protected.
+        // The NetworkService process and the managed dnscrypt-proxy process remain
+        // exempt so the local transparent bridge cannot recursively capture itself.
+        if (_dnsPolicyMode == DnsPolicyMode.DnsCrypt)
+        {
+            return processId == Environment.ProcessId
+                || (_dnsCryptProcessId > 0 && processId == _dnsCryptProcessId)
+                || IsManagedDnsCryptExecutable(processPath);
+        }
+
+        return processId == Environment.ProcessId
+            || processId == _mainProcessId
+            || _excludedProcessIds.Contains(processId)
+            || (_dnsCryptProcessId > 0 && processId == _dnsCryptProcessId)
+            || IsManagedDnsCryptExecutable(processPath);
     }
 
     public RouteAction Evaluate(int processId, string? processPath, string? processName)
     {
-        if (processId == Environment.ProcessId || processId == _mainProcessId || _excludedProcessIds.Contains(processId))
+        if (IsExcludedProcess(processId, processPath))
         {
             return RouteAction.Direct;
         }
@@ -40,6 +80,49 @@ internal sealed class ApplicationPolicy
         }
 
         return _defaultRoute;
+    }
+
+    private bool IsManagedDnsCryptExecutable(string? processPath)
+    {
+        if (string.IsNullOrWhiteSpace(_dnsCryptComponentRoot) || string.IsNullOrWhiteSpace(processPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            string fullPath = Path.GetFullPath(processPath);
+            if (!string.Equals(Path.GetFileName(fullPath), DnsCryptExecutableName, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string directory = Path.GetDirectoryName(fullPath) ?? string.Empty;
+            string normalizedDirectory = NormalizeDirectory(directory) ?? string.Empty;
+            return normalizedDirectory.StartsWith(_dnsCryptComponentRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string? NormalizeDirectory(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            string full = Path.GetFullPath(path.Trim());
+            return full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static bool Matches(string pattern, string? processPath, string? processName)

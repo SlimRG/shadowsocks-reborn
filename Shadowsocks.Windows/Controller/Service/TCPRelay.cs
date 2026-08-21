@@ -244,7 +244,6 @@ namespace Shadowsocks.Controller
 
         private EndPoint _destEndPoint = null;
 
-        // TODO: decouple controller
         public TCPHandler(ShadowsocksController controller, Configuration config, Socket socket)
         {
             _controller = controller;
@@ -654,7 +653,7 @@ namespace Shadowsocks.Controller
                 // Setting up proxy
                 IProxy remote;
                 EndPoint proxyEP = null;
-                EndPoint serverEP = SocketUtil.GetEndPoint(_server.server, _server.server_port);
+                EndPoint serverEP = _controller.ResolveOutboundEndpoint(_server.server, _server.server_port);
                 EndPoint pluginEP = _controller.GetPluginLocalEndPointIfConfigured(_server);
 
                 if (pluginEP != null)
@@ -675,7 +674,7 @@ namespace Shadowsocks.Controller
                         default:
                             throw new NotSupportedException("Unknown forward proxy.");
                     }
-                    proxyEP = SocketUtil.GetEndPoint(_config.proxyServer, _config.proxyPort);
+                    proxyEP = _controller.ResolveOutboundEndpoint(_config.proxyServer, _config.proxyPort);
                 }
                 else
                 {

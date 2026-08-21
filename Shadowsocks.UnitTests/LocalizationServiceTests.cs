@@ -149,7 +149,8 @@ public class LocalizationServiceTests
         string[] trayKeys =
         [
             "System Proxy", "Disable", "PAC", "Global", "Traffic Mode", "User Mode", "Admin Mode",
-            "Traffic Routing", "Servers", "Share Server Config",
+            "Traffic Routing", "Servers", "Share Server Config", "DNS", "System DNS", "DNSCrypt",
+            "DNS Settings", "Check DNSCrypt Update", "DNSCrypt: Not installed", "DNSCrypt: Starting…", "DNSCrypt: Updating…",
             "Local PAC", "Online PAC", "Edit Local PAC File",
             "Update Local PAC from Geosite", "GeoSite Sources", "Edit User Rule for Geosite", "Require secret for local PAC URL",
             "Regenerate Local PAC after application updates", "Edit Online PAC URL",
@@ -161,7 +162,84 @@ public class LocalizationServiceTests
 
         foreach (string key in trayKeys)
         {
-            Assert.AreNotEqual(key, service[key], $"Missing Russian tray translation for '{key}'.");
+            string value = service[key];
+            Assert.IsFalse(string.IsNullOrWhiteSpace(value), $"Missing Russian tray translation for '{key}'.");
+            if (key is "DNS" or "DNSCrypt")
+                continue;
+
+            Assert.AreNotEqual(key, value, $"Missing Russian tray translation for '{key}'.");
         }
     }
+    [TestMethod]
+    public void EmbeddedRussianCatalogCoversDnsCryptManagement()
+    {
+        var service = new CsvLocalizationService(Shadowsocks.Core.EmbeddedResources.I18nCsv, CultureInfo.GetCultureInfo("ru-RU"));
+        string[] keys =
+        [
+            "DNS", "DNS status", "Active adapters", "Windows DNS servers", "Shadowsocks DNS policy", "Transparent interception",
+            "DNS mode", "System DNS", "Direct DNS", "DNS through Shadowsocks", "Custom DoH", "DNSCrypt",
+            "System DNS settings", "Direct DNS settings", "DNS through Shadowsocks settings", "Custom DoH settings",
+            "Original DNS destination", "DNS provider", "Primary DNS server", "Fallback DNS server", "Route Direct DNS through Shadowsocks",
+            "DNSCrypt Proxy", "Installed version", "Latest version", "Local port", "Coverage", "Not installed",
+            "Install DNSCrypt Proxy", "Check for DNSCrypt updates", "Update", "Restart", "Reinstall", "Remove",
+            "Automatically update DNSCrypt Proxy", "Require DNSSEC", "Require no-log resolvers",
+            "Require unfiltered resolvers", "Use IPv6 resolvers", "Route DNSCrypt through Shadowsocks",
+            "In Administrator Mode, DNSCrypt always blocks intercepted plaintext DNS while starting, restarting, or unavailable.", "Resolver selection", "Automatic", "Manual selection",
+            "Automatically selected resolvers",
+            "Available resolvers", "Load resolver list", "Search resolvers",
+            "Resolver list is loaded from DNSCrypt Proxy's signed upstream catalog.",
+            "Loading resolver list", "Resolver list loaded.", "Loaded {0} upstream resolvers.",
+            "Showing {0} matching resolver(s).", "Select at least one resolver.",
+            "DNS settings are saved and applied automatically.", "DNS settings applied.", "DNS server settings applied.", "Custom DoH settings applied.",
+            "Enter a valid primary IPv4 or IPv6 DNS server address.", "Enter a valid fallback IPv4 or IPv6 DNS server address.",
+            "Enter a primary DNS server before configuring a fallback server.",
+            "System DNS information is read from active Windows network adapters; Shadowsocks does not change adapter DNS addresses.",
+            "Windows DNS servers from active network adapters are used without modification.",
+            "Captured DNS queries are sent directly to their original destination and bypass Shadowsocks.",
+            "Captured DNS queries use the active Shadowsocks route; no separate resolver endpoint is required.",
+            "Direct DNS queries are routed to the selected resolver through Shadowsocks.",
+            "DNS queries are sent as DNS-over-HTTPS to the configured endpoint.",
+            "Use DNS servers configured by Windows without Shadowsocks DNS redirection.",
+            "Send captured DNS traffic directly to its original destination. Transparent enforcement requires Administrator Mode.",
+            "Route captured DNS traffic through the active Shadowsocks server. Transparent enforcement requires Administrator Mode.",
+            "Convert captured DNS queries to DNS-over-HTTPS using the configured HTTPS endpoint.",
+            "Use DNSCrypt Proxy for Shadowsocks-managed DNS and transparent DNS capture when available.",
+            "Enter an absolute HTTPS DNS-over-HTTPS endpoint. Changes are applied automatically when you leave the field.",
+            "Protocol",
+            "All protocols",
+            "Automatically select a resolver from DNSCrypt Proxy's signed catalog using the DNSSEC, no-log, unfiltered and address-family settings.",
+            "Choose one or more DNSCrypt or DoH resolvers manually from the signed upstream catalog.",
+            "Automatic mode selects a filtered resolver from DNSCrypt Proxy's signed catalog.",
+            "Automatic filtered selection is active ({0} resolver(s)).",
+            "Automatic filtered resolver is starting.",
+            "Automatic mode selects a resolver from the signed catalog using the DNSSEC, no-log, unfiltered and address-family settings above.",
+            "Filter the signed resolver catalog by transport protocol: DNSCrypt or DNS-over-HTTPS.",
+            "Select the DNSCrypt or DoH resolvers DNSCrypt Proxy may use in manual-selection mode. Ping is measured asynchronously; the active resolver is replaced with DNSCrypt Proxy's actual RTT when available.",
+            "Choose one or more DNSCrypt resolvers manually from the signed upstream catalog.",
+            "Filter resolvers by name, protocol, country code, country name, or description.",
+            "Select the resolvers DNSCrypt Proxy may use in manual-selection mode.",
+            "Checking latest version",
+            "Downloading DNSCrypt Proxy", "Verifying signature", "Validating DNSCrypt runtime",
+            "DNSCrypt Proxy is not installed.", "Download and enable", "DNSCrypt operation failed. See Logs for details.",
+            "DNS operation failed. See Logs for details.", "Enter a valid HTTPS DoH URL to enable Custom DoH.",
+            "Administrator Mode transparently redirects captured UDP/TCP DNS traffic to DNSCrypt. User and Game modes do not provide system-wide interception.",
+            "Transparent DNS interception is active for captured applications.",
+            "DNS is blocked (fail-closed) because DNSCrypt is unavailable.",
+            "DNSCrypt is running, but system-wide interception is paused in Game Mode.",
+            "DNSCrypt is running; full DNS interception requires Administrator Mode.",
+            "System-wide DNS interception is paused in Game Mode.",
+            "DNSCrypt is unavailable; full DNS interception requires Administrator Mode.",
+        ];
+
+        foreach (string key in keys)
+        {
+            string value = service[key];
+            Assert.IsFalse(string.IsNullOrWhiteSpace(value), $"Missing Russian DNSCrypt translation for '{key}'.");
+            if (key is "DNS" or "DNSCrypt" or "DNSCrypt Proxy")
+                continue;
+
+            Assert.AreNotEqual(key, value, $"Missing Russian DNSCrypt translation for '{key}'.");
+        }
+    }
+
 }

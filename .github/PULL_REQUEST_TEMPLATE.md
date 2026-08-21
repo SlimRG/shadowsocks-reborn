@@ -10,7 +10,7 @@ Describe what changed and why.
 - [ ] Runtime-tested the changed path.
 - [ ] Tested PAC/Global persistence if system-proxy code changed.
 - [ ] Tested Admin Mode and automatic Game Mode if WinDivert/routing code changed.
-- [ ] Opened affected WPF/WinForms views.
+- [ ] Opened and runtime-tested affected WinUI pages/views.
 - [ ] Added/updated localization for user-visible strings.
 - [ ] Updated README/CHANGELOG when behavior or requirements changed.
 - [ ] Confirmed no passwords, server addresses, tokens or private configs are included.

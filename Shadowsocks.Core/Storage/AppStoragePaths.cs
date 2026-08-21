@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO;
-using System.Threading;
 
 namespace Shadowsocks.Core.Storage
 {
@@ -8,14 +7,11 @@ namespace Shadowsocks.Core.Storage
     {
         public const string ProductDirectoryName = "Shadowsocks";
         private const string CleanDirectoryName = "Clean";
-        private const string CleanSessionLockFileName = ".session.lock";
-
         private static readonly object SyncRoot = new();
         private static bool initialized;
         private static bool cleanMode;
         private static string storageRoot;
-        private static string cleanSessionRoot;
-        private static FileStream cleanSessionLock;
+        private static CleanStorageSession cleanSession;
 
         public static string LocalAppDataRoot => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -55,12 +51,14 @@ namespace Shadowsocks.Core.Storage
         public static string UserAbpFile => Path.Combine(PacDataDirectory, "abp.txt");
 
         public static string PluginsDirectory => Path.Combine(StorageRoot, "Plugins");
+        public static string ComponentsDirectory => Path.Combine(StorageRoot, "Components");
+        public static string DnsCryptComponentDirectory => Path.Combine(ComponentsDirectory, "DNSCryptProxy");
 
         public static string LogsDirectory => Path.Combine(StorageRoot, "Logs");
         public static string LogFile => Path.Combine(LogsDirectory, "shadowsocks.log");
-        public static string MigrationDirectory => Path.Combine(StorageRoot, "Migration");
         public static string RuntimeRoot => Path.Combine(StorageRoot, "Runtime");
         public static string WinDivertRuntimeRoot => Path.Combine(RuntimeRoot, "WinDivert");
+        public static string DnsCryptRuntimeDirectory => Path.Combine(RuntimeRoot, "DNSCryptProxy");
         public static string StartupDirectory => Path.Combine(StorageRoot, "Startup");
         public static string StartupExecutableFile => Path.Combine(StartupDirectory, "Shadowsocks.exe");
 
@@ -69,6 +67,7 @@ namespace Shadowsocks.Core.Storage
         public static string TempRoot => Path.Combine(StorageRoot, "Temp");
         public static string TempNetworkServiceRoot => Path.Combine(TempRoot, "NetworkService");
         public static string TempUpdatesRoot => Path.Combine(TempRoot, "Updates");
+        public static string DnsCryptUpdateDirectory => Path.Combine(TempUpdatesRoot, "DNSCryptProxy");
         public static string TempWorkingRoot => Path.Combine(TempRoot, "Working");
         public static string TempStartupLogsRoot => Path.Combine(TempRoot, "StartupLogs");
 
@@ -84,18 +83,12 @@ namespace Shadowsocks.Core.Storage
                 cleanMode = IsCleanModeExecutableName(executablePath);
                 if (cleanMode)
                 {
-                    string sessionName = $"{DateTime.UtcNow:yyyyMMddHHmmss}-{Environment.ProcessId}-{Guid.NewGuid():N}";
-                    cleanSessionRoot = Path.Combine(CleanSessionsRoot, sessionName);
-                    Directory.CreateDirectory(cleanSessionRoot);
-                    string lockPath = Path.Combine(cleanSessionRoot, CleanSessionLockFileName);
-                    cleanSessionLock = new FileStream(
-                        lockPath,
-                        FileMode.CreateNew,
-                        FileAccess.ReadWrite,
-                        FileShare.Read,
-                        bufferSize: 1,
-                        FileOptions.DeleteOnClose);
-                    storageRoot = cleanSessionRoot;
+                    cleanSession = CleanStorageSession.Create(
+                        CleanSessionsRoot,
+                        DateTime.UtcNow,
+                        Environment.ProcessId,
+                        Guid.NewGuid());
+                    storageRoot = cleanSession.Root;
                     AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                 }
                 else
@@ -126,8 +119,8 @@ namespace Shadowsocks.Core.Storage
             Directory.CreateDirectory(DataRoot);
             Directory.CreateDirectory(PacDataDirectory);
             Directory.CreateDirectory(PluginsDirectory);
+            Directory.CreateDirectory(ComponentsDirectory);
             Directory.CreateDirectory(LogsDirectory);
-            Directory.CreateDirectory(MigrationDirectory);
             Directory.CreateDirectory(RuntimeRoot);
             Directory.CreateDirectory(TempRoot);
 
@@ -145,29 +138,18 @@ namespace Shadowsocks.Core.Storage
 
         public static void CleanupCleanSession()
         {
-            string sessionRoot;
-            FileStream sessionLock;
+            CleanStorageSession session;
 
             lock (SyncRoot)
             {
-                if (!initialized || !cleanMode || string.IsNullOrWhiteSpace(cleanSessionRoot))
+                if (!initialized || !cleanMode || cleanSession is null)
                     return;
 
-                sessionRoot = cleanSessionRoot;
-                sessionLock = cleanSessionLock;
-                cleanSessionLock = null;
-                cleanSessionRoot = null;
+                session = cleanSession;
+                cleanSession = null;
             }
 
-            try
-            {
-                sessionLock?.Dispose();
-            }
-            catch
-            {
-            }
-
-            TryDeleteDirectory(sessionRoot);
+            session.Dispose();
         }
 
         public static void CleanupStaleCleanSessions(TimeSpan retention)
@@ -202,59 +184,7 @@ namespace Shadowsocks.Core.Storage
 
         private static bool IsCleanSessionActive(string directory)
         {
-            string lockPath = Path.Combine(directory, CleanSessionLockFileName);
-            if (!File.Exists(lockPath))
-                return false;
-
-            try
-            {
-                using FileStream _ = new FileStream(
-                    lockPath,
-                    FileMode.Open,
-                    FileAccess.ReadWrite,
-                    FileShare.None,
-                    bufferSize: 1,
-                    FileOptions.None);
-                return false;
-            }
-            catch (IOException)
-            {
-                return true;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return true;
-            }
-        }
-
-        private static void TryDeleteDirectory(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return;
-
-            for (int attempt = 0; attempt < 3; attempt++)
-            {
-                try
-                {
-                    if (Directory.Exists(path))
-                    {
-                        Directory.Delete(path, recursive: true);
-                    }
-                    return;
-                }
-                catch (IOException) when (attempt < 2)
-                {
-                    Thread.Sleep(50);
-                }
-                catch (UnauthorizedAccessException) when (attempt < 2)
-                {
-                    Thread.Sleep(50);
-                }
-                catch
-                {
-                    return;
-                }
-            }
+            return CleanStorageSession.IsActive(directory);
         }
 
         private static void OnProcessExit(object sender, EventArgs e)

@@ -18,8 +18,8 @@ namespace Shadowsocks.Controller
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string Key = "Shadowsocks Reborn";
-        private const string LegacyKeyPrefix = "shadowsocks-reborn_";
         private const string StartupArguments = "--start-hidden";
+        internal const string StartupOriginOption = "--startup-origin";
         private static bool StartupCopySynchronized;
 
         public static bool Set(bool enabled, string arguments = null)
@@ -40,7 +40,6 @@ namespace Shadowsocks.Controller
                     return false;
                 }
 
-                CleanupLegacyRunValues(runKey);
                 if (enabled)
                 {
                     if (!EnsureStartupExecutable())
@@ -88,18 +87,7 @@ namespace Shadowsocks.Controller
                     return false;
                 }
 
-                bool legacyStartupWasEnabled = CleanupLegacyRunValues(runKey);
                 string command = runKey.GetValue(Key)?.ToString();
-                if (!IsStartupExecutableCommand(command) && legacyStartupWasEnabled)
-                {
-                    if (!EnsureStartupExecutable())
-                    {
-                        return false;
-                    }
-                    command = BuildStartupCommand(StartupArguments);
-                    runKey.SetValue(Key, command);
-                    Logger.Info("Migrated legacy Start with Windows registration to the LocalAppData executable copy.");
-                }
                 if (!IsStartupExecutableCommand(command))
                 {
                     return false;
@@ -142,7 +130,7 @@ namespace Shadowsocks.Controller
                 return false;
             }
 
-            string source = AppRuntimeEnvironment.ExecutablePath;
+            string source = GetPrimaryExecutablePath();
             string destination = AppStoragePaths.StartupExecutableFile;
             try
             {
@@ -217,7 +205,77 @@ namespace Shadowsocks.Controller
         {
             string executable = $"\"{AppStoragePaths.StartupExecutableFile}\"";
             string normalizedArguments = string.IsNullOrWhiteSpace(arguments) ? StartupArguments : arguments.Trim();
-            return $"{executable} {normalizedArguments}";
+            string primaryExecutable = GetPrimaryExecutablePath();
+            return $"{executable} {normalizedArguments} {StartupOriginOption} \"{primaryExecutable}\"";
+        }
+
+        /// <summary>
+        /// Returns the user-facing product executable that should be updated. When Windows
+        /// starts the stable LocalAppData startup copy, the original product path is carried
+        /// in the Run command so an automatic update cannot update only the startup copy.
+        /// </summary>
+        internal static string GetPrimaryExecutablePath()
+            => ResolvePrimaryExecutablePath(
+                AppRuntimeEnvironment.ExecutablePath,
+                AppStoragePaths.StartupExecutableFile,
+                AppRuntimeEnvironment.Arguments);
+
+        internal static string ResolvePrimaryExecutablePath(
+            string currentExecutablePath,
+            string startupExecutablePath,
+            IReadOnlyList<string> arguments)
+        {
+            string current = Path.GetFullPath(currentExecutablePath);
+            string startup = Path.GetFullPath(startupExecutablePath);
+            if (!PathsEqual(current, startup))
+            {
+                return current;
+            }
+
+            string origin = GetOption(arguments, StartupOriginOption);
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                return current;
+            }
+
+            try
+            {
+                string candidate = Path.GetFullPath(origin);
+                string fileName = Path.GetFileNameWithoutExtension(candidate);
+                if (File.Exists(candidate)
+                    && fileName.StartsWith("Shadowsocks", StringComparison.OrdinalIgnoreCase)
+                    && !PathsEqual(candidate, startup))
+                {
+                    return candidate;
+                }
+            }
+            catch
+            {
+            }
+
+            return current;
+        }
+
+        private static string GetOption(IReadOnlyList<string> arguments, string option)
+        {
+            if (arguments == null)
+            {
+                return null;
+            }
+
+            for (int index = 0; index < arguments.Count; index++)
+            {
+                string argument = arguments[index] ?? string.Empty;
+                if (argument.StartsWith(option + "=", StringComparison.OrdinalIgnoreCase))
+                {
+                    return argument.Substring(option.Length + 1).Trim('\"');
+                }
+                if (argument.Equals(option, StringComparison.OrdinalIgnoreCase) && index + 1 < arguments.Count)
+                {
+                    return (arguments[index + 1] ?? string.Empty).Trim('\"');
+                }
+            }
+            return null;
         }
 
         private static bool IsStartupExecutableCommand(string command)
@@ -233,20 +291,6 @@ namespace Shadowsocks.Controller
             return trimmed.Equals(path, StringComparison.OrdinalIgnoreCase)
                 || trimmed.Equals(quoted, StringComparison.OrdinalIgnoreCase)
                 || trimmed.StartsWith(quoted + " ", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool CleanupLegacyRunValues(RegistryKey runKey)
-        {
-            bool hadLegacyValue = false;
-            foreach (string valueName in runKey.GetValueNames())
-            {
-                if (valueName.StartsWith(LegacyKeyPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    hadLegacyValue |= !string.IsNullOrWhiteSpace(runKey.GetValue(valueName)?.ToString());
-                    runKey.DeleteValue(valueName, throwOnMissingValue: false);
-                }
-            }
-            return hadLegacyValue;
         }
 
         private static void TryDeleteUnusedStartupCopy()

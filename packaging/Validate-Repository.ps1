@@ -166,6 +166,27 @@ foreach ($relativeProject in $expectedProjects) {
     }
 }
 
+$globalJsonPath = Join-Path $repoRoot 'global.json'
+$globalJson = Get-Content -LiteralPath $globalJsonPath -Raw | ConvertFrom-Json
+$minimumSecureSdk = [Version]'10.0.303'
+$configuredSdk = [Version][string]$globalJson.sdk.version
+if ($configuredSdk -lt $minimumSecureSdk) {
+    throw "global.json must require .NET SDK $minimumSecureSdk or newer so self-contained releases include the .NET 10.0.11 security fixes. Found $configuredSdk."
+}
+if ([string]$globalJson.sdk.rollForward -ne 'latestFeature' -or $globalJson.sdk.allowPrerelease -ne $false) {
+    throw 'global.json must keep rollForward=latestFeature and allowPrerelease=false for stable secure .NET 10 release builds.'
+}
+
+$directoryBuildPropsText = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Build.props') -Raw
+foreach ($auditWarning in @('NU1900', 'NU1901', 'NU1902', 'NU1903', 'NU1904')) {
+    if ($directoryBuildPropsText -notmatch [regex]::Escape($auditWarning)) {
+        throw "NuGet audit availability/vulnerability warning must be release-blocking when NuGetAudit=true: $auditWarning"
+    }
+}
+if ($directoryBuildPropsText -notmatch 'WarningsAsErrors' -or $directoryBuildPropsText -notmatch "NuGetAudit.*true") {
+    throw 'Directory.Build.props must promote NU1900-NU1904 to errors whenever NuGetAudit=true.'
+}
+
 if (Test-Path -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Engine')) {
     throw 'Legacy Shadowsocks.Engine directory must not exist after Core/Windows separation.'
 }
@@ -245,6 +266,12 @@ foreach ($retiredFileName in @('MenuViewController.cs', 'ConfigForm.cs', 'LogFor
 }
 
 Write-Host 'Validated retired desktop UI checks: WinUI-only project/package/source graph.'
+
+$pullRequestTemplatePath = Join-Path $repoRoot '.github\PULL_REQUEST_TEMPLATE.md'
+$pullRequestTemplateSource = Get-Content -LiteralPath $pullRequestTemplatePath -Raw
+if ($pullRequestTemplateSource -match 'Opened affected WPF/WinForms views') {
+    throw 'Pull request template must reference current WinUI pages/views, not retired WPF/WinForms views.'
+}
 
 
 $appSettingsPath = Join-Path $repoRoot 'appsettings.json'
@@ -541,6 +568,7 @@ $finalSingleFileTarget = @(Get-ProjectTargets -Project $winUiProject | Where-Obj
 if ($null -eq $finalSingleFileTarget) {
     throw 'Phase 10 requires a publish-time validator that enforces a single Shadowsocks.exe output.'
 }
+$winUiVersion = Get-ProjectPropertyValue -Project $winUiProject -Name 'Version'
 $winUiTargetFramework = Get-ProjectPropertyValue -Project $winUiProject -Name 'TargetFramework'
 if ($winUiTargetFramework -ne 'net10.0-windows10.0.26100.0') {
     throw "Shadowsocks.WinUI must compile against the current Windows 11 SDK TFM while retaining Windows 10 as the minimum OS; TargetFramework is '$winUiTargetFramework'."
@@ -548,6 +576,10 @@ if ($winUiTargetFramework -ne 'net10.0-windows10.0.26100.0') {
 $winUiMinimumOs = Get-ProjectPropertyValue -Project $winUiProject -Name 'SupportedOSPlatformVersion'
 if ($winUiMinimumOs -ne '10.0.19041.0') {
     throw "Shadowsocks.WinUI must keep Windows 10 build 19041 as the supported minimum; SupportedOSPlatformVersion is '$winUiMinimumOs'."
+}
+$winUiTargetPlatformMinVersion = Get-ProjectPropertyValue -Project $winUiProject -Name 'TargetPlatformMinVersion'
+if ($winUiTargetPlatformMinVersion -ne '10.0.19041.0') {
+    throw "Shadowsocks.WinUI publish metadata must keep Windows 10 build 19041 as TargetPlatformMinVersion; value is '$winUiTargetPlatformMinVersion'."
 }
 $winUiUseWinUI = Get-ProjectPropertyValue -Project $winUiProject -Name 'UseWinUI'
 $winUiPackageType = Get-ProjectPropertyValue -Project $winUiProject -Name 'WindowsPackageType'
@@ -584,6 +616,26 @@ if ($windowsPackages | Where-Object { $_ -like 'Microsoft.WindowsAppSDK*|*' -or 
 }
 
 [xml]$windowsWinUiProject = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj') -Raw
+$windowsWinUiTargetFramework = Get-ProjectPropertyValue -Project $windowsWinUiProject -Name 'TargetFramework'
+if ($windowsWinUiTargetFramework -ne 'net10.0-windows10.0.26100.0') {
+    throw "Shadowsocks.Windows.WinUI must compile against the same Windows SDK TFM as the product shell; TargetFramework is '$windowsWinUiTargetFramework'."
+}
+$windowsWinUiVersion = Get-ProjectPropertyValue -Project $windowsWinUiProject -Name 'Version'
+if ($windowsWinUiVersion -ne $winUiVersion) {
+    throw "Shadowsocks.Windows.WinUI release version '$windowsWinUiVersion' must match the product version '$winUiVersion'."
+}
+$windowsWinUiMinimumOs = Get-ProjectPropertyValue -Project $windowsWinUiProject -Name 'SupportedOSPlatformVersion'
+$windowsWinUiTargetPlatformMinVersion = Get-ProjectPropertyValue -Project $windowsWinUiProject -Name 'TargetPlatformMinVersion'
+if ($windowsWinUiMinimumOs -ne '10.0.19041.0' -or $windowsWinUiTargetPlatformMinVersion -ne '10.0.19041.0') {
+    throw "Shadowsocks.Windows.WinUI must preserve Windows 10 build 19041 as both SupportedOSPlatformVersion and TargetPlatformMinVersion."
+}
+
+$winUiManifestPath = Join-Path $repoRoot 'Shadowsocks.WinUI\app.manifest'
+$winUiManifestSource = Get-Content -LiteralPath $winUiManifestPath -Raw
+if ($winUiManifestSource -notmatch [regex]::Escape('{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}')) {
+    throw 'Shadowsocks.WinUI app.manifest must declare Windows 10/11 compatibility.'
+}
+
 $windowsWinUiPackages = @(
     Get-ProjectItems -Project $windowsWinUiProject -Name 'PackageReference' |
         ForEach-Object { "$(Get-XmlAttributeText -Node $_ -Name 'Include')|$(Get-XmlMetadataText -Node $_ -Name 'Version')" }
@@ -724,6 +776,8 @@ foreach ($trayParityToken in @(
     'BuildSystemProxyMenu',
     'BuildTrafficMenu',
     'BuildServersMenu',
+    'TrayCommandKind.OpenPlugins',
+    'CreateItem("Plugins", TrayCommandKind.OpenPlugins)',
     'BuildPacMenu',
     'BuildHelpMenu',
     'LeftDoubleClick',
@@ -799,7 +853,7 @@ $phase7RequiredSources = @(
     'Shadowsocks.WinUI\Pages\AboutPage.cs',
     'Shadowsocks.WinUI\Pages\OnlineConfigPage.cs',
     'Shadowsocks.WinUI\UI\WinUIStyles.cs',
-    'WINDOWS11_UI_GUIDE.md'
+    'docs\WINDOWS11_UI_GUIDE.md'
 )
 foreach ($relativePath in $phase7RequiredSources) {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $relativePath) -PathType Leaf)) {
@@ -932,7 +986,7 @@ foreach ($serverValidationToken in @('Configuration.CheckServer(current)', 'Rest
 }
 
 $aboutPageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\AboutPage.cs') -Raw
-foreach ($updateParityToken in @('Release notes', 'Download update', 'Skip this version', 'Not now')) {
+foreach ($updateParityToken in @('Release notes', 'Install update', 'Skip this version', 'Not now')) {
     if ($aboutPageSource -notmatch [regex]::Escape($updateParityToken)) {
         throw "Phase-7 About/Update parity is missing required original update workflow token: $updateParityToken"
     }
@@ -1042,9 +1096,14 @@ foreach ($row in $i18nRows) {
             throw "Localization translation is missing for '$normalizedKey' in language '$language'."
         }
     }
+    if ([string]$row.'ru-RU' -match '[\u3400-\u4DBF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]') {
+        throw "Russian localization contains CJK/Japanese/Korean characters for '$normalizedKey'."
+    }
 }
 foreach ($requiredWinUiKey in @(
     'Settings',
+    'Automatic mode is not pinned to a filtered resolver set from the signed catalog.',
+    'Filter resolvers by name, protocol, country code, country name, or description.',
     'Game Mode',
     'Traffic Routing',
     'Forward Proxy',
@@ -1052,6 +1111,7 @@ foreach ($requiredWinUiKey in @(
     'Share / QR',
     'Logs',
     'About & updates',
+    'Close',
     'System shell',
     'Controller unavailable',
     'Shortcut format',
@@ -1164,6 +1224,8 @@ if ($phase7MainWindow -notmatch 'ForwardProxyPage' -or $phase7MainWindow -notmat
 Write-Host 'Validated occupied-port startup reporting and phase-7 controller/UI feature wiring.'
 foreach ($appTrayParityToken in @(
     'BuildTrayMenuState',
+    'TrayCommandKind.OpenPlugins',
+    'NavigateToPlugins',
     'StartAutomaticUpdateCheck',
     'TrafficChanged += OnControllerTrafficChanged')) {
     if ($phase7App -notmatch [regex]::Escape($appTrayParityToken)) {
@@ -1192,20 +1254,20 @@ if ($hotkeysPageText -notmatch 'LibraryImport\("user32\.dll"\)' -or $hotkeysPage
 }
 $settingsPagePath = Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\SettingsPage.cs'
 $settingsPageText = [System.IO.File]::ReadAllText($settingsPagePath)
-foreach ($retiredSettingsToken in @('Check for Updates at Startup', 'Verbose Logging', 'Show Plugin Output')) {
+foreach ($retiredSettingsToken in @('Automatically install updates', 'Verbose Logging', 'Show Plugin Output')) {
     if ($settingsPageText -match [regex]::Escape($retiredSettingsToken)) {
         throw "Settings page must not contain feature-specific preference that belongs to Logs/About: $retiredSettingsToken"
     }
 }
-foreach ($logsPreferenceToken in @('Verbose Logging', 'Show Plugin Output')) {
+foreach ($logsPreferenceToken in @('Verbose Logging', 'Show Plugin Output', 'Show DNS Logs')) {
     if ($logsPageSource -notmatch [regex]::Escape($logsPreferenceToken)) {
         throw "Logs page is missing required logging preference: $logsPreferenceToken"
     }
 }
-if ($aboutPageSource -notmatch [regex]::Escape('Check for Updates at Startup')) {
-    throw 'About page must expose Check for Updates at Startup next to the other update controls.'
+if ($aboutPageSource -notmatch [regex]::Escape('Automatically install updates')) {
+    throw 'About page must expose the automatic application-update toggle next to the other update controls.'
 }
-if ($traySource -match 'Check for Updates at Startup|Verbose Logging|Show Plugin Output|Write translation template') {
+if ($traySource -match 'Automatically install updates|Verbose Logging|Show Plugin Output|Show DNS Logs|Write translation template') {
     throw 'Main-window-only preferences or translation-template command must not appear in the tray.'
 }
 
@@ -1233,8 +1295,13 @@ if ($stylesText -notmatch 'PageGutter = 16' -or $mainWindowLayoutText -match 'Di
     throw 'WinUI pages must use one fixed content gutter across NavigationView display modes.'
 }
 $logsLayoutText = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\LogsPage.cs'))
-if ($logsLayoutText -notmatch 'loggingOptionsRow' -or $logsLayoutText -notmatch 'Grid.SetColumn\(_pluginOutputToggle, 1\)') {
-    throw 'Verbose Logging and Show Plugin Output must share one row in the Logs page.'
+if ($logsLayoutText -notmatch 'loggingOptionsRow' -or
+    $logsLayoutText -notmatch 'Grid.SetColumn\(_pluginOutputToggle, 1\)' -or
+    $logsLayoutText -notmatch 'Grid.SetColumn\(_dnsLogsToggle, 2\)') {
+    throw 'Verbose Logging, Show Plugin Output, and Show DNS Logs must share one row in the Logs page.'
+}
+if ($configurationText -notmatch 'showDnsLogs' -or $configurationText -notmatch 'showDnsLogs = false') {
+    throw 'Detailed DNS diagnostic logging must be persisted and disabled by default.'
 }
 $sharingPageText = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\SharingPage.cs'))
 foreach ($sharingToken in @('Scan QRCode from Screen', 'Open image', 'Scan QR from clipboard image', 'Paste URL from clipboard', 'OnDeleteServerClicked')) {
@@ -1255,9 +1322,18 @@ foreach ($foregroundToken in @('presenter.Restore(true)', 'AppWindow.Show(true)'
         throw "Tray foreground activation is missing token: $foregroundToken"
     }
 }
-if ($mainWindowRegressionText -notmatch 'ShowPluginOutputChanged \+= OnControllerStateChanged' -or
-    $mainWindowRegressionText -notmatch 'ShowPluginOutputChanged -= OnControllerStateChanged') {
-    throw 'MainWindow must subscribe/unsubscribe ShowPluginOutputChanged so the Logs page stays synchronized.'
+if ($mainWindowRegressionText -match 'VerboseLoggingStatusChanged \+= OnControllerStateChanged' -or
+    $mainWindowRegressionText -match 'ShowPluginOutputChanged \+= OnControllerStateChanged' -or
+    $mainWindowRegressionText -match 'ShowDnsLogsChanged \+= OnControllerStateChanged') {
+    throw 'Logging-only preference events must not trigger a global MainWindow page refresh.'
+}
+foreach ($logsPerfToken in @('QueueLogRefresh', 'Task.Run', 'MaxVisibleLogLines = 750', 'MaxTailBytes = 256 * 1024', '_viewerConfigSaveTimer')) {
+    if ($logsPageSource -notmatch [regex]::Escape($logsPerfToken)) {
+        throw "Logs page is missing responsiveness safeguard: $logsPerfToken"
+    }
+}
+if ($logsPageSource -match 'ApplyWrapMode\(\);[\s\S]{0,300}RebuildVisibleLogLines\(\);') {
+    throw 'Wrap changes must not rebuild the RichTextBlock document.'
 }
 if ([regex]::Matches($logsPageSource, 'UnsubscribeTraffic\(\);').Count -ne 1) {
     throw 'LogsPage must unsubscribe from traffic exactly once on unload.'
@@ -1310,6 +1386,14 @@ if ($buildReleaseText -notmatch "Shadowsocks\.WinUI\\Shadowsocks\.WinUI\.csproj"
 }
 if ($buildReleaseText -notmatch 'PublishProfile=FolderProfile') {
     throw 'Build-Release.ps1 must use the WinUI FolderProfile so product publish remains single-file.'
+}
+if ($buildReleaseText -notmatch [regex]::Escape('Shadowsocks-win-x64.zip')) {
+    throw 'Build-Release.ps1 must publish the canonical Shadowsocks-win-x64.zip GitHub release asset.'
+}
+foreach ($releaseGateToken in @('minimumReleaseSdk', '10.0.303', 'expectedFourPartVersion', 'FileVersionInfo', 'publishedFileVersion')) {
+    if ($buildReleaseText -notmatch [regex]::Escape($releaseGateToken)) {
+        throw "Build-Release.ps1 is missing required secure/versioned release gate: $releaseGateToken"
+    }
 }
 $ciPath = Join-Path $repoRoot '.github\workflows\ci.yml'
 $ciText = [System.IO.File]::ReadAllText($ciPath)
@@ -1390,7 +1474,7 @@ foreach ($storageToken in @(
     }
 }
 if ($storagePathsSource -notmatch 'TempRoot\s*=>\s*Path\.Combine\(StorageRoot,\s*"Temp"\)') {
-    throw 'All normal-mode application-owned scratch/helper/update data must remain below LocalAppData via StorageRoot\Temp.'
+    throw 'Normal-mode component scratch/helper data must remain below LocalAppData via StorageRoot\Temp; application self-update transactions use the separately validated system-temp SelfUpdater root.'
 }
 
 $storageBootstrapSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Storage\WindowsStorageBootstrapper.cs') -Raw
@@ -1398,10 +1482,6 @@ foreach ($storageBootstrapToken in @(
     'JsonFileSettingsStore',
     'AppStoragePaths.SettingsFile',
     'AppStoragePaths.SettingsBackupFile',
-    'MigrateLegacySidecarData',
-    'MigrateLegacyConfiguration',
-    'RemoveObsoleteLocalizationOverride',
-    '!AppStoragePaths.IsCleanMode',
     'CleanupStaleTempData',
     'CleanupStaleRuntime')) {
     if ($storageBootstrapSource -notmatch [regex]::Escape($storageBootstrapToken)) {
@@ -1427,12 +1507,15 @@ if ($configurationSource -match 'File\.WriteAllText\([^\r\n]*gui-config\.json' -
 }
 
 $winUiProgramStorageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Program.cs') -Raw
-if ($winUiProgramStorageSource -notmatch 'AppRuntimeEnvironment\.Initialize' -or
+if ($winUiProgramStorageSource -notmatch 'SelfUpdater\.TryRunUpdaterMode' -or
+    $winUiProgramStorageSource -notmatch 'SelfUpdater\.CleanupCompletedUpdate' -or
+    $winUiProgramStorageSource -notmatch 'SelfUpdater\.RemoveInternalArguments' -or
+    $winUiProgramStorageSource -notmatch 'AppRuntimeEnvironment\.Initialize' -or
     $winUiProgramStorageSource -notmatch 'AppStoragePaths\.Initialize\(executablePath\)' -or
-    $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment();', [System.StringComparison]::Ordinal) -lt 0 -or
-    $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment();', [System.StringComparison]::Ordinal) -gt
+    $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment(applicationArguments);', [System.StringComparison]::Ordinal) -lt 0 -or
+    $winUiProgramStorageSource.IndexOf('InitializeProcessEnvironment(applicationArguments);', [System.StringComparison]::Ordinal) -gt
         $winUiProgramStorageSource.IndexOf('CsvLocalizationService.CreateDefault()', [System.StringComparison]::Ordinal)) {
-    throw 'WinUI Main must select normal/Clean storage before localization and application initialization.'
+    throw 'WinUI Main must process internal self-update commands and select normal/Clean storage before localization and application initialization.'
 }
 if ($phase7App -notmatch 'WindowsStorageBootstrapper\.Initialize\(\)' -or
     $phase7App -notmatch 'Directory\.SetCurrentDirectory\(AppStoragePaths\.RuntimeRoot\)' -or
@@ -1452,21 +1535,42 @@ if ($controllerSource -notmatch '_pacDaemon\.Dispose\(\)' -or $controllerSource 
 $pacDaemonSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Controller\Service\PACDaemon.cs') -Raw
 $onlinePacSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Controller\Service\OnlinePacCache.cs') -Raw
 $geositeSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Controller\Service\GeositeUpdater.cs') -Raw
-if ($geositeSource -notmatch 'TryMigrateLegacyCache' -or $geositeSource -notmatch 'AppStoragePaths\.IsCleanMode') {
-    throw 'GeoSite legacy executable-side cache migration must be disabled in Clean Mode.'
+if ($geositeSource -match 'TryMigrateLegacyCache' -or $geositeSource -match 'LegacyDatabasePath') {
+    throw 'Retired executable-side GeoSite cache migration must not return.'
 }
 $loggingSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Logging\LoggingConfigurator.cs') -Raw
-$tempUtilSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Util\Util.cs') -Raw
 $winDivertInstallerSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\Traffic\WinDivertInstaller.cs') -Raw
 $updateCheckerSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\Service\UpdateChecker.cs') -Raw
+$protocolHandlerSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\System\ProtocolHandler.cs') -Raw
+$canonicalProtocolCommandSource = 'return $"\"{executablePath}\" --open-url \"%1\"";'
+if ($protocolHandlerSource -notmatch [regex]::Escape('BuildShellOpenCommand') -or
+    $protocolHandlerSource -notmatch [regex]::Escape($canonicalProtocolCommandSource)) {
+    throw 'ss:// protocol registration must quote both the executable path and "%1" URL placeholder.'
+}
+if ($protocolHandlerSource -match [regex]::Escape('$"{RuntimeEnvironment.ExecutablePath} --open-url %1"')) {
+    throw 'Unsafe unquoted ss:// shell command registration returned.'
+}
+$protocolHandlerTestsPath = Join-Path $repoRoot 'Shadowsocks.UnitTests\ProtocolHandlerTests.cs'
+if (-not (Test-Path -LiteralPath $protocolHandlerTestsPath -PathType Leaf)) {
+    throw 'Release validation requires ProtocolHandlerTests.cs to guard command-line quoting.'
+}
+$protocolHandlerTestsSource = Get-Content -LiteralPath $protocolHandlerTestsPath -Raw
+if ($protocolHandlerTestsSource -notmatch [regex]::Escape('ShellOpenCommandQuotesExecutableAndProtocolUrl')) {
+    throw 'Protocol handler regression test for executable/URL quoting is missing.'
+}
+
+if ($updateCheckerSource -notmatch [regex]::Escape('PreferredReleaseZipFilename = "Shadowsocks-win-x64.zip"') -or
+    $updateCheckerSource -notmatch 'SelectReleaseZipAsset' -or
+    $updateCheckerSource -notmatch 'SHA256\.HashDataAsync') {
+    throw 'UpdateChecker must prefer the canonical x64 release ZIP and verify a published SHA-256 sidecar.'
+}
 $sip003Source = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\Service\Sip003Plugin.cs') -Raw
 foreach ($storageCheck in @(
     @{ Name = 'PAC'; Source = $pacDaemonSource; Token = 'AppStoragePaths.PacDataDirectory' },
     @{ Name = 'Online PAC'; Source = $onlinePacSource; Token = 'AppStoragePaths.OnlinePacCacheFile' },
     @{ Name = 'GeoSite'; Source = $geositeSource; Token = 'AppStoragePaths.GeositeCacheDirectory' },
     @{ Name = 'Logging'; Source = $loggingSource; Token = 'AppStoragePaths.LogFile' },
-    @{ Name = 'Temp'; Source = $tempUtilSource; Token = 'AppStoragePaths.TempWorkingRoot' },
-    @{ Name = 'Updates'; Source = $updateCheckerSource; Token = 'AppStoragePaths.TempUpdatesRoot' },
+    @{ Name = 'Updates'; Source = $updateCheckerSource; Token = 'SelfUpdater.CreateTransactionDirectory' },
     @{ Name = 'SIP003'; Source = $sip003Source; Token = 'AppStoragePaths.TempWorkingRoot' },
     @{ Name = 'WinDivert'; Source = $winDivertInstallerSource; Token = 'AppStoragePaths.WinDivertRuntimeRoot' }
 )) {
@@ -1479,12 +1583,149 @@ if ($serversPageSource -match 'Portable Mode') {
     throw 'Portable Mode UI must stay removed; Clean Mode is selected only by the executable p-suffix.'
 }
 if ($sip003Source -match 'RuntimeEnvironment\.WorkingDirectory' -or
-    $sip003Source -match 'AppContext\.BaseDirectory') {
-    throw 'SIP003 plugin discovery must not depend on the Shadowsocks.exe directory; use absolute paths or PATH.'
+    $sip003Source -match 'AppContext\.BaseDirectory' -or
+    $sip003Source -match 'Path\.IsPathRooted' -or
+    $sip003Source -notmatch 'PluginManager\.ResolveExecutable') {
+    throw 'SIP003 execution must resolve only plugins installed through PluginManager; executable-directory, absolute-path and PATH fallbacks are forbidden.'
+}
+
+
+$selfUpdaterPath = Join-Path $repoRoot 'Shadowsocks.Windows\Controller\Service\SelfUpdater.cs'
+if (-not (Test-Path -LiteralPath $selfUpdaterPath -PathType Leaf)) {
+    throw 'Single-file application self-updater implementation is missing.'
+}
+$selfUpdaterSource = Get-Content -LiteralPath $selfUpdaterPath -Raw
+if ($selfUpdaterSource -notmatch 'namespace\s+Shadowsocks\.Controller\.Service' -or
+    $updateCheckerSource -notmatch 'using\s+Shadowsocks\.Controller\.Service\s*;') {
+    throw 'UpdateChecker must import the SelfUpdater namespace so the release build resolves the updater implementation.'
+}
+if ($selfUpdaterSource -match '(?ms)^\s*Process\.Start\(startInfo\)\s*\?\?\s*throw') {
+    throw 'SelfUpdater contains an invalid standalone null-coalescing Process.Start expression (CS0201).'
+}
+foreach ($updaterToken in @(
+    'Shadowsocks.Update.exe',
+    '--update',
+    '--update-cleanup',
+    'WaitForProcessExit',
+    'File.Replace',
+    'update-backup',
+    'CleanupCompletedUpdate',
+    'ResumeHiddenSwitch',
+    'PayloadSha256Option',
+    'FileShare.Read',
+    'VerifySha256',
+    'fileName.StartsWith("Shadowsocks"')) {
+    if ($selfUpdaterSource -notmatch [regex]::Escape($updaterToken)) {
+        throw "Self-updater is missing required handoff/rollback token: $updaterToken"
+    }
+}
+foreach ($updateCheckerToken in @(
+    'PreferredReleaseZipFilename = "Shadowsocks-win-x64.zip"',
+    'PreferredReleaseZipFilename + ".sha256"',
+    'VerifySha256Async',
+    'ExtractCanonicalExecutable',
+    'ValidatePayloadVersion',
+    'SelfUpdater.ComputeSha256Hex',
+    'SelfUpdater.CreateTransactionDirectory',
+    'SelfUpdater.LaunchStagedUpdater',
+    'X-GitHub-Api-Version',
+    'Shadowsocks-Reborn/')) {
+    if ($updateCheckerSource -notmatch [regex]::Escape($updateCheckerToken)) {
+        throw "Application updater is missing required release-contract token: $updateCheckerToken"
+    }
+}
+if ($updateCheckerSource -match 'explorer\.exe' -or
+    $updateCheckerSource -match 'continuing for backward compatibility' -or
+    $updateCheckerSource -match 'return\s+x64Zip\s*\?\?\s*anyZip' -or
+    $updateCheckerSource -match 'Path\.GetFileName\(\(string\)asset\["name"\]') {
+    throw 'Manual/legacy application-update fallback returned; updater must use strict canonical GitHub assets and self-install.'
+}
+if ($phase7App -notmatch 'checker\.DoUpdate\(\)' -or
+    $phase7App -notmatch 'ShutdownAndExit\(\)') {
+    throw 'Startup update detection must automatically install the selected release and shut down only after updater handoff.'
+}
+if ($updateCheckerSource -notmatch 'AutoStartup\.GetPrimaryExecutablePath\(\)') {
+    throw 'Application self-update must target the primary product EXE, not blindly replace the stable Start-with-Windows copy.'
+}
+$selfUpdaterTestsSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\SelfUpdaterTests.cs') -Raw
+if ($selfUpdaterTestsSource -notmatch 'StagedPayloadHashRejectsTampering' -or
+    $selfUpdaterTestsSource -notmatch 'PayloadSha256Option') {
+    throw 'SelfUpdater tests must guard staged-payload SHA-256 tamper detection and internal argument removal.'
+}
+
+$removedLegacyPaths = @(
+    'Shadowsocks.Windows\Controller\Service\IPCService.cs',
+    'Shadowsocks.Windows\Util\ProcessManagement\ThreadUtil.cs',
+    'Shadowsocks.Core\Util\Util.cs',
+    'Shadowsocks.Core\Util\Sockets\LineReader.cs'
+)
+foreach ($removedLegacyPath in $removedLegacyPaths) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot $removedLegacyPath)) {
+        throw "Retired legacy source file returned: $removedLegacyPath"
+    }
+}
+$legacySourceTokens = @(
+    'LegacyConfigFilePath',
+    'portableMode',
+    'generateLegacyUrl',
+    'warnLegacyUrl',
+    'ParseLegacyURL',
+    'MigrateLegacyConfiguration',
+    'MigrateLegacySidecarData',
+    'TryMigrateLegacyCache',
+    'CleanupLegacyRunValues',
+    'LegacyKeyPrefix',
+    'ResolvePluginPath',
+    'UpdateChecker.Version',
+    'ProgramUpdated',
+    'UpdatedEventArgs',
+    '4.3.0.0',
+    '4.3.1.0',
+    'TODO: support SOCKS5 auth',
+    'Chrome/85.0.4183.83',
+    'LRUCache',
+    'stackoverflow.com/a/3719378'
+)
+$productionSources = @(
+    Get-ChildItem -LiteralPath $repoRoot -Recurse -File -Filter '*.cs' |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj|Shadowsocks\.UnitTests)[\\/]' }
+)
+foreach ($legacyToken in $legacySourceTokens) {
+    $match = $productionSources | Select-String -SimpleMatch $legacyToken | Select-Object -First 1
+    if ($null -ne $match) {
+        $relative = [System.IO.Path]::GetRelativePath($repoRoot, $match.Path)
+        throw "Retired legacy production token returned: ${relative}:$($match.LineNumber): $legacyToken"
+    }
+}
+
+$socks5ProxySource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Proxy\Socks5Proxy.cs') -Raw
+foreach ($socks5Token in @('MethodUsernamePassword', 'AuthenticateUsernamePasswordAsync', 'ReceiveExactAsync', 'AddressTypeDomain')) {
+    if ($socks5ProxySource -notmatch [regex]::Escape($socks5Token)) {
+        throw "SOCKS5 forward proxy is missing required RFC 1928/1929 token: $socks5Token"
+    }
+}
+$httpProxySource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\Proxy\HttpProxy.cs') -Raw
+foreach ($httpProxyToken in @('Shadowsocks-Reborn/{2}', 'StorePending', 'SendAllAsync', 'MaxProxyResponseHeaderBytes')) {
+    if ($httpProxySource -notmatch [regex]::Escape($httpProxyToken)) {
+        throw "HTTP CONNECT forward proxy is missing hardened stream-handling token: $httpProxyToken"
+    }
+}
+if ($httpProxySource -match 'Mozilla/5\.0' -or $httpProxySource -match 'TODO:\s*save last bytes') {
+    throw 'Retired browser User-Agent or tunnel-byte-loss fallback returned to HttpProxy.'
+}
+
+$udpRelaySource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\Service\UDPRelay.cs') -Raw
+foreach ($udpRelayToken in @('TryParseDestination', 'GetAServer(IStrategyCallerType.UDP, remoteEndPoint, destination)', 'UdpAssociationCache', 'using IEncryptor')) {
+    if ($udpRelaySource -notmatch [regex]::Escape($udpRelayToken)) {
+        throw "UDP relay is missing hardened routing/lifecycle token: $udpRelayToken"
+    }
+}
+if ($udpRelaySource -match 'LRUCache' -or $udpRelaySource -match 'stackoverflow\.com/a/3719378' -or $udpRelaySource -match 'null/\*TODO') {
+    throw 'Retired UDP relay legacy cache/destination fallback returned.'
 }
 
 $autoStartupSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Windows\Controller\System\AutoStartup.cs') -Raw
-foreach ($startupToken in @('AppStoragePaths.StartupExecutableFile', 'SHA256.HashData', 'BuildStartupCommand', '--start-hidden', 'AppStoragePaths.IsCleanMode')) {
+foreach ($startupToken in @('AppStoragePaths.StartupExecutableFile', 'SHA256.HashData', 'BuildStartupCommand', '--start-hidden', '--startup-origin', 'GetPrimaryExecutablePath', 'AppStoragePaths.IsCleanMode')) {
     if ($autoStartupSource -notmatch [regex]::Escape($startupToken)) {
         throw "Start with Windows policy is missing token: $startupToken"
     }
@@ -1537,7 +1778,7 @@ foreach ($helperToken in @(
     'SHA256.HashData',
     'Shadowsocks.Reborn.NetworkService.Extraction',
     'FileShare.Read',
-    'Guid.NewGuid()',
+    'deleteOnDispose: false',
     'StaleRuntimeAge')) {
     if ($networkServiceRuntimeSource -notmatch [regex]::Escape($helperToken)) {
         throw "Phase 10 NetworkService runtime materialization is missing token: $helperToken"
@@ -1548,7 +1789,7 @@ if ($adminCaptureSource -notmatch 'NetworkServiceRuntime\.AcquireHelper\(\)' -or
     $adminCaptureSource -notmatch '_helperLease\?\.Dispose\(\)' -or
     $adminCaptureSource -notmatch 'ValidateHelperVersion' -or
     $adminCaptureSource -notmatch 'SendCommandAsync\("ping"') {
-    throw 'Admin Mode must acquire an on-demand NetworkService lease, validate its protocol version, and release/delete it with the elevated broker.'
+    throw 'Admin Mode must acquire an on-demand NetworkService lease, validate its protocol version, and release its guarded handle with the elevated broker.'
 }
 if ($adminCaptureSource -match 'FindHelperPath\(' -or $adminCaptureSource -match 'EnsureHelperAvailable\(') {
     throw 'Legacy sidecar NetworkService discovery must not be used by the Phase 10 product path.'
@@ -1577,5 +1818,112 @@ if ($buildReleaseText -notmatch "Shadowsocks\.NetworkService\.exe" -or
 if ($ciText -notmatch '\$entries\.Count -ne 1' -or $ciText -notmatch "Shadowsocks\.exe") {
     throw 'CI must require exactly one product publish file: Shadowsocks.exe.'
 }
+if ($ciText -notmatch 'FileVersionInfo' -or
+    $ciText -notmatch 'expectedFileVersion' -or
+    $ciText -notmatch 'actualFileVersion') {
+    throw 'CI must verify the published Shadowsocks.exe FileVersion against the product project version.'
+}
 
-Write-Host 'Validated Phase 10 LocalAppData/Clean-Mode storage policy, embedded-only localization, guarded on-demand NetworkService extraction, and one-file release layout.'
+$workflowPins = @(
+    'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68',
+    'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+)
+foreach ($relativeWorkflow in @('.github\workflows\ci.yml', '.github\workflows\release.yml')) {
+    $workflowText = Get-Content -LiteralPath (Join-Path $repoRoot $relativeWorkflow) -Raw
+    foreach ($pin in $workflowPins) {
+        if ($workflowText -notmatch [regex]::Escape($pin)) {
+            throw "GitHub Actions supply-chain pin is missing from ${relativeWorkflow}: $pin"
+        }
+    }
+    if ($workflowText -notmatch 'persist-credentials:\s*false') {
+        throw "GitHub checkout credentials must not remain persisted in ${relativeWorkflow}."
+    }
+    if ($workflowText -notmatch 'dotnet-version:\s*10\.0\.303') {
+        throw "GitHub release/CI workflow must pin the security-patched .NET SDK 10.0.303 baseline: ${relativeWorkflow}."
+    }
+}
+
+$dnsPageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\DnsPage.cs') -Raw
+foreach ($dohPresetToken in @(
+    'https://cloudflare-dns.com/dns-query',
+    'https://dns.google/dns-query',
+    'https://dns.quad9.net/dns-query',
+    'https://dns10.quad9.net/dns-query',
+    'https://dns.adguard-dns.com/dns-query',
+    'https://unfiltered.adguard-dns.com/dns-query')) {
+    if ($dnsPageSource -notmatch [regex]::Escape($dohPresetToken)) {
+        throw "DNS page is missing built-in DoH provider endpoint: $dohPresetToken"
+    }
+}
+
+$rootMarkdown = @(Get-ChildItem -LiteralPath $repoRoot -File -Filter '*.md')
+if ($rootMarkdown.Count -ne 0) {
+    throw "Repository Markdown documentation must live in docs for Wiki synchronization. Root Markdown found: $($rootMarkdown.Name -join ', ')"
+}
+foreach ($requiredDoc in @(
+    'docs\README.md',
+    'docs\README.ru.md',
+    'docs\Home.md',
+    'docs\_Sidebar.md',
+    'docs\ARCHITECTURE.md',
+    'docs\CHANGELOG.md',
+    'docs\CONTRIBUTING.md',
+    'docs\RELEASE_CHECKLIST.md',
+    'docs\SECURITY.md',
+    'docs\LICENSE.md',
+    'docs\STORAGE_POLICY.md',
+    'docs\THIRD-PARTY-NOTICES.md',
+    'docs\WINDOWS11_UI_GUIDE.md')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $requiredDoc) -PathType Leaf)) {
+        throw "Required docs/Wiki source is missing: $requiredDoc"
+    }
+}
+
+$licenseText = Get-Content -LiteralPath (Join-Path $repoRoot 'LICENSE.txt') -Raw
+$thirdPartyNoticesText = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\THIRD-PARTY-NOTICES.md') -Raw
+$coreEmbeddedResourcesSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.Core\EmbeddedResources.cs') -Raw
+$aboutPageSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Pages\AboutPage.cs') -Raw
+foreach ($requiredLicenseToken in @('Shadowsocks Reborn', 'GPL-3.0-or-later', 'GNU GENERAL PUBLIC LICENSE', 'Version 3, 29 June 2007')) {
+    if ($licenseText -notmatch [regex]::Escape($requiredLicenseToken)) {
+        throw "LICENSE.txt is missing required product-license token: $requiredLicenseToken"
+    }
+}
+foreach ($obsoleteLicenseToken in @('Privoxy', 'mbed TLS', 'libsodium')) {
+    if ($licenseText -match [regex]::Escape($obsoleteLicenseToken)) {
+        throw "LICENSE.txt contains obsolete third-party material that belongs in docs/THIRD-PARTY-NOTICES.md: $obsoleteLicenseToken"
+    }
+}
+foreach ($requiredNoticeToken in @(
+    'Bouncy Castle Cryptography for .NET',
+    'Google.Protobuf',
+    'Newtonsoft.Json',
+    'NLog',
+    'WinUIEx',
+    'ZXing.Net',
+    'System.Management',
+    'System.Drawing.Common',
+    'Windows App SDK',
+    'dnscrypt-proxy',
+    'WinDivert',
+    'ByteCircularBuffer',
+    'Adblock Plus-derived PAC helper')) {
+    if ($thirdPartyNoticesText -notmatch [regex]::Escape($requiredNoticeToken)) {
+        throw "docs/THIRD-PARTY-NOTICES.md is missing current component: $requiredNoticeToken"
+    }
+}
+if ($coreEmbeddedResourcesSource -notmatch 'ProductLicense\s*=>\s*ReadRequiredText' -or
+    $coreEmbeddedResourcesSource -notmatch 'ThirdPartyNotices\s*=>\s*ReadRequiredText') {
+    throw 'EmbeddedResources must expose non-empty type-safe ProductLicense and ThirdPartyNotices resources.'
+}
+if ($aboutPageSource -notmatch 'EmbeddedResources\.ProductLicense' -or
+    $aboutPageSource -notmatch 'EmbeddedResources\.ThirdPartyNotices') {
+    throw 'About page must display legal resources through EmbeddedResources rather than fragile manifest-name literals.'
+}
+
+& (Join-Path $PSScriptRoot 'Validate-DnsCrypt.ps1')
+
+if ($networkServiceRuntimeSource -match 'Environment\.ProcessId[\s\S]{0,120}Guid\.NewGuid') {
+    throw 'NetworkService helper path must remain stable per version/SHA so Windows Firewall consent is not requested on every Admin Mode start.'
+}
+Write-Host 'Validated Phase 10 LocalAppData/Clean-Mode storage policy, embedded-only localization, stable guarded NetworkService extraction, and one-file release layout.'

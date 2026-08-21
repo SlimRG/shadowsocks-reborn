@@ -158,7 +158,7 @@ namespace Shadowsocks.Controller
                 byte[] body = Encoding.UTF8.GetBytes(pacContent);
                 string responseHead =
                     $"HTTP/1.1 200 OK\r\n" +
-                    $"Server: ShadowsocksWindows/{ApplicationInfo.Version}\r\n" +
+                    $"Server: Shadowsocks-Reborn/{ApplicationInfo.Version}\r\n" +
                     "Content-Type: application/x-ns-proxy-autoconfig; charset=utf-8\r\n" +
                     $"Content-Length: {body.Length}\r\n" +
                     "Cache-Control: no-cache\r\n" +

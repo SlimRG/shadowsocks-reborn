@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Shadowsocks.Core;
 using Shadowsocks.Core.Storage;
 
 namespace Shadowsocks.Controller.Service
@@ -318,7 +319,7 @@ namespace Shadowsocks.Controller.Service
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Shadowsocks-Reborn", "5.0"));
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Shadowsocks-Reborn", ApplicationInfo.Version));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
             return client;
         }

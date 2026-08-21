@@ -25,6 +25,7 @@ internal sealed class WinUIPageContext
         Action<bool> setAlwaysOnTop,
         Func<HotkeyConfig, IReadOnlyList<string>> registerHotkeys,
         Func<HotkeyConfig, IReadOnlyList<string>> applyHotkeys,
+        Action requestApplicationExit,
         ILocalizationService localization)
     {
         Controller = controller;
@@ -40,6 +41,7 @@ internal sealed class WinUIPageContext
         SetAlwaysOnTop = setAlwaysOnTop;
         RegisterHotkeys = registerHotkeys;
         ApplyHotkeys = applyHotkeys;
+        RequestApplicationExit = requestApplicationExit ?? throw new ArgumentNullException(nameof(requestApplicationExit));
         Localization = localization ?? throw new ArgumentNullException(nameof(localization));
     }
 
@@ -62,6 +64,7 @@ internal sealed class WinUIPageContext
     public Action<bool> SetAlwaysOnTop { get; }
     public Func<HotkeyConfig, IReadOnlyList<string>> RegisterHotkeys { get; }
     public Func<HotkeyConfig, IReadOnlyList<string>> ApplyHotkeys { get; }
+    public Action RequestApplicationExit { get; }
     public ILocalizationService Localization { get; }
 
     public string L(string key) => Localization[key];

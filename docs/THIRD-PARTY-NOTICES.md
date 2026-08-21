@@ -1,0 +1,143 @@
+﻿# Third-party notices
+
+This document records third-party software that is compiled into, linked by, derived into, or downloaded by Shadowsocks Reborn 5.2.22.
+
+The Shadowsocks Reborn application itself is licensed under **GPL-3.0-or-later**. Third-party components remain under their own licenses. A dependency listed here is not relicensed under the Shadowsocks Reborn license.
+
+> Russian note / Примечание: названия лицензий и юридические условия ниже сохраняются на языке оригинала. Русский интерфейс локализует название раздела, но не подменяет оригинальный текст лицензий неофициальным переводом.
+
+## Runtime components included in the application
+
+| Component | Version | License / terms | Purpose |
+| --- | ---: | --- | --- |
+| Bouncy Castle Cryptography for .NET | 2.7.0 | MIT-style Bouncy Castle License; bundled modified Bzip2 code is Apache-2.0 | Managed Minisign/Ed25519 verification for DNSCrypt release assets |
+| Google.Protobuf | 3.35.1 | BSD-3-Clause | GeoSite/protobuf data parsing |
+| Newtonsoft.Json | 13.0.4 | MIT | JSON parsing and configuration/update data |
+| NLog | 6.2.0 | BSD-3-Clause | Application logging |
+| WinUIEx | 2.9.3 | MIT | WinUI window/tray integration |
+| ZXing.Net | 0.16.11 | Apache-2.0 | QR-code support |
+| System.Management | 10.0.11 | MIT (.NET Runtime) | Windows management APIs |
+| System.Drawing.Common | 10.0.11 | MIT (.NET Runtime) | Windows image/graphics compatibility used by UI integration |
+| .NET 10 runtime libraries | 10.0.11 security baseline (release SDK 10.0.303+) | MIT plus the .NET Runtime repository's third-party notices | Self-contained .NET runtime |
+| Windows App SDK | 2.4.0 | Microsoft package license terms; source repository is MIT-licensed where stated by Microsoft | Self-contained Windows App SDK runtime |
+| Microsoft.WindowsAppSDK.WinUI | 2.3.6 | Microsoft package license terms supplied with the NuGet package | WinUI 3 UI runtime |
+
+### Bouncy Castle Cryptography for .NET
+
+Project: https://www.bouncycastle.org/csharp/
+Source: https://github.com/bcgit/bc-csharp
+Package: `BouncyCastle.Cryptography` 2.7.0
+
+Copyright (c) 2000-2026 The Legion of the Bouncy Castle Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sub license, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+The Bouncy Castle package also contains a modified Bzip2 implementation licensed under Apache License 2.0. See: https://www.apache.org/licenses/LICENSE-2.0
+
+### Newtonsoft.Json and MIT-licensed managed dependencies
+
+Newtonsoft.Json source: https://github.com/JamesNK/Newtonsoft.Json
+WinUIEx source: https://github.com/dotMorten/WinUIEx
+.NET Runtime source: https://github.com/dotnet/runtime
+
+These components are distributed under the MIT license (or, for Microsoft package payloads, the package-specific terms identified above). The applicable copyright and license files remain authoritative.
+
+### Google.Protobuf
+
+Package: `Google.Protobuf` 3.35.1
+Source: https://github.com/protocolbuffers/protobuf
+License: BSD-3-Clause
+Copyright: Google Inc. and contributors.
+
+### NLog
+
+Package: `NLog` 6.2.0
+Source: https://github.com/NLog/NLog
+License: BSD-3-Clause
+Copyright (c) 2004-2026 NLog Project.
+
+### ZXing.Net
+
+Package: `ZXing.Net` 0.16.11
+Source: https://github.com/micjahn/ZXing.Net
+License: Apache-2.0
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
+
+### Windows App SDK / WinUI 3
+
+Packages used by the application include `Microsoft.WindowsAppSDK` 2.4.0 and `Microsoft.WindowsAppSDK.WinUI` 2.3.6. The application uses self-contained Windows App SDK deployment.
+
+Source repository: https://github.com/microsoft/WindowsAppSDK
+NuGet package pages:
+- https://www.nuget.org/packages/Microsoft.WindowsAppSDK/2.4.0
+- https://www.nuget.org/packages/Microsoft.WindowsAppSDK.WinUI/2.3.6
+
+**Important:** binary redistribution is governed by the license terms shipped with the corresponding Microsoft NuGet packages. The MIT license of source portions in the public Windows App SDK repository must not be used to replace package-specific binary license terms.
+
+## Source-derived code included in the repository
+
+### ByteCircularBuffer
+
+File: `Shadowsocks.Core/Encryption/CircularBuffer/ByteCircularBuffer.cs`
+License: BSD-3-Clause / New BSD License.
+
+Copyright (c) 2014-2015 Cyotek Ltd
+Copyright (c) 2012 Alex Regueiro
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the copyright notice, conditions and disclaimer in the source file are retained/reproduced as required by the BSD license. The complete original notice is preserved verbatim at the top of `ByteCircularBuffer.cs`.
+
+### Adblock Plus-derived PAC helper
+
+File: `Shadowsocks.Core/Data/abp.js`
+Origin: Adblock Plus / Eyeo GmbH
+License: GNU GPL version 3.
+Copyright (C) 2006-2014 Eyeo GmbH.
+
+The original GPL notice is preserved in the embedded source file. Shadowsocks Reborn is itself distributed under GPL-3.0-or-later.
+
+## Optional runtime components downloaded on demand
+
+These executables/drivers are **not included in the Shadowsocks Reborn GitHub release ZIP**. The application downloads official upstream artifacts only when the corresponding feature is requested.
+
+### dnscrypt-proxy
+
+Version: selected verified upstream release
+Project/source: https://github.com/DNSCrypt/dnscrypt-proxy
+License: ISC.
+
+`dnscrypt-proxy.exe` is not bundled in `Shadowsocks-win-x64.zip`. The application downloads the official Windows x64 release and verifies the signed release material before activation. The downloaded component remains an independent work under the DNSCrypt project's ISC license.
+
+### WinDivert
+
+Version: 2.2.2
+Project/source: https://github.com/basil00/WinDivert
+License: user's choice of GNU LGPL version 3 or GNU GPL version 2.
+
+`WinDivert.dll` and `WinDivert64.sys` are not bundled in `Shadowsocks-win-x64.zip`. Administrator Mode downloads the pinned official WinDivert 2.2.2 x64 archive and verifies pinned SHA-256 hashes before using the runtime. Complete upstream license terms are available in the WinDivert `LICENSE` file.
+
+## Build-time tooling (not shipped in the release executable)
+
+| Component | Version | License | Role |
+| --- | ---: | --- | --- |
+| Fody | 6.9.3 | MIT | Build-time IL weaving infrastructure |
+| Caseless.Fody | 1.9.1 | MIT | Build-time weaving plugin |
+| Microsoft.Windows.SDK.BuildTools | 10.0.28000.2526 | Microsoft package terms | Windows SDK build tooling |
+
+Build/test-only packages such as MSTest and Microsoft.NET.Test.Sdk are development dependencies and are not part of the product release artifact.
+
+## Source and corresponding source
+
+Shadowsocks Reborn source code, build scripts and release metadata are published at:
+
+https://github.com/SlimRG/shadowsocks-reborn
+
+For third-party components, the upstream source URLs above identify the corresponding projects. Exact package versions used for release builds are pinned in the repository `.csproj` files.
+
+## No warranty
+
+Third-party names and trademarks belong to their respective owners. Inclusion of a component or reference to an upstream project does not imply endorsement. Each component is provided subject to its own warranty disclaimer and license terms.

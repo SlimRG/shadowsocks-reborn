@@ -10,7 +10,7 @@ This document defines the current WinUI 3 presentation rules. It is not a migrat
 - Closing the window hides it; tray state remains active until explicit Quit.
 - Keep persistent application preferences in the main Settings page. The tray is for quick runtime actions, not logging/update preference switches.
 - Settings exposes the current data root with an explicit LocalAppData/Clean Mode folder action. In Clean Mode the Start with Windows control is disabled and the displayed root points to the Temp session.
-- New profiles check for updates at startup by default. Update preferences live under About & updates; verbose logging and plugin-output preferences live on the Logs page.
+- New profiles automatically download, verify and install newer releases after startup by default. Update preferences live under About & updates; verbose logging and plugin-output preferences live on the Logs page.
 - Command labels do not use trailing ellipses; reserve ellipses for transient progress/status text.
 - Tray integration belongs to `Shadowsocks.Windows.WinUI`; base `Shadowsocks.Windows` stays WinUI-free.
 
@@ -49,7 +49,7 @@ Code-only pages are constructed explicitly and hosted in the shell. Avoid introd
 ## Servers, plugins and secrets
 
 - Server Name appears before Server IP in the editor.
-- The server plugin field is a `ComboBox`: `None`, installed managed plugins, and any existing legacy value needed to preserve configuration compatibility.
+- The server plugin field is a `ComboBox`: `None` plus plugins installed and resolved by `PluginManager`; arbitrary PATH/absolute executable fallbacks are not exposed.
 - Plugin Options and optional Plugin Arguments remain per-server settings.
 - The Plugins page owns installation/removal. Built-in entries are `xray-plugin`, `v2ray-plugin` and `qtun`; manual import accepts ZIP and TAR.GZ packages.
 - Plugin packages are stored below the active storage root so Clean Mode automatically uses its Temp session.
@@ -74,7 +74,7 @@ Long-running network/update operations must use async controller APIs and keep t
 
 ## Localization
 
-- WinUI depends on `ILocalizationService`, not direct legacy static UI calls.
+- WinUI depends on `ILocalizationService`; pages do not use the Core compatibility facade directly.
 - One localization service instance flows through app, shell, pages and tray integration.
 - Static control text is localized after control-tree construction; dynamic/formatted text uses page-context localization helpers.
 - Do not use translated labels as persisted enum/configuration values.
@@ -104,7 +104,7 @@ Long-running network/update operations must use async controller APIs and keep t
 - Mica material
 - Windows app settings guidelines
 
-Use current Microsoft documentation when changing these primitives rather than preserving obsolete migration-era workarounds.
+Use current Microsoft documentation when changing these primitives; do not preserve retired framework workarounds.
 
 - Main pages use a fixed 16-DIP content gutter in every `NavigationView` display mode; page-specific max-width centering must not shift the left edge.
 

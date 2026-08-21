@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Core.Storage;
+using Shadowsocks.Controller;
 using Shadowsocks.Model;
 
 namespace Shadowsocks.UnitTests
@@ -24,6 +25,11 @@ namespace Shadowsocks.UnitTests
             Assert.IsTrue(AppStoragePaths.SettingsFile.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(AppStoragePaths.PluginsDirectory.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.AreEqual(Path.Combine(AppStoragePaths.StorageRoot, "Plugins"), AppStoragePaths.PluginsDirectory);
+            Assert.AreEqual(Path.Combine(AppStoragePaths.StorageRoot, "Components"), AppStoragePaths.ComponentsDirectory);
+            Assert.AreEqual(Path.Combine(AppStoragePaths.ComponentsDirectory, "DNSCryptProxy"), AppStoragePaths.DnsCryptComponentDirectory);
+            Assert.AreEqual(Path.Combine(AppStoragePaths.RuntimeRoot, "DNSCryptProxy"), AppStoragePaths.DnsCryptRuntimeDirectory);
+            Assert.AreEqual(Path.Combine(AppStoragePaths.TempUpdatesRoot, "DNSCryptProxy"), AppStoragePaths.DnsCryptUpdateDirectory);
+            Assert.IsTrue(AppStoragePaths.DnsCryptComponentDirectory.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.IsTrue(AppStoragePaths.StartupExecutableFile.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase));
             Assert.AreEqual("Shadowsocks.exe", Path.GetFileName(AppStoragePaths.StartupExecutableFile));
         }
@@ -124,16 +130,6 @@ namespace Shadowsocks.UnitTests
             Assert.AreEqual(1081, restoredConfig.localPort);
         }
 
-        [TestMethod]
-        public void LegacyPortableFlagIsAlwaysDisabledAfterProcessing()
-        {
-            Configuration configuration = new() { portableMode = true };
-
-            Configuration.Process(ref configuration);
-
-            Assert.IsFalse(configuration.portableMode);
-        }
-
         private sealed class MemorySettingsStore : ISettingsStore
         {
             private readonly Dictionary<string, object> values = new(StringComparer.Ordinal);
@@ -166,5 +162,48 @@ namespace Shadowsocks.UnitTests
 
             public void DeleteValue(string name) => values.Remove(name);
         }
+        [TestMethod]
+        public void StartupCopyResolvesOriginalExecutableForSelfUpdate()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "ShadowsocksTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                string startup = Path.Combine(root, "Startup", "Shadowsocks.exe");
+                string original = Path.Combine(root, "Shadowsocks-main.exe");
+                Directory.CreateDirectory(Path.GetDirectoryName(startup)!);
+                File.WriteAllText(startup, "startup");
+                File.WriteAllText(original, "original");
+
+                string resolved = AutoStartup.ResolvePrimaryExecutablePath(
+                    startup,
+                    startup,
+                    new[] { "--start-hidden", AutoStartup.StartupOriginOption, original });
+
+                Assert.AreEqual(Path.GetFullPath(original), resolved);
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, recursive: true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void StartupCopyRejectsMissingOriginForSelfUpdate()
+        {
+            string startup = Path.Combine(Path.GetTempPath(), "ShadowsocksTests", Guid.NewGuid().ToString("N"), "Shadowsocks.exe");
+            string missing = Path.Combine(Path.GetDirectoryName(startup)!, "Shadowsocks-missing.exe");
+
+            string resolved = AutoStartup.ResolvePrimaryExecutablePath(
+                startup,
+                startup,
+                new[] { AutoStartup.StartupOriginOption, missing });
+
+            Assert.AreEqual(Path.GetFullPath(startup), resolved);
+        }
+
     }
 }

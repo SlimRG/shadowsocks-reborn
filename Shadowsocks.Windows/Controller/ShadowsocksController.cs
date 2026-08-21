@@ -18,7 +18,7 @@ using Shadowsocks.Core;
 
 namespace Shadowsocks.Controller
 {
-    public class ShadowsocksController
+    public partial class ShadowsocksController
     {
         private readonly Logger logger;
         private readonly HttpClient httpClient;
@@ -37,6 +37,15 @@ namespace Shadowsocks.Controller
         private readonly TrafficPolicyEngine _trafficPolicyEngine;
         private readonly AdminCaptureManager _adminCaptureManager;
         private readonly GameModeManager _gameModeManager;
+        private readonly DnsCryptComponentManager _dnsCryptComponentManager;
+        private readonly DnsCryptRuntimeManager _dnsCryptRuntimeManager;
+        private readonly DnsCryptCoordinator _dnsCryptCoordinator;
+        private IReadOnlyList<DnsCryptResolverInfo> _dnsCryptResolverCatalog = Array.Empty<DnsCryptResolverInfo>();
+        private IReadOnlyList<string> _dnsCryptAutomaticServerNames = Array.Empty<string>();
+        private DateTimeOffset _dnsCryptResolverCatalogLoadedUtc;
+        private readonly SemaphoreSlim _dnsCaptureRefreshGate = new(1, 1);
+        private int _suppressDnsCaptureRefresh;
+        private Version _latestDnsCryptVersion;
         private ManagedHttpProxyService _managedHttpProxy;
         private readonly ConcurrentDictionary<Server, Sip003Plugin> _pluginsByServer;
         private Exception _lastListenerError;
@@ -48,16 +57,11 @@ namespace Shadowsocks.Controller
         public Queue<TrafficPerSecond> trafficPerSecondQueue;
 
         private bool stopped = false;
+        private long _trafficConfigurationGeneration;
 
         public class PathEventArgs : EventArgs
         {
             public string Path;
-        }
-
-        public class UpdatedEventArgs : EventArgs
-        {
-            public string OldVersion;
-            public string NewVersion;
         }
 
         public class TrafficPerSecond
@@ -74,8 +78,10 @@ namespace Shadowsocks.Controller
         public event EventHandler ShareOverLANStatusChanged;
         public event EventHandler VerboseLoggingStatusChanged;
         public event EventHandler ShowPluginOutputChanged;
+        public event EventHandler ShowDnsLogsChanged;
         public event EventHandler TrafficChanged;
         public event EventHandler TrafficModeChanged;
+        public event EventHandler DnsCryptStatusChanged;
 
         // when user clicked Edit PAC, and PAC file has already created
         public event EventHandler<PathEventArgs> PACFileReadyToOpen;
@@ -87,8 +93,6 @@ namespace Shadowsocks.Controller
 
         public event ErrorEventHandler Errored;
 
-        // Invoked when controller.Start();
-        public event EventHandler<UpdatedEventArgs> ProgramUpdated;
         #endregion
 
         public ShadowsocksController(IUserInteractionService userInteraction = null)
@@ -103,17 +107,27 @@ namespace Shadowsocks.Controller
             _adminCaptureManager = new AdminCaptureManager();
             _gameModeManager = new GameModeManager(_adminCaptureManager);
             _gameModeManager.StatusChanged += (_, _) => TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+            _dnsCryptComponentManager = new DnsCryptComponentManager();
+            _dnsCryptRuntimeManager = new DnsCryptRuntimeManager(
+                _dnsCryptComponentManager,
+                () => _config?.showDnsLogs == true,
+                () => _config?.isVerboseLogging == true);
+            _dnsCryptCoordinator = new DnsCryptCoordinator();
+            _dnsCryptRuntimeManager.StatusChanged += (_, _) =>
+            {
+                RememberAutomaticDnsCryptRuntimeResolver();
+                DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
+                if (Volatile.Read(ref _suppressDnsCaptureRefresh) == 0)
+                    _ = RefreshDnsCaptureAfterRuntimeChangeAsync();
+            };
+            _dnsCryptRuntimeManager.ResolverMetricsChanged += (_, _) =>
+            {
+                RememberAutomaticDnsCryptRuntimeResolver();
+                DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
+            };
             _pluginsByServer = new ConcurrentDictionary<Server, Sip003Plugin>();
             StartTrafficStatistics(61);
 
-            ProgramUpdated += (o, e) =>
-            {
-                // version update precedures
-                if (e.OldVersion == "4.3.0.0" || e.OldVersion == "4.3.1.0")
-                    _config.geositeDirectGroups.Add("private");
-
-                logger.Info($"Updated from {e.OldVersion} to {e.NewVersion}");
-            };
         }
 
         #region Basic
@@ -123,15 +137,13 @@ namespace Shadowsocks.Controller
 
         public void Start(bool systemWakeUp = false)
         {
+            _dnsCryptCoordinator.Resume();
             stopped = false;
             if (_config.firstRunOnNewVersion && !systemWakeUp)
             {
-                ProgramUpdated.Invoke(this, new UpdatedEventArgs()
-                {
-                    OldVersion = _config.version,
-                    NewVersion = UpdateChecker.Version,
-                });
-                // delete pac.txt when regeneratePacOnUpdate is true
+                string previousVersion = string.IsNullOrWhiteSpace(_config.version) ? "unknown" : _config.version;
+                logger.Info("Updated from {0} to {1}", previousVersion, ApplicationInfo.Version);
+                // Delete pac.txt when regeneratePacOnUpdate is true.
                 if (_config.regeneratePacOnUpdate)
                     try
                     {
@@ -144,10 +156,11 @@ namespace Shadowsocks.Controller
                     }
                 // finish up first run of new version
                 _config.firstRunOnNewVersion = false;
-                _config.version = UpdateChecker.Version;
+                _config.version = ApplicationInfo.Version;
                 Configuration.Save(_config);
             }
             Reload();
+            StartDnsCryptMaintenance();
         }
 
         public void Stop()
@@ -157,9 +170,46 @@ namespace Shadowsocks.Controller
                 return;
             }
             stopped = true;
+            // Cancel DNSCrypt downloads/update validation before tearing down capture/runtime.
+            // This is also used by Windows suspend, so no maintenance task keeps Clean Mode
+            // files or runtime processes alive across Stop()/Start().
+            StopDnsCryptMaintenance();
+
+            // A manual install/update/settings transaction can still be running while the app
+            // exits or Windows suspends. Cancel it, wait for the shared DNS transaction gate,
+            // then tear capture down before the local DNS listener.
             try
             {
-                _gameModeManager.StopAsync().GetAwaiter().GetResult();
+                _dnsCryptCoordinator.SuspendAndExecuteAsync(
+                    "Stop DNSCrypt subsystem",
+                    async _ =>
+                    {
+                        Interlocked.Increment(ref _suppressDnsCaptureRefresh);
+                        try
+                        {
+                            try
+                            {
+                                await _gameModeManager.StopAsync().ConfigureAwait(false);
+                            }
+                            catch (Exception exception)
+                            {
+                                logger.LogUsefulException(exception);
+                            }
+
+                            try
+                            {
+                                await _dnsCryptRuntimeManager.StopAsync().ConfigureAwait(false);
+                            }
+                            catch (Exception exception)
+                            {
+                                logger.LogUsefulException(exception);
+                            }
+                        }
+                        finally
+                        {
+                            Interlocked.Decrement(ref _suppressDnsCaptureRefresh);
+                        }
+                    }).GetAwaiter().GetResult();
             }
             catch (Exception exception)
             {
@@ -196,9 +246,12 @@ namespace Shadowsocks.Controller
             // some logic in configuration updated the config when saving, we need to read it again
             _config = Configuration.Load();
             Configuration.Process(ref _config);
+            long trafficConfigurationGeneration = Interlocked.Increment(ref _trafficConfigurationGeneration);
             if (!_config.HasConfiguredServer)
             {
-                logger.Warn("No Shadowsocks server is configured. Proxy relay will stay inactive until a server is added. Settings are stored under the active application data root.");
+                logger.Warn(
+                    "No Shadowsocks server is configured. Proxy relay will stay inactive until a server is added. " +
+                    "Settings are stored under the active application data root.");
             }
             if (!_config.useOnlinePac)
                 GeositeUpdater.ConfigureSources(_config.geositeUrls);
@@ -271,7 +324,7 @@ namespace Shadowsocks.Controller
                 }
                 _listener = new Listener(services);
                 _listener.Start(_config);
-                _ = ApplyTrafficCaptureAsync(_config);
+                _ = ApplyTrafficCaptureAsync(_config, trafficConfigurationGeneration);
             }
             catch (Exception e)
             {
@@ -347,8 +400,8 @@ namespace Shadowsocks.Controller
         {
             _config.configs = servers;
             _config.localPort = localPort;
-            _config.portableMode = false;
             Configuration.Save(_config);
+            QueueDnsCryptAutomaticResolverRefresh();
         }
 
         public void SelectServerIndex(int index)
@@ -356,6 +409,7 @@ namespace Shadowsocks.Controller
             _config.index = index;
             _config.strategy = null;
             SaveConfig(_config);
+            QueueDnsCryptAutomaticResolverRefresh();
         }
 
         public bool RemoveServerAt(int index)
@@ -434,12 +488,23 @@ namespace Shadowsocks.Controller
                 _gameModeManager.AutomaticGameMode || _adminCaptureManager.IsGameMode,
                 _adminCaptureManager.IsCaptureActive && _adminCaptureManager.TcpRedirectPort > 0,
                 _adminCaptureManager.IsCaptureActive && _adminCaptureManager.UdpRedirectPort > 0,
+                _adminCaptureManager.DnsInterceptionActive,
+                _adminCaptureManager.DnsFailClosedActive,
                 _adminCaptureManager.TcpRedirectPort,
                 _adminCaptureManager.UdpRedirectPort,
                 _gameModeManager.RunningGameApplications.ToArray());
         }
 
-        public async Task<bool> SetTrafficCaptureModeAsync(TrafficCaptureMode mode)
+        public Task<bool> SetTrafficCaptureModeAsync(TrafficCaptureMode mode)
+        {
+            return _dnsCryptCoordinator.ExecuteExclusiveAsync(
+                "Set traffic capture mode",
+                cancellationToken => SetTrafficCaptureModeCoreAsync(mode, cancellationToken));
+        }
+
+        private async Task<bool> SetTrafficCaptureModeCoreAsync(
+            TrafficCaptureMode mode,
+            CancellationToken cancellationToken)
         {
             TrafficCaptureMode previousMode = _config.trafficCaptureMode;
             _config.trafficCaptureMode = mode;
@@ -447,7 +512,8 @@ namespace Shadowsocks.Controller
 
             try
             {
-                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken).ConfigureAwait(false);
+                await StopDnsCryptRuntimeWhenNotRequiredAsync(cancellationToken).ConfigureAwait(false);
                 Configuration.Save(_config);
                 TrafficModeChanged?.Invoke(this, EventArgs.Empty);
                 ConfigChanged?.Invoke(this, EventArgs.Empty);
@@ -473,7 +539,8 @@ namespace Shadowsocks.Controller
             Configuration.Save(_config);
             try
             {
-                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, CancellationToken.None).ConfigureAwait(false);
+                await StopDnsCryptRuntimeWhenNotRequiredAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -484,10 +551,23 @@ namespace Shadowsocks.Controller
             return false;
         }
 
-        public async Task<bool> SaveTrafficRoutingAsync(
+        public Task<bool> SaveTrafficRoutingAsync(
             TrafficCaptureMode captureMode,
             IEnumerable<ApplicationRouteRule> applicationRules,
             IEnumerable<string> gameModeApplications)
+        {
+            ApplicationRouteRule[] rulesSnapshot = (applicationRules ?? []).ToArray();
+            string[] gamesSnapshot = (gameModeApplications ?? []).ToArray();
+            return _dnsCryptCoordinator.ExecuteExclusiveAsync(
+                "Save traffic routing",
+                cancellationToken => SaveTrafficRoutingCoreAsync(captureMode, rulesSnapshot, gamesSnapshot, cancellationToken));
+        }
+
+        private async Task<bool> SaveTrafficRoutingCoreAsync(
+            TrafficCaptureMode captureMode,
+            IEnumerable<ApplicationRouteRule> applicationRules,
+            IEnumerable<string> gameModeApplications,
+            CancellationToken cancellationToken)
         {
             _config.applicationRules = (applicationRules ?? [])
                 .Where(rule => rule is not null && !string.IsNullOrWhiteSpace(rule.application))
@@ -509,7 +589,8 @@ namespace Shadowsocks.Controller
             _config.trafficCaptureMode = captureMode;
             try
             {
-                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken).ConfigureAwait(false);
+                await StopDnsCryptRuntimeWhenNotRequiredAsync(cancellationToken).ConfigureAwait(false);
                 Configuration.Save(_config);
                 TrafficModeChanged?.Invoke(this, EventArgs.Empty);
                 ConfigChanged?.Invoke(this, EventArgs.Empty);
@@ -531,7 +612,8 @@ namespace Shadowsocks.Controller
             Configuration.Save(_config);
             try
             {
-                await _gameModeManager.ApplyConfigurationAsync(_config, GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, CancellationToken.None).ConfigureAwait(false);
+                await StopDnsCryptRuntimeWhenNotRequiredAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
             {
@@ -542,18 +624,61 @@ namespace Shadowsocks.Controller
             return false;
         }
 
-        private async Task ApplyTrafficCaptureAsync(Configuration configurationAtStart)
+        private async Task StopDnsCryptRuntimeWhenNotRequiredAsync(CancellationToken cancellationToken)
         {
+            if (IsDnsCryptRuntimeRequired() || !_dnsCryptRuntimeManager.GetStatus().IsServing)
+            {
+                return;
+            }
+
+            Interlocked.Increment(ref _suppressDnsCaptureRefresh);
             try
             {
-                await _gameModeManager.ApplyConfigurationAsync(
+                await _dnsCryptRuntimeManager.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _suppressDnsCaptureRefresh);
+            }
+        }
+
+        private Task ApplyTrafficCaptureAsync(
+            Configuration configurationAtStart,
+            long configurationGeneration)
+        {
+            return _dnsCryptCoordinator.ExecuteExclusiveAsync(
+                "Apply traffic capture configuration",
+                cancellationToken => ApplyTrafficCaptureStartupCoreAsync(
                     configurationAtStart,
-                    GetCaptureExclusionProcessIds()).ConfigureAwait(false);
+                    configurationGeneration,
+                    cancellationToken));
+        }
+
+        private async Task ApplyTrafficCaptureStartupCoreAsync(
+            Configuration configurationAtStart,
+            long configurationGeneration,
+            CancellationToken cancellationToken)
+        {
+            if (stopped
+                || configurationGeneration != Volatile.Read(ref _trafficConfigurationGeneration)
+                || !ReferenceEquals(_config, configurationAtStart))
+            {
+                return;
+            }
+
+            try
+            {
+                await ApplyTrafficCaptureConfigurationCoreAsync(
+                    configurationAtStart,
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (AdminElevationCanceledException exception)
             {
                 logger.Info(exception, "Administrator elevation for Admin Mode was cancelled.");
-                if (ReferenceEquals(_config, configurationAtStart) && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
+                if (!stopped
+                    && configurationGeneration == Volatile.Read(ref _trafficConfigurationGeneration)
+                    && ReferenceEquals(_config, configurationAtStart)
+                    && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
                 {
                     _config.trafficCaptureMode = TrafficCaptureMode.User;
                     Configuration.Save(_config);
@@ -561,10 +686,17 @@ namespace Shadowsocks.Controller
                     ConfigChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The coordinator caller was cancelled before this configuration became active.
+            }
             catch (Exception exception)
             {
                 logger.LogUsefulException(exception);
-                if (ReferenceEquals(_config, configurationAtStart) && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
+                if (!stopped
+                    && configurationGeneration == Volatile.Read(ref _trafficConfigurationGeneration)
+                    && ReferenceEquals(_config, configurationAtStart)
+                    && _config.trafficCaptureMode == TrafficCaptureMode.Admin)
                 {
                     _config.trafficCaptureMode = TrafficCaptureMode.User;
                     Configuration.Save(_config);
@@ -576,13 +708,150 @@ namespace Shadowsocks.Controller
 
         private int[] GetCaptureExclusionProcessIds()
         {
+            int dnsCryptProcessId = _dnsCryptRuntimeManager.GetStatus().ProcessId;
             return _pluginsByServer.Values
                 .Where(plugin => plugin != null)
                 .Select(plugin => plugin.ProcessId)
                 .Where(processId => processId > 0)
                 .Append(Environment.ProcessId)
+                .Append(dnsCryptProcessId)
+                .Where(processId => processId > 0)
                 .Distinct()
                 .ToArray();
+        }
+
+        private DnsCaptureRuntimeState GetDnsCaptureRuntimeState()
+        {
+            DnsCryptRuntimeStatus runtime = _dnsCryptRuntimeManager.GetStatus();
+            return runtime.IsServing
+                ? new DnsCaptureRuntimeState(runtime.Port, runtime.ProcessId)
+                : DnsCaptureRuntimeState.Unavailable;
+        }
+
+        private async Task EnsureDnsCryptRuntimeForCaptureAsync(Configuration configuration, CancellationToken cancellationToken)
+        {
+            if (configuration?.dnsPolicy?.mode != DnsPolicyMode.DnsCrypt)
+            {
+                return;
+            }
+
+            try
+            {
+                DnsCryptBootstrapPolicy.Validate(configuration, configuration.dnsPolicy?.dnsCrypt);
+            }
+            catch (InvalidOperationException exception)
+            {
+                logger.Error(exception, "DNSCrypt runtime was disabled to prevent a DNS bootstrap recursion loop.");
+                if (_dnsCryptRuntimeManager.GetStatus().IsServing)
+                {
+                    Interlocked.Increment(ref _suppressDnsCaptureRefresh);
+                    try
+                    {
+                        await _dnsCryptRuntimeManager.StopAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref _suppressDnsCaptureRefresh);
+                    }
+                }
+                return;
+            }
+
+            if (_dnsCryptRuntimeManager.GetStatus().IsServing)
+                return;
+
+            DnsCryptComponentStatus component = _dnsCryptComponentManager.GetStatus();
+            if (!component.IsInstalled)
+            {
+                logger.Warn("DNSCrypt mode is selected but DNSCrypt Proxy is not installed.");
+                return;
+            }
+
+            Interlocked.Increment(ref _suppressDnsCaptureRefresh);
+            try
+            {
+                await StartDnsCryptWithResolvedResolversAsync(
+                    configuration.dnsPolicy?.dnsCrypt, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                // DNSCrypt is intentionally fail-closed. Capture configuration must still be
+                // applied with an unavailable runtime so NetworkService blocks UDP/TCP 53
+                // instead of silently falling back to plaintext system DNS.
+                logger.Warn(exception, "DNSCrypt runtime could not be prepared; DNS/53 will remain fail-closed.");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _suppressDnsCaptureRefresh);
+            }
+        }
+
+        private async Task ApplyTrafficCaptureConfigurationCoreAsync(
+            Configuration configuration,
+            CancellationToken cancellationToken = default,
+            bool ensureDnsRuntime = true)
+        {
+            if (ensureDnsRuntime)
+                await EnsureDnsCryptRuntimeForCaptureAsync(configuration, cancellationToken).ConfigureAwait(false);
+
+            await _gameModeManager.ApplyConfigurationAsync(
+                configuration,
+                GetCaptureExclusionProcessIds(),
+                GetDnsCaptureRuntimeState(),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private Task RefreshDnsCaptureAfterRuntimeChangeAsync()
+        {
+            return _dnsCryptCoordinator.ExecuteExclusiveAsync(
+                "Refresh DNS capture",
+                RefreshDnsCaptureAfterRuntimeChangeCoreAsync);
+        }
+
+        private async Task RefreshDnsCaptureAfterRuntimeChangeCoreAsync(CancellationToken cancellationToken)
+        {
+            if (stopped
+                || Volatile.Read(ref _suppressDnsCaptureRefresh) != 0
+                || _config.trafficCaptureMode != TrafficCaptureMode.Admin)
+            {
+                return;
+            }
+
+            await _dnsCaptureRefreshGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (stopped
+                    || Volatile.Read(ref _suppressDnsCaptureRefresh) != 0
+                    || _config.trafficCaptureMode != TrafficCaptureMode.Admin)
+                {
+                    return;
+                }
+
+                DnsCaptureRuntimeState dnsRuntime = GetDnsCaptureRuntimeState();
+                if (!_adminCaptureManager.IsBrokerRunning)
+                {
+                    // A game may have prevented the first Admin elevation. Keep the cached
+                    // DNS runtime current without creating an unexpected UAC prompt; the
+                    // latest endpoint will be used when automatic Game Mode ends.
+                    await _gameModeManager.UpdateDnsRuntimeAsync(dnsRuntime).ConfigureAwait(false);
+                    return;
+                }
+
+                await _gameModeManager.ApplyConfigurationAsync(
+                    _config,
+                    GetCaptureExclusionProcessIds(),
+                    dnsRuntime,
+                    cancellationToken).ConfigureAwait(false);
+                TrafficModeChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception exception)
+            {
+                logger.Warn(exception, "Unable to refresh Admin DNS capture after a DNSCrypt runtime change.");
+            }
+            finally
+            {
+                _dnsCaptureRefreshGate.Release();
+            }
         }
 
         #endregion
@@ -819,8 +1088,6 @@ namespace Shadowsocks.Controller
                 foreach (var server in servers)
                 {
                     _config.configs.Add(server);
-                    if (server.warnLegacyUrl)
-                        userInteraction.ShowWarning(I18N.GetString("Warning: importing {0} from a legacy ss:// link. Legacy ss:// links may be removed in a future release. Please update your ss:// links.", server.ToString()), I18N.GetString("shadowsocks-reborn"));
                 }
                 _config.index = _config.configs.Count - 1;
                 SaveConfig(_config);
@@ -836,7 +1103,7 @@ namespace Shadowsocks.Controller
 
         public string GetServerURLForCurrentServer()
         {
-            return GetCurrentServer().GetURL(_config.generateLegacyUrl);
+            return GetCurrentServer().GetURL();
         }
 
         #endregion
@@ -845,10 +1112,16 @@ namespace Shadowsocks.Controller
 
         public void ToggleVerboseLogging(bool enabled)
         {
-            _config.isVerboseLogging = enabled;
-            SaveConfig(_config);
+            if (_config.isVerboseLogging == enabled)
+                return;
 
-            VerboseLoggingStatusChanged?.Invoke(this, new EventArgs());
+            _config.isVerboseLogging = enabled;
+            // Log level changes do not require a network/controller reload. Reconfigure NLog
+            // in place so toggling a logging option never restarts listeners or SIP003 plugins.
+            Configuration.Save(_config);
+            LoggingConfigurator.Configure(enabled);
+
+            VerboseLoggingStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void ToggleCheckingUpdate(bool enabled)
@@ -875,9 +1148,9 @@ namespace Shadowsocks.Controller
         public void SaveLogViewerConfig(LogViewerConfig newConfig)
         {
             _config.logViewer = newConfig;
+            // Viewer-only preferences do not affect proxy/runtime state. Broadcasting a global
+            // configuration event here caused MainWindow to refresh and rebuild the Logs page.
             Configuration.Save(_config);
-
-            ConfigChanged?.Invoke(this, new EventArgs());
         }
 
         public void SaveHotkeyConfig(HotkeyConfig newConfig)
@@ -897,6 +1170,7 @@ namespace Shadowsocks.Controller
             _config.index = -1;
             _config.strategy = strategyID;
             SaveConfig(_config);
+            QueueDnsCryptAutomaticResolverRefresh();
         }
 
         public IList<IStrategy> GetStrategies()
@@ -961,7 +1235,7 @@ namespace Shadowsocks.Controller
 
             var plugin = _pluginsByServer.GetOrAdd(
                 server,
-                x => Sip003Plugin.CreateIfConfigured(x, _config.showPluginOutput));
+                x => Sip003Plugin.CreateIfConfigured(x, () => _config.showPluginOutput));
 
             if (plugin == null)
             {
@@ -987,10 +1261,25 @@ namespace Shadowsocks.Controller
 
         public void ToggleShowPluginOutput(bool enabled)
         {
-            _config.showPluginOutput = enabled;
-            SaveConfig(_config);
+            if (_config.showPluginOutput == enabled)
+                return;
 
-            ShowPluginOutputChanged?.Invoke(this, new EventArgs());
+            _config.showPluginOutput = enabled;
+            // Logging visibility is a presentation/runtime flag. A full controller reload restarts
+            // the listener and SIP003 process, which is unnecessary and can block plugin shutdown.
+            Configuration.Save(_config);
+            ShowPluginOutputChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ToggleShowDnsLogs(bool enabled)
+        {
+            if (_config.showDnsLogs == enabled)
+                return;
+
+            _config.showDnsLogs = enabled;
+            Configuration.Save(_config);
+
+            ShowDnsLogsChanged?.Invoke(this, EventArgs.Empty);
         }
 
         #endregion

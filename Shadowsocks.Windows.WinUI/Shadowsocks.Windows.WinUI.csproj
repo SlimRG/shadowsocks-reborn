@@ -3,6 +3,7 @@
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <Version>5.2.22</Version>
     <RootNamespace>Shadowsocks.Windows.WinUI</RootNamespace>
     <AssemblyName>Shadowsocks.Windows.WinUI</AssemblyName>
     <Platforms>x64</Platforms>

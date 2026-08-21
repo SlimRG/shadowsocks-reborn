@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Shadowsocks.Controller;
 
@@ -15,11 +14,6 @@ namespace Shadowsocks.Model
     {
         public const string DefaultMethod = "chacha20-ietf-poly1305";
         public const int DefaultPort = 8388;
-
-        #region ParseLegacyURL
-        private static readonly Regex UrlFinder = new Regex(@"ss://(?<base64>[A-Za-z0-9+-/=_]+)(?:#(?<tag>\S+))?", RegexOptions.IgnoreCase);
-        private static readonly Regex DetailsParser = new Regex(@"^((?<method>.+?):(?<password>.*)@(?<hostname>.+?):(?<port>\d+?))$", RegexOptions.IgnoreCase);
-        #endregion ParseLegacyURL
 
         private const int DefaultServerTimeoutSec = 5;
         public const int MaxServerTimeoutSec = 20;
@@ -47,9 +41,6 @@ namespace Shadowsocks.Model
         public string group;
 
         public int timeout;
-
-        // Set to true when imported from a legacy ss:// URL.
-        public bool warnLegacyUrl;
 
         // Credentials originating from a link/subscription stay reveal-protected in the UI.
         // The flag is persisted so a direct SIP002 import remains protected after restart.
@@ -80,49 +71,31 @@ namespace Shadowsocks.Model
                 : $"{remarks} ({serverStr})";
         }
 
-        public string GetURL(bool legacyUrl = false)
+        public string GetURL()
         {
-            string tag = string.Empty;
-            string url = string.Empty;
+            string parts = $"{method}:{password}";
+            string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(parts));
+            string websafeBase64 = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
 
-            if (legacyUrl && string.IsNullOrWhiteSpace(plugin))
+            string url = string.Format(
+                "{0}@{1}:{2}/",
+                websafeBase64,
+                FormalHostName,
+                server_port);
+
+            if (!string.IsNullOrWhiteSpace(plugin))
             {
-                // For backwards compatiblity, if no plugin, use old url format
-                string parts = $"{method}:{password}@{server}:{server_port}";
-                string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(parts));
-                url = base64;
-            }
-            else
-            {
-                // SIP002
-                string parts = $"{method}:{password}";
-                string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(parts));
-                string websafeBase64 = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
-
-                url = string.Format(
-                    "{0}@{1}:{2}/",
-                    websafeBase64,
-                    FormalHostName,
-                    server_port
-                    );
-
-                if (!string.IsNullOrWhiteSpace(plugin))
+                string pluginPart = plugin;
+                if (!string.IsNullOrWhiteSpace(plugin_opts))
                 {
-
-                    string pluginPart = plugin;
-                    if (!string.IsNullOrWhiteSpace(plugin_opts))
-                    {
-                        pluginPart += ";" + plugin_opts;
-                    }
-                    string pluginQuery = "?plugin=" + UrlEncodeShareComponent(pluginPart);
-                    url += pluginQuery;
+                    pluginPart += ";" + plugin_opts;
                 }
+                url += "?plugin=" + UrlEncodeShareComponent(pluginPart);
             }
 
-            if (!string.IsNullOrEmpty(remarks))
-            {
-                tag = $"#{UrlEncodeShareComponent(remarks)}";
-            }
+            string tag = string.IsNullOrEmpty(remarks)
+                ? string.Empty
+                : $"#{UrlEncodeShareComponent(remarks)}";
             return $"ss://{url}{tag}";
         }
 
@@ -183,107 +156,68 @@ namespace Shadowsocks.Model
             timeout = DefaultServerTimeoutSec;
         }
 
-        private static Server ParseLegacyURL(string ssURL)
+        public static Server ParseURL(string serverUrl)
         {
-            var match = UrlFinder.Match(ssURL);
-            if (!match.Success)
-                return null;
-
-            Server server = new Server();
-            var base64 = match.Groups["base64"].Value.TrimEnd('/');
-            var tag = match.Groups["tag"].Value;
-            if (!string.IsNullOrEmpty(tag))
+            if (string.IsNullOrWhiteSpace(serverUrl))
             {
-                server.remarks = WebUtility.UrlDecode(tag);
+                return null;
             }
-            Match details = null;
+
+            string normalized = serverUrl.Trim();
+            if (!normalized.StartsWith("ss://", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            Uri parsedUrl;
             try
             {
-                details = DetailsParser.Match(Encoding.UTF8.GetString(Convert.FromBase64String(
-                base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '='))));
+                parsedUrl = new Uri(normalized);
+            }
+            catch (UriFormatException)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(parsedUrl.IdnHost) || parsedUrl.Port <= 0)
+            {
+                return null;
+            }
+
+            string rawUserInfo = parsedUrl.GetComponents(UriComponents.UserInfo, UriFormat.Unescaped);
+            string base64 = rawUserInfo.Replace('-', '+').Replace('_', '/');
+            string userInfo;
+            try
+            {
+                userInfo = Encoding.UTF8.GetString(Convert.FromBase64String(
+                    base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=')));
             }
             catch (FormatException)
             {
                 return null;
             }
-            if (!details.Success)
+
+            string[] userInfoParts = userInfo.Split(new[] { ':' }, 2);
+            if (userInfoParts.Length != 2)
+            {
                 return null;
-            server.method = details.Groups["method"].Value;
-            server.password = details.Groups["password"].Value;
-            server.server = details.Groups["hostname"].Value;
-            server.server_port = int.Parse(details.Groups["port"].Value);
-            server.warnLegacyUrl = true;
-            server.importedFromUrl = true;
+            }
+
+            var server = new Server
+            {
+                remarks = WebUtility.UrlDecode(parsedUrl.GetComponents(UriComponents.Fragment, UriFormat.Unescaped)),
+                server = parsedUrl.IdnHost,
+                server_port = parsedUrl.Port,
+                method = userInfoParts[0],
+                password = userInfoParts[1],
+                importedFromUrl = true,
+            };
+
+            string pluginValue = GetQueryParameter(parsedUrl, "plugin") ?? string.Empty;
+            string[] pluginParts = pluginValue.Split(new[] { ';' }, 2);
+            server.plugin = pluginParts.Length > 0 ? pluginParts[0] ?? string.Empty : string.Empty;
+            server.plugin_opts = pluginParts.Length > 1 ? pluginParts[1] ?? string.Empty : string.Empty;
             return server;
-        }
-
-        public static Server ParseURL(string serverUrl)
-        {
-            string _serverUrl = serverUrl.Trim();
-            if (!_serverUrl.StartsWith("ss://", StringComparison.InvariantCultureIgnoreCase))
-            {
-                return null;
-            }
-
-            Server legacyServer = ParseLegacyURL(serverUrl);
-            if (legacyServer != null)   //legacy
-            {
-                return legacyServer;
-            }
-            else   //SIP002
-            {
-                Uri parsedUrl;
-                try
-                {
-                    parsedUrl = new Uri(serverUrl);
-                }
-                catch (UriFormatException)
-                {
-                    return null;
-                }
-                Server server = new Server
-                {
-                    remarks = WebUtility.UrlDecode(parsedUrl.GetComponents(
-                        UriComponents.Fragment, UriFormat.Unescaped)),
-                    server = parsedUrl.IdnHost,
-                    server_port = parsedUrl.Port,
-                };
-
-                // parse base64 UserInfo
-                string rawUserInfo = parsedUrl.GetComponents(UriComponents.UserInfo, UriFormat.Unescaped);
-                string base64 = rawUserInfo.Replace('-', '+').Replace('_', '/');    // Web-safe base64 to normal base64
-                string userInfo = "";
-                try
-                {
-                    userInfo = Encoding.UTF8.GetString(Convert.FromBase64String(
-                    base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=')));
-                }
-                catch (FormatException)
-                {
-                    return null;
-                }
-                string[] userInfoParts = userInfo.Split(new char[] { ':' }, 2);
-                if (userInfoParts.Length != 2)
-                {
-                    return null;
-                }
-                server.method = userInfoParts[0];
-                server.password = userInfoParts[1];
-                server.importedFromUrl = true;
-
-                string[] pluginParts = (GetQueryParameter(parsedUrl, "plugin") ?? "").Split(new[] { ';' }, 2);
-                if (pluginParts.Length > 0)
-                {
-                    server.plugin = pluginParts[0] ?? "";
-                }
-
-                if (pluginParts.Length > 1)
-                {
-                    server.plugin_opts = pluginParts[1] ?? "";
-                }
-
-                return server;
-            }
         }
 
         private static string GetQueryParameter(Uri uri, string name)

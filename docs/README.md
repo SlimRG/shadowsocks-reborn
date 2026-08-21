@@ -1,6 +1,6 @@
 ﻿# shadowsocks-reborn for Windows
 
-<img src="docs/assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
+<img src="assets/shadowsocks.png" alt="Shadowsocks logo" width="64">
 
 **English** | [Русский](README.ru.md)
 
@@ -39,7 +39,7 @@ The Traffic page exposes configured/runtime mode, NetworkService state, WinDiver
 
 - Windows 10 2004 / build 19041 or newer, or Windows 11;
 - x64 Windows;
-- .NET 10 SDK only when building from source.
+- .NET 10 SDK 10.0.303 or newer when building from source (release builds require the .NET 10.0.11 security baseline).
 
 The published product is self-contained and does not require a separately installed .NET runtime.
 
@@ -56,7 +56,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for project boundaries and runtime flow.
 
 ## Build
 
-Use a .NET 10 SDK on Windows:
+Use .NET SDK 10.0.303 or newer on Windows:
 
 ```powershell
 dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64
@@ -74,8 +74,10 @@ dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platfo
 Or build the release ZIP and SHA-256 file:
 
 ```powershell
-.\packaging\Build-Release.ps1 -Version v5.1.0
+.\packaging\Build-Release.ps1 -Version 5.2.22
 ```
+
+The canonical GitHub Release asset is `Shadowsocks-win-x64.zip`, with `Shadowsocks-win-x64.zip.sha256` published beside it.
 
 The final publish directory and release ZIP must contain exactly:
 
@@ -97,11 +99,15 @@ The configuration backend is `%LOCALAPPDATA%\Shadowsocks\settings.json` with an 
 
 The Settings page shows the active storage path and provides a single **Open** button that opens that directory in either normal or Clean Mode.
 
-Rename the executable so its file name ends in `p` before `.exe` to start **Clean Mode**, for example `Shadowsocksp.exe` or `Shadowsocks-5.0p.exe`. Clean Mode redirects settings, caches, PAC data, logs, installed plugin packages, runtime files and helper/update working data to a unique `%TEMP%\Shadowsocks\Clean\...` session and removes that session best-effort on Quit. Start with Windows is unavailable in Clean Mode.
+Rename the executable so its file name ends in `p` before `.exe` to start **Clean Mode**, for example `Shadowsocksp.exe` or `Shadowsocks-5.0p.exe`. Clean Mode redirects settings, caches, PAC data, logs, installed plugin packages, runtime files and helper/component-update working data to a unique `%TEMP%\Shadowsocks\Clean\...` session and removes that session best-effort on Quit. Start with Windows is unavailable in Clean Mode.
 
 In normal mode, Start with Windows copies the verified product EXE to `%LOCALAPPDATA%\Shadowsocks\Startup\Shadowsocks.exe`; the Windows Run integration points to that stable copy.
 
 See [STORAGE_POLICY.md](STORAGE_POLICY.md) for the complete layout and cleanup rules.
+
+## Application updates
+
+Application updates are automatic by default. After startup, the app checks GitHub Releases, selects an eligible newer version, requires the exact `Shadowsocks-win-x64.zip` plus `.sha256` sidecar, verifies the SHA-256, ZIP layout and payload file version, then stages the new single-file EXE under `%TEMP%\Shadowsocks\Updates`. The staged new EXE runs with the internal `--update` command, waits for the current process to exit, replaces the product EXE with rollback protection and starts the installed new copy. That installed copy removes the temporary updater transaction. If Start with Windows launched the LocalAppData startup copy, the recorded primary EXE is updated instead of only the startup copy.
 
 ## Embedded NetworkService
 
@@ -133,18 +139,18 @@ Local PAC uses configured GeoSite sources and persistent cache data. Online PAC 
 
 `ManagedHttpProxyService` handles HTTP/1.1 and HTTPS `CONNECT`. HTTPS is tunneled as bytes, so HTTP/2 negotiated inside TLS does not require a local HTTP/2 parser. FTP gatewaying is not implemented.
 
-The configuration contract includes `System`, `Direct`, `Proxy` and `CustomDoh` DNS policy values, but transparent DNS interception/routing is not implemented in 5.1.0.
+The DNS page can manage the optional signed `dnscrypt-proxy` component. Its `Automatic` resolver mode selects a concrete DNSCrypt/DoH resolver from the signed public catalog using the configured DNSSEC, no-log, unfiltered and address-family constraints, then pins that resolver in `server_names`; the active runtime therefore keeps `bootstrap_resolvers = []` and does not fall back to plaintext system DNS. Manual mode exposes signed DNSCrypt and DoH catalog entries with protocol filtering; resolver-catalog refresh is an explicit maintenance operation and may use one-shot bootstrap DNS only before a signed catalog cache exists, while the active DNS runtime itself always uses `bootstrap_resolvers = []` and `ignore_system_dns = true`. The DNS page provides both a local `Test DNSCrypt` health check and a DNS privacy self-test covering Administrator interception, fail-closed/system-DNS isolation, upstream/transport and active runtime bootstrap configuration. Starting with 5.2.0, Admin Mode transparently intercepts UDP/TCP port 53 through WinDivert and forwards it to the dynamic local DNSCrypt listener. DNSCrypt PID/port changes are propagated at runtime, Game Mode pauses system-wide interception, and DNSCrypt is always fail-closed: plaintext DNS is blocked during startup, restart, recovery, or runtime failure instead of silently downgrading to system DNS. WinDivert 2.2.2 is downloaded only from the pinned official release URL and the extracted x64 DLL/driver must match the release-pinned SHA-256 digests before they can be loaded. A read-only WinDivert FLOW observer supplies endpoint PID ownership for NETWORK-layer routing, with IP Helper lookup as fallback. Fragmented datagrams that would require transparent DNS/proxy rewriting are dropped as a whole so later fragments cannot bypass policy; direct fragmented traffic remains direct. `Direct`, `Proxy` and `CustomDoh` are exposed as working DNS policies: Direct can preserve the original destination or transparently redirect captured UDP/TCP DNS to primary/fallback IPv4/IPv6 resolvers, with an optional route through the local Shadowsocks SOCKS5 path; Proxy sends captured DNS through Shadowsocks, and Custom DoH bridges captured DNS wire messages to the configured HTTPS endpoint with its own optional Shadowsocks route. DNSCrypt Automatic mode prefers a compatible resolver in the country of the active Shadowsocks server and falls back to the best compatible signed-catalog resolver when no country match is available; resolver countries are derived only from their endpoint IPs through GeoIP and never from resolver names or descriptions. Anycast is not guessed from textual metadata because `dnscrypt-proxy -list-all -json` does not expose it as a structured property. Manual selection may use DNSCrypt or DoH entries from the signed catalog and includes protocol, country, address-family, DNSSEC, no-log and unfiltered filters; ODoH remains disabled. DNSCrypt manual selection resolver latency is measured asynchronously and the active resolver uses dnscrypt-proxy's actual RTT when available. DNSCrypt also runs in User Mode for Shadowsocks-managed hostname resolution; transparent system-wide DNS interception still requires Administrator Mode. The transparent interception covers classic DNS on UDP/TCP port 53; application-internal DoH/DoT/DoQ traffic is not generically intercepted. Automatic component update checks are persisted and run no more than once per 24 hours, including clock-skew recovery; initial installation is always explicit. When DNSCrypt itself is routed through Shadowsocks, Shadowsocks/forward-proxy endpoints must be IP literals to prevent DNS bootstrap recursion.
 
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — project boundaries and runtime architecture.
-- [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData/Clean Mode/Temp rules and migration.
+- [STORAGE_POLICY.md](STORAGE_POLICY.md) — LocalAppData, Clean Mode, component staging and application self-update storage rules.
 - [WINDOWS11_UI_GUIDE.md](WINDOWS11_UI_GUIDE.md) — current WinUI design/implementation rules.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development rules.
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — release validation.
 - [SECURITY.md](SECURITY.md) — security reporting and sensitive areas.
-- [CHANGELOG.md](CHANGELOG.md) — fork changes; upstream history remains in `CHANGES`.
+- [CHANGELOG.md](CHANGELOG.md) — fork changes; upstream history remains in [`CHANGES`](https://github.com/SlimRG/shadowsocks-reborn/blob/main/CHANGES).
 
 ## License
 
-`shadowsocks-reborn` is distributed under the [GNU General Public License v3.0](LICENSE.txt). Third-party components retain their own licenses.
+`shadowsocks-reborn` is distributed under **GPL-3.0-or-later**. See [License](LICENSE.md) and the authoritative [LICENSE.txt](https://github.com/SlimRG/shadowsocks-reborn/blob/main/LICENSE.txt). Third-party components retain their own licenses; see [Third-party notices](THIRD-PARTY-NOTICES.md).

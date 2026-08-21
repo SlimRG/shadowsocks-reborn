@@ -32,9 +32,6 @@ namespace Shadowsocks.Controller.Service
 
         public const string DefaultSourceUrl = "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat";
 
-        // fix28 used one shared dlc.dat cache. fix29 migrates it when there is exactly
-        // one configured source, then keeps a separate cache per URL.
-        private static readonly string LegacyDatabasePath = Path.Combine(Shadowsocks.Core.RuntimeEnvironment.WorkingDirectory, "dlc.dat");
         private static readonly string CacheDirectory = AppStoragePaths.GeositeCacheDirectory;
         private static readonly string AppliedSourcesPath = Path.Combine(CacheDirectory, "active-sources.sha256");
 
@@ -97,7 +94,6 @@ namespace Shadowsocks.Controller.Service
         {
             List<string> normalized = NormalizeSources(sources);
             Directory.CreateDirectory(CacheDirectory);
-            TryMigrateLegacyCache(normalized);
 
             List<Dictionary<string, IList<DomainObject>>> databases = [];
             HashSet<string> needsRefresh = new(StringComparer.OrdinalIgnoreCase);
@@ -147,38 +143,6 @@ namespace Shadowsocks.Controller.Service
             }
 
             return normalized;
-        }
-
-        private static void TryMigrateLegacyCache(IReadOnlyList<string> sources)
-        {
-            if (AppStoragePaths.IsCleanMode)
-            {
-                return;
-            }
-
-            if (sources.Count != 1 || !File.Exists(LegacyDatabasePath))
-            {
-                return;
-            }
-
-            string target = GetCachePath(sources[0]);
-            if (File.Exists(target))
-            {
-                return;
-            }
-
-            try
-            {
-                byte[] legacy = File.ReadAllBytes(LegacyDatabasePath);
-                ParseGeositeList(legacy); // validate before associating it with the source URL
-                File.WriteAllBytes(target, legacy);
-                File.Delete(LegacyDatabasePath);
-                logger.Info($"Migrated legacy GeoSite cache to {target}.");
-            }
-            catch (Exception ex)
-            {
-                logger.Warn(ex, "Could not migrate the legacy dlc.dat cache; it will be ignored.");
-            }
         }
 
         private static Dictionary<string, IList<DomainObject>> ParseGeositeList(byte[] database)

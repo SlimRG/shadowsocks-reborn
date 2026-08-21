@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Shadowsocks.Model;
@@ -53,6 +54,8 @@ public sealed class ServersPage : Page, IRefreshablePage
     private bool _loadedOnce;
     private bool _dirty;
     private bool _selectionValidationPending;
+    private readonly Dictionary<string, string> _serverCountryFlags = new(StringComparer.Ordinal);
+    private int _countryLookupGeneration;
 
     internal ServersPage(WinUIPageContext context)
     {
@@ -344,10 +347,9 @@ public sealed class ServersPage : Page, IRefreshablePage
             for (int index = 0; index < _servers.Count; index++)
             {
                 Server server = _servers[index];
-                string text = server.IsConfigured ? server.ToString() : _context.LF("New server {0}", index + 1);
                 _serverList.Items.Add(new ListViewItem
                 {
-                    Content = text,
+                    Content = CreateServerListContent(server, index),
                     Padding = new Thickness(8, 5, 8, 5),
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 });
@@ -359,6 +361,7 @@ public sealed class ServersPage : Page, IRefreshablePage
             _loading = false;
         }
         UpdateListButtons();
+        _ = RefreshServerCountryFlagsAsync(++_countryLookupGeneration);
     }
 
 
@@ -408,7 +411,76 @@ public sealed class ServersPage : Page, IRefreshablePage
         if (_serverList.Items[index] is ListViewItem item)
         {
             Server server = _servers[index];
-            item.Content = server.IsConfigured ? server.ToString() : _context.LF("New server {0}", index + 1);
+            item.Content = CreateServerListContent(server, index);
+        }
+    }
+
+    private FrameworkElement CreateServerListContent(Server server, int index)
+    {
+        string name = server.IsConfigured
+            ? !string.IsNullOrWhiteSpace(server.remarks)
+                ? server.remarks.Trim()
+                : _context.LF("Server {0}", index + 1)
+            : _context.LF("New server {0}", index + 1);
+        string identity = BuildServerIdentity(server);
+        _serverCountryFlags.TryGetValue(identity, out string? flag);
+
+        var row = new Grid { ColumnSpacing = 8 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var nameBlock = new TextBlock
+        {
+            Text = name,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(nameBlock, 0);
+        row.Children.Add(nameBlock);
+
+        var flagBlock = new TextBlock
+        {
+            Text = flag ?? string.Empty,
+            FontSize = 18,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            MinWidth = 24,
+            TextAlignment = TextAlignment.Right,
+        };
+        Grid.SetColumn(flagBlock, 1);
+        row.Children.Add(flagBlock);
+        return row;
+    }
+
+    private async Task RefreshServerCountryFlagsAsync(int generation)
+    {
+        if (_context.Controller is null)
+            return;
+        for (int index = 0; index < _servers.Count; index++)
+        {
+            if (generation != _countryLookupGeneration)
+                return;
+            Server server = _servers[index];
+            if (!server.IsConfigured)
+                continue;
+            string identity = BuildServerIdentity(server);
+            if (_serverCountryFlags.ContainsKey(identity))
+                continue;
+            try
+            {
+                IpCountryInfo? country = await _context.Controller.GetServerCountryAsync(server);
+                if (generation != _countryLookupGeneration)
+                    return;
+                if (country is not null && !string.IsNullOrWhiteSpace(country.FlagEmoji))
+                {
+                    _serverCountryFlags[identity] = country.FlagEmoji;
+                    UpdateServerListItem(index);
+                }
+            }
+            catch
+            {
+                // Country flags are best-effort presentation metadata and must never block server editing.
+            }
         }
     }
 
@@ -810,7 +882,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         {
             return true;
         }
-        if (server.importedFromUrl || server.warnLegacyUrl)
+        if (server.importedFromUrl)
         {
             return false;
         }
@@ -838,7 +910,6 @@ public sealed class ServersPage : Page, IRefreshablePage
             remarks = source.remarks ?? string.Empty,
             group = source.group ?? string.Empty,
             timeout = source.timeout,
-            warnLegacyUrl = source.warnLegacyUrl,
             importedFromUrl = source.importedFromUrl,
         };
 }

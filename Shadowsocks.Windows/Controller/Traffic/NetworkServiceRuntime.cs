@@ -105,33 +105,42 @@ namespace Shadowsocks.Controller.Traffic
                     throw new TimeoutException("Timed out waiting for the NetworkService extraction lock.");
 
                 Directory.CreateDirectory(hashDirectory);
-                CleanupStaleHelpers(keepDirectory: null);
+                CleanupStaleHelpers(keepDirectory: hashDirectory);
 
-                string runDirectory = System.IO.Path.Combine(
-                    hashDirectory,
-                    $"{Environment.ProcessId}-{Guid.NewGuid():N}");
-                Directory.CreateDirectory(runDirectory);
+                // Keep one stable helper path per application version + embedded SHA-256.
+                // Windows Defender Firewall keys application consent to the executable path;
+                // the previous PID/GUID directory made the same signed/hashed helper look like
+                // a brand-new application on every Admin Mode start and repeatedly triggered
+                // the public/private network access prompt. The SHA directory already gives us
+                // immutable versioning, so another per-run directory is unnecessary.
+                string runDirectory = hashDirectory;
                 string targetPath = System.IO.Path.Combine(runDirectory, "Shadowsocks.NetworkService.exe");
                 string temporaryPath = targetPath + ".new";
 
                 try
                 {
-                    using (FileStream output = new(
-                        temporaryPath,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.None,
-                        bufferSize: 1024 * 64,
-                        FileOptions.WriteThrough))
+                    if (!IsFileHashValid(targetPath, hash))
                     {
-                        output.Write(helperBytes, 0, helperBytes.Length);
-                        output.Flush(flushToDisk: true);
+                        TryDeleteFile(targetPath);
+                        TryDeleteFile(temporaryPath);
+                        using (FileStream output = new(
+                            temporaryPath,
+                            FileMode.CreateNew,
+                            FileAccess.Write,
+                            FileShare.None,
+                            bufferSize: 1024 * 64,
+                            FileOptions.WriteThrough))
+                        {
+                            output.Write(helperBytes, 0, helperBytes.Length);
+                            output.Flush(flushToDisk: true);
+                        }
+
+                        if (!IsFileHashValid(temporaryPath, hash))
+                            throw new InvalidDataException("Extracted NetworkService staging hash validation failed.");
+
+                        File.Move(temporaryPath, targetPath, overwrite: false);
                     }
 
-                    if (!IsFileHashValid(temporaryPath, hash))
-                        throw new InvalidDataException("Extracted NetworkService staging hash validation failed.");
-
-                    File.Move(temporaryPath, targetPath, overwrite: false);
                     if (!IsFileHashValid(targetPath, hash))
                         throw new InvalidDataException("Extracted NetworkService hash validation failed.");
 
@@ -139,16 +148,15 @@ namespace Shadowsocks.Controller.Traffic
                     // lets Windows load the image while denying replacement/write/delete access.
                     FileStream guard = new(targetPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                     Logger.Info(
-                        "NetworkService helper materialized on demand: {0} (version {1}, SHA256 {2})",
+                        "NetworkService helper ready at stable path: {0} (version {1}, SHA256 {2})",
                         targetPath,
                         ApplicationInfo.Version,
                         hash);
-                    return new HelperLease(targetPath, hash, guard, runDirectory, deleteOnDispose: true);
+                    return new HelperLease(targetPath, hash, guard, runDirectory, deleteOnDispose: false);
                 }
                 catch
                 {
                     TryDeleteFile(temporaryPath);
-                    TryDeleteDirectory(runDirectory);
                     throw;
                 }
             }
@@ -212,24 +220,24 @@ namespace Shadowsocks.Controller.Traffic
                 {
                     foreach (string hashDirectory in SafeEnumerateDirectories(versionDirectory))
                     {
-                        foreach (string runDirectory in SafeEnumerateDirectories(hashDirectory))
+                        if (!string.IsNullOrWhiteSpace(keepDirectory)
+                            && string.Equals(hashDirectory, keepDirectory, StringComparison.OrdinalIgnoreCase))
                         {
-                            if (!string.IsNullOrWhiteSpace(keepDirectory)
-                                && string.Equals(runDirectory, keepDirectory, StringComparison.OrdinalIgnoreCase))
-                            {
-                                continue;
-                            }
+                            continue;
+                        }
 
+                        string stableHelper = System.IO.Path.Combine(hashDirectory, "Shadowsocks.NetworkService.exe");
+                        if (File.Exists(stableHelper))
+                        {
                             try
                             {
-                                DateTime lastWriteUtc = Directory.GetLastWriteTimeUtc(runDirectory);
-                                if (lastWriteUtc > cutoffUtc)
-                                    continue;
-                                Directory.Delete(runDirectory, recursive: true);
+                                DateTime lastWriteUtc = File.GetLastWriteTimeUtc(stableHelper);
+                                if (lastWriteUtc <= cutoffUtc)
+                                    Directory.Delete(hashDirectory, recursive: true);
                             }
                             catch
                             {
-                                // A live process can keep its helper locked. Leave it for a later pass.
+                                // The helper may still be guarded by a live broker.
                             }
                         }
 

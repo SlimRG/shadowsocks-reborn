@@ -3,13 +3,14 @@
 on:
   push:
     tags:
-      - 'v*'
+      - '[0-9]*.[0-9]*.[0-9]*'
+      - 'v[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
     inputs:
       version:
-        description: Package version label, for example v5.1.0
+        description: Package version label, for example 5.2.22
         required: true
-        default: v5.1.0
+        default: 5.2.22
 
 permissions:
   contents: write
@@ -21,12 +22,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.303
 
       - name: Resolve version label
         id: version
@@ -42,10 +45,12 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.label }}
+          NuGetAudit: 'true'
+          NuGetAuditMode: 'all'
         run: .\packaging\Build-Release.ps1 -Version $env:RELEASE_VERSION
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: shadowsocks-reborn-${{ steps.version.outputs.label }}-win-x64
           path: |

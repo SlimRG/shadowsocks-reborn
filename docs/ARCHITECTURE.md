@@ -24,7 +24,7 @@ Shadowsocks.NetworkService
 Projects:
 
 - `Shadowsocks.Core` (`net10.0`) — protocol, encryption, configuration model, PAC/GeoSite logic, localization, routing models, logging configuration and storage abstractions.
-- `Shadowsocks.Windows` — file-storage bootstrap, legacy migration, WinINet/system proxy, startup, hotkeys, SIP003 package management/process hosting, UAC/Admin capture, WinDivert runtime and NetworkService coordination.
+- `Shadowsocks.Windows` — file-storage bootstrap, WinINet/system proxy, startup, self-update, hotkeys, SIP003 package management/process hosting, UAC/Admin capture, WinDivert runtime and NetworkService coordination.
 - `Shadowsocks.Windows.WinUI` — WinUI-specific Windows shell/tray integration.
 - `Shadowsocks.WinUI` — unpackaged WinUI 3 application and product publish project. Release assembly name is `Shadowsocks`.
 - `Shadowsocks.NetworkService` — isolated elevated x64 helper that owns transparent WinDivert capture/routing.
@@ -74,6 +74,8 @@ GameModeManager / AdminCaptureManager
 Shadowsocks.NetworkService (elevated)
   ↓
 WinDivert
+
+The Admin capture path opens a read-only WinDivert FLOW observer before the NETWORK packet handle. FLOW events populate endpoint-to-PID ownership used by routing; IP Helper tables remain a fallback for flows that pre-date the observer or are ambiguous. WinDivert 2.2.2 x64 runtime files are accepted only when their pinned SHA-256 values match. Fragmented datagrams that require transparent rewriting are dropped as a complete flow rather than allowing later fragments to bypass the first-fragment decision.
 ```
 
 Only **User** and **Admin** are selectable traffic modes.
@@ -109,7 +111,7 @@ Clean Mode is selected by an executable stem ending in `p` and redirects the sam
 
 The Registry is not an application-configuration backend. Registry access remains only for Windows integrations that require it (Run, protocol association, WinINet/system proxy, discovery reads).
 
-The executable directory is a legacy/development read source only. Product runtime must not use it as mutable storage.
+The release directory is immutable application code. Product runtime does not use executable-side files as a configuration, migration, plugin, cache, log or update source.
 
 See [STORAGE_POLICY.md](STORAGE_POLICY.md).
 
@@ -135,6 +137,20 @@ When Start with Windows is enabled, `AutoStartup` copies the current executable 
 ```
 
 The copy is SHA-256 checked and the HKCU Run entry points to that stable path with `--start-hidden`. Start with Windows is disabled in Clean Mode.
+
+## Application self-update
+
+Application updates use the canonical GitHub assets `Shadowsocks-win-x64.zip` and `Shadowsocks-win-x64.zip.sha256`. The updater rejects missing/non-canonical assets, invalid GitHub release URLs, checksum mismatches, ZIPs that do not contain exactly one root `Shadowsocks.exe`, and payloads whose file version does not match the selected release.
+
+The single-file handoff is:
+
+1. download and verify the release into `%TEMP%\Shadowsocks\Updates\<transaction>`;
+2. extract the new payload as `Shadowsocks.Update.exe`;
+3. start that new payload with the internal `--update` command and only then shut down the current instance;
+4. the temporary new payload waits for the old PID, keeps a rollback copy, replaces the product EXE and starts the installed new copy;
+5. the installed new copy waits for the temporary updater to exit and removes the transaction/rollback files.
+
+If the running process is the stable Start-with-Windows copy, its Run command carries the original product EXE path via an internal startup-origin argument so updates replace the user-facing product binary rather than only the LocalAppData startup copy. Clean Mode executables are updated under their current `...p.exe` name while the self-update transaction itself stays outside the disposable Clean Mode session.
 
 ## Embedded NetworkService
 

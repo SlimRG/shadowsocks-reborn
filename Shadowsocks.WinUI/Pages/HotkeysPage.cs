@@ -200,7 +200,7 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
         }
     }
 
-    // Keep modifier-state lookup on Win32 so the WinUI frontend does not pull the legacy
+    // Keep modifier-state lookup on Win32 so the WinUI frontend does not pull the older
     // UWP XAML projection graph into this process. GetKeyState reports the state that
     // belonged to the keyboard message currently being handled, which is exactly what the
     // shortcut recorder needs.

@@ -42,6 +42,14 @@ namespace Shadowsocks.UnitTests
         }
 
         [TestMethod]
+        public void DnsDiagnosticLoggingIsDisabledByDefault()
+        {
+            Configuration configuration = new();
+
+            Assert.IsFalse(configuration.showDnsLogs);
+        }
+
+        [TestMethod]
         public void RealServerIsConfigured()
         {
             Configuration configuration = new();

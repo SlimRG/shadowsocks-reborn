@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shadowsocks.Model;
 
 namespace Shadowsocks.UnitTests
@@ -7,256 +6,77 @@ namespace Shadowsocks.UnitTests
     [TestClass]
     public class UrlTest
     {
-        Server server1, server1WithRemark, server1WithPlugin, server1WithPluginAndRemark;
-        string server1CanonUrl, server1WithRemarkCanonUrl, server1WithPluginCanonUrl, server1WithPluginAndRemarkCanonUrl;
+        private const string BaseUserInfo = "Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTp0ZXN0";
 
-        Server server2, server2WithRemark, server2WithPlugin, server2WithPluginAndRemark;
-        string server2CanonUrl, server2WithRemarkCanonUrl, server2WithPluginCanonUrl, server2WithPluginAndRemarkCanonUrl;
-
-
-        [TestInitialize]
-        public void PrepareTestData()
+        [TestMethod]
+        public void Sip002UrlRoundTripsWithoutPlugin()
         {
-            server1 = new Server
+            var expected = new Server
             {
                 server = "192.168.100.1",
                 server_port = 8888,
                 password = "test",
-                method = "bf-cfb"
+                method = Server.DefaultMethod,
+                remarks = "example-server 1",
             };
-            server1CanonUrl = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4";
 
-            // server2 has base64 padding
-            server2 = new Server
+            string url = $"ss://{BaseUserInfo}@192.168.100.1:8888/#example-server+1";
+            Server actual = Server.ParseURL(url);
+
+            AssertServerEquals(expected, actual);
+            Assert.IsTrue(actual.importedFromUrl);
+            Assert.AreEqual(url, actual.GetURL());
+        }
+
+        [TestMethod]
+        public void Sip002UrlRoundTripsWithPlugin()
+        {
+            var expected = new Server
             {
                 server = "192.168.1.1",
                 server_port = 8388,
                 password = "test",
-                method = "bf-cfb"
-            };
-            server2CanonUrl = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xLjE6ODM4OA==";
-
-            server1WithRemark = new Server
-            {
-                server = server1.server,
-                server_port = server1.server_port,
-                password = server1.password,
-                method = server1.method,
-                remarks = "example-server 1"
-            };
-            server1WithRemarkCanonUrl = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4#example-server+1";
-
-            server2WithRemark = new Server
-            {
-                server = server2.server,
-                server_port = server2.server_port,
-                password = server2.password,
-                method = server2.method,
-                remarks = "example-server 2"
+                method = Server.DefaultMethod,
+                plugin = "v2ray-plugin",
+                plugin_opts = "mode=websocket;host=example.com",
             };
 
-            server2WithRemarkCanonUrl = "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xLjE6ODM4OA==#example-server+2";
+            string url = $"ss://{BaseUserInfo}@192.168.1.1:8388/?plugin=v2ray-plugin%3bmode%3dwebsocket%3bhost%3dexample.com";
+            Server actual = Server.ParseURL(url);
 
-            server1WithPlugin = new Server
-            {
-                server = server1.server,
-                server_port = server1.server_port,
-                password = server1.password,
-                method = server1.method,
-                plugin = "obfs-local",
-                plugin_opts = "obfs=http;obfs-host=google.com"
-            };
-            server1WithPluginCanonUrl =
-                "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com";
-
-            server2WithPlugin = new Server
-            {
-                server = server2.server,
-                server_port = server2.server_port,
-                password = server2.password,
-                method = server2.method,
-                plugin = "obfs-local",
-                plugin_opts = "obfs=http;obfs-host=google.com"
-            };
-            server2WithPluginCanonUrl =
-                "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com";
-
-            server1WithPluginAndRemark = new Server
-            {
-                server = server1.server,
-                server_port = server1.server_port,
-                password = server1.password,
-                method = server1.method,
-                plugin = server1WithPlugin.plugin,
-                plugin_opts = server1WithPlugin.plugin_opts,
-                remarks = server1WithRemark.remarks
-            };
-            server1WithPluginAndRemarkCanonUrl =
-                "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com#example-server+1";
-
-            server2WithPluginAndRemark = new Server
-            {
-                server = server2.server,
-                server_port = server2.server_port,
-                password = server2.password,
-                method = server2.method,
-                plugin = server2WithPlugin.plugin,
-                plugin_opts = server2WithPlugin.plugin_opts,
-                remarks = server2WithRemark.remarks
-            };
-            server2WithPluginAndRemarkCanonUrl =
-                "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com#example-server+2";
+            AssertServerEquals(expected, actual);
+            Assert.AreEqual(url, actual.GetURL());
         }
 
         [TestMethod]
-        public void TestParseUrl_Server1()
+        public void MultipleSip002UrlsAreParsed()
         {
-            RunParseShadowsocksUrlTest(
-                string.Join(
-                    "\r\n",
-                    server1CanonUrl,
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4/",
-                    server1WithRemarkCanonUrl,
-                    "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4/#example-server+1"),
-                new[]
-                {
-                    server1,
-                    server1,
-                    server1WithRemark,
-                    server1WithRemark
-                });
+            string first = $"ss://{BaseUserInfo}@192.168.100.1:8888/";
+            string second = $"ss://{BaseUserInfo}@192.168.1.1:8388/";
 
-            RunParseShadowsocksUrlTest(
-                string.Join(
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888",
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888#example-server+1",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/#example-server+1",
-                    server1WithPluginCanonUrl,
-                    server1WithPluginAndRemarkCanonUrl,
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com&unsupported=1#example-server+1"),
-                new[]
-                {
-                    server1,
-                    server1,
-                    server1WithRemark,
-                    server1WithRemark,
-                    server1WithPlugin,
-                    server1WithPluginAndRemark,
-                    server1WithPluginAndRemark
-                });
-        }
+            var servers = Server.GetServers(first + "\r\n" + second);
 
-
-
-        [TestMethod]
-        public void TestParseUrl_Server2()
-        {
-            RunParseShadowsocksUrlTest(
-                string.Join(
-                    "\r\n",
-                    server2CanonUrl,
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xLjE6ODM4OA==/",
-                    server2WithRemarkCanonUrl,
-                    "ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xLjE6ODM4OA==/#example-server+2"),
-                new[]
-                {
-                    server2,
-                    server2,
-                    server2WithRemark,
-                    server2WithRemark
-                });
-
-            RunParseShadowsocksUrlTest(
-                string.Join(
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388",
-                    "\r\n",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388/",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388#example-server+2",
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388/#example-server+2",
-                    server2WithPluginCanonUrl,
-                    server2WithPluginAndRemarkCanonUrl,
-                    "ss://YmYtY2ZiOnRlc3Q@192.168.1.1:8388/?plugin=obfs-local%3bobfs%3dhttp%3bobfs-host%3dgoogle.com&unsupported=1#example-server+2"),
-                new[]
-                {
-                    server2,
-                    server2,
-                    server2WithRemark,
-                    server2WithRemark,
-                    server2WithPlugin,
-                    server2WithPluginAndRemark,
-                    server2WithPluginAndRemark
-                });
-        }
-
-
-        [TestMethod]
-        public void ParsedUrlServersAreMarkedAsUrlImports()
-        {
-            Server legacy = Server.ParseURL(server1CanonUrl);
-            Server sip002 = Server.ParseURL("ss://YmYtY2ZiOnRlc3Q@192.168.100.1:8888/");
-
-            Assert.IsNotNull(legacy);
-            Assert.IsNotNull(sip002);
-            Assert.IsTrue(legacy.importedFromUrl);
-            Assert.IsTrue(sip002.importedFromUrl);
+            Assert.AreEqual(2, servers.Count);
+            Assert.AreEqual("192.168.100.1", servers[0].server);
+            Assert.AreEqual("192.168.1.1", servers[1].server);
         }
 
         [TestMethod]
-        public void TestUrlGenerate()
+        public void PreSip002UrlIsRejected()
         {
-            var generateUrlCases = new Dictionary<string, Server>
-            {
-                [server1CanonUrl] = server1,
-                [server1WithRemarkCanonUrl] = server1WithRemark,
-                [server1WithPluginCanonUrl] = server1WithPlugin,
-                [server1WithPluginAndRemarkCanonUrl] = server1WithPluginAndRemark
-            };
-            RunGenerateShadowsocksUrlTest(generateUrlCases);
+            Assert.IsNull(Server.ParseURL("ss://YmYtY2ZiOnRlc3RAMTkyLjE2OC4xMDAuMTo4ODg4"));
         }
 
-        private static void RunParseShadowsocksUrlTest(string testCase, IReadOnlyList<Server> expected)
+        private static void AssertServerEquals(Server expected, Server actual)
         {
-            var actual = Server.GetServers(testCase);
-            if (actual.Count != expected.Count)
-            {
-                Assert.Fail($"Wrong number of configs. Expected: {expected.Count}. Actual: {actual.Count}");
-            }
-
-            for (int i = 0; i < expected.Count; i++)
-            {
-                var expectedServer = expected[i];
-                var actualServer = actual[i];
-
-                Assert.AreEqual(expectedServer.server, actualServer.server);
-                Assert.AreEqual(expectedServer.server_port, actualServer.server_port);
-                Assert.AreEqual(expectedServer.password, actualServer.password);
-                Assert.AreEqual(expectedServer.method, actualServer.method);
-                Assert.AreEqual(expectedServer.plugin, actualServer.plugin);
-                Assert.AreEqual(expectedServer.plugin_opts, actualServer.plugin_opts);
-                Assert.AreEqual(expectedServer.remarks, actualServer.remarks);
-                Assert.AreEqual(expectedServer.timeout, actualServer.timeout);
-            }
+            Assert.IsNotNull(actual);
+            Assert.AreEqual(expected.server, actual.server);
+            Assert.AreEqual(expected.server_port, actual.server_port);
+            Assert.AreEqual(expected.password, actual.password);
+            Assert.AreEqual(expected.method, actual.method);
+            Assert.AreEqual(expected.plugin, actual.plugin);
+            Assert.AreEqual(expected.plugin_opts, actual.plugin_opts);
+            Assert.AreEqual(expected.remarks, actual.remarks);
         }
-
-        private static void RunGenerateShadowsocksUrlTest(IReadOnlyDictionary<string, Server> testCases)
-        {
-            foreach (var testCase in testCases)
-            {
-                string expected = testCase.Key;
-                Server config = testCase.Value;
-
-                var actual = config.GetURL(true);
-                Assert.AreEqual(expected, actual);
-            }
-        }
-
     }
-
-
 }

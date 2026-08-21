@@ -12,6 +12,20 @@ internal enum WinDivertLayer : int
     Reflect = 4,
 }
 
+internal enum WinDivertEvent : byte
+{
+    NetworkPacket = 0,
+    FlowEstablished = 1,
+    FlowDeleted = 2,
+    SocketBind = 3,
+    SocketConnect = 4,
+    SocketListen = 5,
+    SocketAccept = 6,
+    SocketClose = 7,
+    ReflectOpen = 8,
+    ReflectClose = 9,
+}
+
 [Flags]
 internal enum WinDivertFlags : ulong
 {
@@ -47,6 +61,19 @@ internal struct WinDivertDataNetwork
     public uint SubIfIdx;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct WinDivertDataFlow
+{
+    public ulong EndpointId;
+    public ulong ParentEndpointId;
+    public uint ProcessId;
+    public fixed uint LocalAddr[4];
+    public fixed uint RemoteAddr[4];
+    public ushort LocalPort;
+    public ushort RemotePort;
+    public byte Protocol;
+}
+
 [StructLayout(LayoutKind.Explicit, Size = 80)]
 internal unsafe struct WinDivertAddress
 {
@@ -54,7 +81,10 @@ internal unsafe struct WinDivertAddress
     [FieldOffset(8)] public uint BitFields;
     [FieldOffset(12)] public uint Reserved2;
     [FieldOffset(16)] public WinDivertDataNetwork Network;
+    [FieldOffset(16)] public WinDivertDataFlow Flow;
     [FieldOffset(16)] public fixed byte Data[64];
+
+    public readonly WinDivertEvent Event => (WinDivertEvent)((BitFields >> 8) & 0xFF);
 
     public bool Outbound
     {

@@ -30,6 +30,7 @@ namespace Shadowsocks.Controller.Traffic
         Direct = 1,
         Proxy = 2,
         CustomDoh = 3,
+        DnsCrypt = 4,
     }
 
     public sealed record TrafficCaptureStatus(
@@ -40,9 +41,22 @@ namespace Shadowsocks.Controller.Traffic
         bool GameModeActive,
         bool TcpCaptureActive,
         bool UdpCaptureActive,
+        bool DnsInterceptionActive,
+        bool DnsFailClosedActive,
         int TcpRedirectPort,
         int UdpRedirectPort,
         IReadOnlyList<string> RunningGameApplications);
+
+    /// <summary>
+    /// Ephemeral DNSCrypt runtime data passed to the elevated capture service.
+    /// This state is intentionally not persisted in settings because the listener
+    /// port and process identifier change whenever DNSCrypt restarts.
+    /// </summary>
+    public readonly record struct DnsCaptureRuntimeState(int Port, int ProcessId)
+    {
+        public bool IsReady => Port is >= 1 and <= 65535 && ProcessId > 0;
+        public static DnsCaptureRuntimeState Unavailable => default;
+    }
 
     public sealed class TrafficContext
     {

@@ -1,181 +1,153 @@
-﻿using System;
+﻿#nullable enable
+using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using NLog;
 
 namespace Shadowsocks.Util.ProcessManagement
 {
-    /*
-     * See:
-     * http://stackoverflow.com/questions/6266820/working-example-of-createjobobject-setinformationjobobject-pinvoke-in-net
-     */
-    public class Job : IDisposable
+    /// <summary>
+    /// Windows Job Object configured with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE.
+    /// All assigned processes are terminated automatically when the job handle is closed.
+    /// </summary>
+    public sealed class Job : IDisposable
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private const uint JobObjectLimitKillOnJobClose = 0x00002000;
+        private const int JobObjectExtendedLimitInformationClass = 9;
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        private IntPtr handle = IntPtr.Zero;
+        private readonly SafeFileHandle _handle;
+        private bool _disposed;
 
         public Job()
         {
-            handle = CreateJobObject(IntPtr.Zero, null);
-            var extendedInfoPtr = IntPtr.Zero;
-            var info = new JOBOBJECT_BASIC_LIMIT_INFORMATION
+            nint rawHandle = CreateJobObjectW(nint.Zero, null);
+            if (rawHandle == nint.Zero)
             {
-                LimitFlags = 0x2000
-            };
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to create process job object.");
+            }
 
-            var extendedInfo = new JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-            {
-                BasicLimitInformation = info
-            };
-
+            _handle = new SafeFileHandle(rawHandle, ownsHandle: true);
             try
             {
-                int length = Marshal.SizeOf(typeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
-                extendedInfoPtr = Marshal.AllocHGlobal(length);
-                Marshal.StructureToPtr(extendedInfo, extendedInfoPtr, false);
-
-                if (!SetInformationJobObject(handle, JobObjectInfoType.ExtendedLimitInformation, extendedInfoPtr,
-                        (uint)length))
-                    throw new Exception(string.Format("Unable to set information.  Error: {0}",
-                        Marshal.GetLastWin32Error()));
-            }
-            finally
-            {
-                if (extendedInfoPtr != IntPtr.Zero)
+                var information = new JobObjectExtendedLimitInformation
                 {
-                    Marshal.FreeHGlobal(extendedInfoPtr);
-                    extendedInfoPtr = IntPtr.Zero;
+                    BasicLimitInformation = new JobObjectBasicLimitInformation
+                    {
+                        LimitFlags = JobObjectLimitKillOnJobClose,
+                    },
+                };
+
+                int size = Marshal.SizeOf<JobObjectExtendedLimitInformation>();
+                if (!SetInformationJobObject(
+                    _handle,
+                    JobObjectExtendedLimitInformationClass,
+                    ref information,
+                    (uint)size))
+                {
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to configure process job object.");
                 }
+            }
+            catch
+            {
+                _handle.Dispose();
+                throw;
             }
         }
 
         public bool AddProcess(IntPtr processHandle)
         {
-            var succ = AssignProcessToJobObject(handle, processHandle);
-
-            if (!succ)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            bool success = AssignProcessToJobObject(_handle, processHandle);
+            if (!success)
             {
-                logger.Error("Failed to call AssignProcessToJobObject! GetLastError=" + Marshal.GetLastWin32Error());
+                Logger.Error("AssignProcessToJobObject failed. GetLastError={Error}", Marshal.GetLastWin32Error());
             }
 
-            return succ;
+            return success;
         }
 
         public bool AddProcess(int processId)
         {
-            return AddProcess(Process.GetProcessById(processId).Handle);
+            using Process process = Process.GetProcessById(processId);
+            return AddProcess(process.Handle);
         }
 
-        #region IDisposable
+        public void AddProcessOrThrow(Process process, string processDescription = "child process")
+        {
+            ArgumentNullException.ThrowIfNull(process);
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        private bool disposed;
+            if (!AssignProcessToJobObject(_handle, process.Handle))
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    $"Unable to assign {processDescription} to its process job object.");
+            }
+        }
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposed) return;
-            disposed = true;
-
-            if (disposing)
+            if (_disposed)
             {
-                // no managed objects to free
+                return;
             }
 
-            if (handle != IntPtr.Zero)
-            {
-                CloseHandle(handle);
-                handle = IntPtr.Zero;
-            }
+            _disposed = true;
+            _handle.Dispose();
         }
 
-        ~Job()
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobObjectBasicLimitInformation
         {
-            Dispose(false);
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
         }
 
-        #endregion
+        [StructLayout(LayoutKind.Sequential)]
+        private struct IoCounters
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
 
-        #region Interop
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobObjectExtendedLimitInformation
+        {
+            public JobObjectBasicLimitInformation BasicLimitInformation;
+            public IoCounters IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
 
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr CreateJobObject(IntPtr a, string lpName);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool SetInformationJobObject(IntPtr hJob, JobObjectInfoType infoType, IntPtr lpJobObjectInfo, uint cbJobObjectInfoLength);
-
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern nint CreateJobObjectW(nint lpJobAttributes, string? lpName);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CloseHandle(IntPtr hObject);
+        private static extern bool SetInformationJobObject(
+            SafeFileHandle hJob,
+            int jobObjectInformationClass,
+            ref JobObjectExtendedLimitInformation lpJobObjectInformation,
+            uint cbJobObjectInformationLength);
 
-        #endregion
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AssignProcessToJobObject(SafeFileHandle hJob, nint hProcess);
     }
-
-    #region Helper classes
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct IO_COUNTERS
-    {
-        public ulong ReadOperationCount;
-        public ulong WriteOperationCount;
-        public ulong OtherOperationCount;
-        public ulong ReadTransferCount;
-        public ulong WriteTransferCount;
-        public ulong OtherTransferCount;
-    }
-
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct JOBOBJECT_BASIC_LIMIT_INFORMATION
-    {
-        public long PerProcessUserTimeLimit;
-        public long PerJobUserTimeLimit;
-        public uint LimitFlags;
-        public UIntPtr MinimumWorkingSetSize;
-        public UIntPtr MaximumWorkingSetSize;
-        public uint ActiveProcessLimit;
-        public UIntPtr Affinity;
-        public uint PriorityClass;
-        public uint SchedulingClass;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct SECURITY_ATTRIBUTES
-    {
-        public uint nLength;
-        public IntPtr lpSecurityDescriptor;
-        public int bInheritHandle;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-    {
-        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
-        public IO_COUNTERS IoInfo;
-        public UIntPtr ProcessMemoryLimit;
-        public UIntPtr JobMemoryLimit;
-        public UIntPtr PeakProcessMemoryUsed;
-        public UIntPtr PeakJobMemoryUsed;
-    }
-
-    public enum JobObjectInfoType
-    {
-        AssociateCompletionPortInformation = 7,
-        BasicLimitInformation = 2,
-        BasicUIRestrictions = 4,
-        EndOfJobTimeInformation = 6,
-        ExtendedLimitInformation = 9,
-        SecurityLimitInformation = 5,
-        GroupInformation = 11
-    }
-
-    #endregion
 }

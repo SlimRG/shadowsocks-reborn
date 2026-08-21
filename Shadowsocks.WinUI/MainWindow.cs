@@ -22,6 +22,7 @@ public sealed class MainWindow : Window
     private const string ServersTag = "servers";
     private const string PluginsTag = "plugins";
     private const string TrafficTag = "traffic";
+    private const string DnsTag = "dns";
     private const string GamesTag = "games";
     private const string PacTag = "pac";
     private const string ForwardProxyTag = "forward-proxy";
@@ -54,6 +55,7 @@ public sealed class MainWindow : Window
         Func<bool, bool> setStartWithWindows,
         Func<HotkeyConfig, IReadOnlyList<string>> registerHotkeys,
         Func<HotkeyConfig, IReadOnlyList<string>> applyHotkeys,
+        Action requestApplicationExit,
         ILocalizationService localization)
     {
         _controller = controller;
@@ -115,6 +117,7 @@ public sealed class MainWindow : Window
             SetAlwaysOnTop,
             registerHotkeys,
             applyHotkeys,
+            requestApplicationExit,
             _localization);
 
         Content = _rootGrid;
@@ -152,6 +155,15 @@ public sealed class MainWindow : Window
     public void NavigateToServers() => NavigateAndSelect(ServersTag);
     public void NavigateToPlugins() => NavigateAndSelect(PluginsTag);
     public void NavigateToTraffic() => NavigateAndSelect(TrafficTag);
+    public void NavigateToDns() => NavigateAndSelect(DnsTag);
+
+    public async Task NavigateToDnsAndEnableAsync()
+    {
+        NavigateAndSelect(DnsTag);
+        ShowFromTray();
+        if (_contentHost.Content is DnsPage dnsPage)
+            await dnsPage.RequestEnableDnsCryptAsync();
+    }
     public void NavigateToPac() => NavigateAndSelect(PacTag);
     public void NavigateToForwardProxy() => NavigateAndSelect(ForwardProxyTag);
     public void NavigateToHotkeys() => NavigateAndSelect(HotkeysTag);
@@ -426,6 +438,7 @@ public sealed class MainWindow : Window
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Servers"], ServersTag, Symbol.World, "Manage Shadowsocks servers and local client connection settings."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Plugins"], PluginsTag, Symbol.Add, "Install and manage SIP003 plugins."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Traffic"], TrafficTag, Symbol.Sync, "Configure capture mode, Windows proxy settings and per-application routing."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["DNS"], DnsTag, Symbol.Globe, "Manage DNS policy and DNSCrypt Proxy."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Game Mode"], GamesTag, Symbol.Play, "Manage applications that automatically suspend WinDivert while they are running."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["PAC / GeoSite"], PacTag, Symbol.Globe, "Configure PAC behavior, local PAC security and GeoSite sources."));
         navigationView.MenuItems.Add(CreateNavigationItem(_localization["Forward Proxy"], ForwardProxyTag, Symbol.Forward, "Configure an optional upstream proxy used to reach Shadowsocks servers."));
@@ -476,6 +489,7 @@ public sealed class MainWindow : Window
             ServersTag => typeof(ServersPage),
             PluginsTag => typeof(PluginsPage),
             TrafficTag => typeof(TrafficPage),
+            DnsTag => typeof(DnsPage),
             GamesTag => typeof(GamesPage),
             PacTag => typeof(PacGeositePage),
             ForwardProxyTag => typeof(ForwardProxyPage),
@@ -514,6 +528,7 @@ public sealed class MainWindow : Window
             : pageType == typeof(ServersPage) ? new ServersPage(_pageContext)
             : pageType == typeof(PluginsPage) ? new PluginsPage(_pageContext)
             : pageType == typeof(TrafficPage) ? new TrafficPage(_pageContext)
+            : pageType == typeof(DnsPage) ? new DnsPage(_pageContext)
             : pageType == typeof(GamesPage) ? new GamesPage(_pageContext)
             : pageType == typeof(PacGeositePage) ? new PacGeositePage(_pageContext)
             : pageType == typeof(ForwardProxyPage) ? new ForwardProxyPage(_pageContext)
@@ -558,9 +573,8 @@ public sealed class MainWindow : Window
         controller.EnableStatusChanged += OnControllerStateChanged;
         controller.EnableGlobalChanged += OnControllerStateChanged;
         controller.ShareOverLANStatusChanged += OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged += OnControllerStateChanged;
-        controller.ShowPluginOutputChanged += OnControllerStateChanged;
         controller.TrafficModeChanged += OnControllerStateChanged;
+        controller.DnsCryptStatusChanged += OnControllerStateChanged;
     }
 
     private void UnsubscribeControllerEvents(ShadowsocksController controller)
@@ -569,9 +583,8 @@ public sealed class MainWindow : Window
         controller.EnableStatusChanged -= OnControllerStateChanged;
         controller.EnableGlobalChanged -= OnControllerStateChanged;
         controller.ShareOverLANStatusChanged -= OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged -= OnControllerStateChanged;
-        controller.ShowPluginOutputChanged -= OnControllerStateChanged;
         controller.TrafficModeChanged -= OnControllerStateChanged;
+        controller.DnsCryptStatusChanged -= OnControllerStateChanged;
     }
 
     private void OnControllerStateChanged(object? _, EventArgs _1)

@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading;
 using NLog;
 using Shadowsocks.Controller.Strategy;
 using Shadowsocks.Encryption;
@@ -12,13 +13,9 @@ namespace Shadowsocks.Controller
 {
     class UDPRelay : Listener.Service
     {
-        private ShadowsocksController _controller;
-
-        // TODO: choose a smart number
-        private LRUCache<IPEndPoint, UDPHandler> _cache = new LRUCache<IPEndPoint, UDPHandler>(512);
-
-        public long outbound = 0;
-        public long inbound = 0;
+        private const int MaxUdpAssociations = 512;
+        private readonly ShadowsocksController _controller;
+        private readonly UdpAssociationCache _cache = new(MaxUdpAssociations);
 
         public UDPRelay(ShadowsocksController controller)
         {
@@ -37,99 +34,155 @@ namespace Shadowsocks.Controller
             }
             Listener.UDPState udpState = (Listener.UDPState)state;
             IPEndPoint remoteEndPoint = (IPEndPoint)udpState.remoteEndPoint;
-            UDPHandler handler = _cache.get(remoteEndPoint);
-            if (handler == null)
+            if (firstPacket[0] != 0 || firstPacket[1] != 0 || firstPacket[2] != 0)
             {
-                Server server = _controller.GetAServer(IStrategyCallerType.UDP, remoteEndPoint, null/*TODO: fix this*/);
+                return true; // SOCKS5 UDP fragmentation is intentionally unsupported; drop invalid/fragmented datagrams.
+            }
+
+            EndPoint destination = TryParseDestination(firstPacket, length);
+            if (destination == null)
+            {
+                return true;
+            }
+
+            UDPHandler handler = _cache.Get(remoteEndPoint);
+            if (handler == null || handler.IsClosed)
+            {
+                Server server = _controller.GetAServer(IStrategyCallerType.UDP, remoteEndPoint, destination);
                 if (server?.IsConfigured != true)
                 {
                     return true;
                 }
 
-                handler = new UDPHandler(socket, server, remoteEndPoint);
+                handler = new UDPHandler(_controller, socket, server, remoteEndPoint);
                 handler.Receive();
-                _cache.add(remoteEndPoint, handler);
+                _cache.AddOrReplace(remoteEndPoint, handler);
             }
             handler.Send(firstPacket, length);
             return true;
         }
 
-        public class UDPHandler
+        internal static EndPoint TryParseDestination(byte[] packet, int length)
         {
-            private static Logger logger = LogManager.GetCurrentClassLogger();
-
-            private Socket _local;
-            private Socket _remote;
-
-            private Server _server;
-            private byte[] _buffer = new byte[65536];
-
-            private IPEndPoint _localEndPoint;
-            private IPEndPoint _remoteEndPoint;
-
-            private IPAddress GetIPAddress()
+            if (packet == null || length < 7 || length > packet.Length)
             {
-                switch (_remote.AddressFamily)
-                {
-                    case AddressFamily.InterNetwork:
-                        return IPAddress.Any;
-                    case AddressFamily.InterNetworkV6:
-                        return IPAddress.IPv6Any;
-                    default:
-                        return IPAddress.Any;
-                }
+                return null;
             }
 
-            public UDPHandler(Socket local, Server server, IPEndPoint localEndPoint)
+            int offset = 3;
+            byte addressType = packet[offset++];
+            string host;
+            switch (addressType)
+            {
+                case 0x01:
+                    if (length < offset + 4 + 2) return null;
+                    host = new IPAddress(packet.AsSpan(offset, 4)).ToString();
+                    offset += 4;
+                    break;
+                case 0x04:
+                    if (length < offset + 16 + 2) return null;
+                    host = new IPAddress(packet.AsSpan(offset, 16)).ToString();
+                    offset += 16;
+                    break;
+                case 0x03:
+                    if (length < offset + 1) return null;
+                    int hostLength = packet[offset++];
+                    if (hostLength <= 0 || length < offset + hostLength + 2) return null;
+                    host = Encoding.ASCII.GetString(packet, offset, hostLength);
+                    offset += hostLength;
+                    break;
+                default:
+                    return null;
+            }
+
+            int port = (packet[offset] << 8) | packet[offset + 1];
+            if (port <= 0)
+            {
+                return null;
+            }
+
+            return IPAddress.TryParse(host, out IPAddress address)
+                ? new IPEndPoint(address, port)
+                : new DnsEndPoint(host, port);
+        }
+
+        public class UDPHandler
+        {
+            private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+
+            private readonly Socket _local;
+            private Socket _remote;
+
+            private readonly Server _server;
+            private readonly byte[] _buffer = new byte[65536];
+
+            private readonly IPEndPoint _localEndPoint;
+            private readonly IPEndPoint _remoteEndPoint;
+
+            public bool IsClosed => _remote == null;
+
+            private static IPAddress GetBindAddress(AddressFamily addressFamily)
+            {
+                return addressFamily == AddressFamily.InterNetworkV6
+                    ? IPAddress.IPv6Any
+                    : IPAddress.Any;
+            }
+
+            public UDPHandler(ShadowsocksController controller, Socket local, Server server, IPEndPoint localEndPoint)
             {
                 _local = local;
                 _server = server;
                 _localEndPoint = localEndPoint;
 
-                // TODO async resolving
-                IPAddress ipAddress;
-                bool parsed = IPAddress.TryParse(server.server, out ipAddress);
-                if (!parsed)
-                {
-                    IPHostEntry ipHostInfo = Dns.GetHostEntry(server.server);
-                    ipAddress = ipHostInfo.AddressList[0];
-                }
-                _remoteEndPoint = new IPEndPoint(ipAddress, server.server_port);
+                _remoteEndPoint = controller.ResolveOutboundEndpoint(server.server, server.server_port);
                 _remote = new Socket(_remoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
-                _remote.Bind(new IPEndPoint(GetIPAddress(), 0));
+                _remote.Bind(new IPEndPoint(GetBindAddress(_remote.AddressFamily), 0));
             }
 
             public void Send(byte[] data, int length)
             {
-                IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password);
+                Socket remote = _remote;
+                if (remote == null)
+                {
+                    return;
+                }
+
+                using IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password);
                 byte[] dataIn = new byte[length - 3];
                 Array.Copy(data, 3, dataIn, 0, length - 3);
                 byte[] dataOut = new byte[65536];  // enough space for AEAD ciphers
                 int outlen;
                 encryptor.EncryptUDP(dataIn, length - 3, dataOut, out outlen);
                 logger.Debug(_localEndPoint, _remoteEndPoint, outlen, "UDP Relay");
-                _remote?.SendTo(dataOut, outlen, SocketFlags.None, _remoteEndPoint);
+                remote.SendTo(dataOut, outlen, SocketFlags.None, _remoteEndPoint);
             }
 
             public void Receive()
             {
-                EndPoint remoteEndPoint = new IPEndPoint(GetIPAddress(), 0);
-                logger.Debug($"++++++Receive Server Port, size:" + _buffer.Length);
-                _remote?.BeginReceiveFrom(_buffer, 0, _buffer.Length, 0, ref remoteEndPoint, new AsyncCallback(RecvFromCallback), null);
+                Socket remote = _remote;
+                if (remote == null)
+                {
+                    return;
+                }
+
+                EndPoint remoteEndPoint = new IPEndPoint(GetBindAddress(remote.AddressFamily), 0);
+                logger.Debug("UDP relay waiting for server responses on {0}.", remote.LocalEndPoint);
+                remote.BeginReceiveFrom(_buffer, 0, _buffer.Length, 0, ref remoteEndPoint, RecvFromCallback, null);
             }
 
             public void RecvFromCallback(IAsyncResult ar)
             {
                 try
                 {
-                    if (_remote == null) return;
-                    EndPoint remoteEndPoint = new IPEndPoint(GetIPAddress(), 0);
-                    int bytesRead = _remote.EndReceiveFrom(ar, ref remoteEndPoint);
+                    Socket remote = _remote;
+                    if (remote == null) return;
+                    EndPoint remoteEndPoint = new IPEndPoint(GetBindAddress(remote.AddressFamily), 0);
+                    int bytesRead = remote.EndReceiveFrom(ar, ref remoteEndPoint);
 
                     byte[] dataOut = new byte[bytesRead];
                     int outlen;
 
-                    IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password);
+                    using IEncryptor encryptor = EncryptorFactory.GetEncryptor(_server.method, _server.password);
                     encryptor.DecryptUDP(_buffer, bytesRead, dataOut, out outlen);
 
                     byte[] sendBuf = new byte[outlen + 3];
@@ -142,101 +195,106 @@ namespace Shadowsocks.Controller
                 }
                 catch (ObjectDisposedException)
                 {
-                    // TODO: handle the ObjectDisposedException
+                    Close();
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // TODO: need more think about handle other Exceptions, or should remove this catch().
-                }
-                finally
-                {
-                    // No matter success or failed, we keep receiving
-
+                    logger.LogUsefulException(exception);
+                    Close();
                 }
             }
 
             public void Close()
             {
+                Socket remote = Interlocked.Exchange(ref _remote, null);
+                if (remote == null)
+                {
+                    return;
+                }
+
                 try
                 {
-                    _remote?.Close();
+                    remote.Dispose();
                 }
                 catch (ObjectDisposedException)
                 {
-                    // TODO: handle the ObjectDisposedException
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
-                    // TODO: need more think about handle other Exceptions, or should remove this catch().
+                    logger.LogUsefulException(exception);
                 }
             }
         }
     }
 
-    #region LRU cache
-
-    // cc by-sa 3.0 http://stackoverflow.com/a/3719378/1124054
-    class LRUCache<K, V> where V : UDPRelay.UDPHandler
+    internal sealed class UdpAssociationCache
     {
-        private int capacity;
-        private Dictionary<K, LinkedListNode<LRUCacheItem<K, V>>> cacheMap = new Dictionary<K, LinkedListNode<LRUCacheItem<K, V>>>();
-        private LinkedList<LRUCacheItem<K, V>> lruList = new LinkedList<LRUCacheItem<K, V>>();
+        private readonly int _capacity;
+        private readonly object _sync = new();
+        private readonly Dictionary<IPEndPoint, LinkedListNode<Entry>> _entries = new();
+        private readonly LinkedList<Entry> _lru = new();
 
-        public LRUCache(int capacity)
+        public UdpAssociationCache(int capacity)
         {
-            this.capacity = capacity;
-        }
-
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public V get(K key)
-        {
-            LinkedListNode<LRUCacheItem<K, V>> node;
-            if (cacheMap.TryGetValue(key, out node))
+            if (capacity <= 0)
             {
-                V value = node.Value.value;
-                lruList.Remove(node);
-                lruList.AddLast(node);
-                return value;
+                throw new ArgumentOutOfRangeException(nameof(capacity));
             }
-            return default(V);
+            _capacity = capacity;
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
-        public void add(K key, V val)
+        public UDPRelay.UDPHandler Get(IPEndPoint key)
         {
-            if (cacheMap.Count >= capacity)
+            lock (_sync)
             {
-                RemoveFirst();
-            }
+                if (!_entries.TryGetValue(key, out LinkedListNode<Entry> node))
+                {
+                    return null;
+                }
 
-            LRUCacheItem<K, V> cacheItem = new LRUCacheItem<K, V>(key, val);
-            LinkedListNode<LRUCacheItem<K, V>> node = new LinkedListNode<LRUCacheItem<K, V>>(cacheItem);
-            lruList.AddLast(node);
-            cacheMap.Add(key, node);
+                _lru.Remove(node);
+                _lru.AddLast(node);
+                return node.Value.Handler;
+            }
         }
 
-        private void RemoveFirst()
+        public void AddOrReplace(IPEndPoint key, UDPRelay.UDPHandler handler)
         {
-            // Remove from LRUPriority
-            LinkedListNode<LRUCacheItem<K, V>> node = lruList.First;
-            lruList.RemoveFirst();
+            UDPRelay.UDPHandler toClose = null;
+            lock (_sync)
+            {
+                if (_entries.TryGetValue(key, out LinkedListNode<Entry> existing))
+                {
+                    _lru.Remove(existing);
+                    _entries.Remove(key);
+                    toClose = existing.Value.Handler;
+                }
+                else if (_entries.Count >= _capacity && _lru.First is LinkedListNode<Entry> oldest)
+                {
+                    _lru.RemoveFirst();
+                    _entries.Remove(oldest.Value.Key);
+                    toClose = oldest.Value.Handler;
+                }
 
-            // Remove from cache
-            cacheMap.Remove(node.Value.key);
-            node.Value.value.Close();
+                var entry = new Entry(key, handler);
+                var node = new LinkedListNode<Entry>(entry);
+                _lru.AddLast(node);
+                _entries.Add(key, node);
+            }
+
+            toClose?.Close();
+        }
+
+        private sealed class Entry
+        {
+            public Entry(IPEndPoint key, UDPRelay.UDPHandler handler)
+            {
+                Key = key;
+                Handler = handler;
+            }
+
+            public IPEndPoint Key { get; }
+            public UDPRelay.UDPHandler Handler { get; }
         }
     }
-
-    class LRUCacheItem<K, V>
-    {
-        public LRUCacheItem(K k, V v)
-        {
-            key = k;
-            value = v;
-        }
-        public K key;
-        public V value;
-    }
-
-    #endregion
 }

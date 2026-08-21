@@ -393,7 +393,7 @@ public sealed class SharingPage : Page, IRefreshablePage
             return;
         }
 
-        string url = server.GetURL(_configuration.generateLegacyUrl);
+        string url = server.GetURL();
         _url.Text = url;
         try
         {

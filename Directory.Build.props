@@ -3,5 +3,16 @@
     <!-- Pin analyzer behavior to the .NET 10 ruleset and enforce configured style diagnostics during builds. -->
     <AnalysisLevel>10.0</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      NuGet Audit depends on an external vulnerability feed. Keep ordinary local/Visual Studio
+      restores deterministic and offline-friendly; CI explicitly enables the audit so release
+      validation still checks direct and transitive dependencies. Override locally with
+      -p:NuGetAudit=true when an on-demand audit is desired.
+    -->
+    <NuGetAudit Condition="'$(NuGetAudit)' == ''">false</NuGetAudit>
+    <NuGetAuditMode Condition="'$(NuGetAuditMode)' == ''">all</NuGetAuditMode>
+    <!-- Release/CI restores enable NuGetAudit=true; an unavailable vulnerability feed or known vulnerable packages must then be release-blocking. -->
+    <WarningsAsErrors Condition="'$(NuGetAudit)' == 'true'">$(WarningsAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
   </PropertyGroup>
 </Project>

@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
 using NLog;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Core;
 using Shadowsocks.Core.Logging;
@@ -133,6 +134,7 @@ public sealed partial class App : Application
             SetStartWithWindows,
             RegisterHotkeys,
             ApplyHotkeys,
+            ShutdownAndExit,
             _localization);
         if (_userInteraction is not null)
         {
@@ -183,7 +185,7 @@ public sealed partial class App : Application
 
         // Controller startup errors (for example, an occupied local port) still
         // need a visible XamlRoot so the user sees the same explicit error flow
-        // as the legacy client. This is an exceptional path, not normal startup.
+        // as expected by the controller contract. This is an exceptional path, not normal startup.
         if (!firstRun && !_pendingControllerErrors.IsEmpty)
         {
             ShowMainWindow();
@@ -381,9 +383,8 @@ public sealed partial class App : Application
         controller.EnableStatusChanged += OnControllerStateChanged;
         controller.EnableGlobalChanged += OnControllerStateChanged;
         controller.ShareOverLANStatusChanged += OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged += OnControllerStateChanged;
-        controller.ShowPluginOutputChanged += OnControllerStateChanged;
         controller.TrafficModeChanged += OnControllerStateChanged;
+        controller.DnsCryptStatusChanged += OnControllerStateChanged;
         controller.TrafficChanged += OnControllerTrafficChanged;
         controller.PACFileReadyToOpen += OnControllerPathReadyToOpen;
         controller.UserRuleFileReadyToOpen += OnControllerPathReadyToOpen;
@@ -396,9 +397,8 @@ public sealed partial class App : Application
         controller.EnableStatusChanged -= OnControllerStateChanged;
         controller.EnableGlobalChanged -= OnControllerStateChanged;
         controller.ShareOverLANStatusChanged -= OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged -= OnControllerStateChanged;
-        controller.ShowPluginOutputChanged -= OnControllerStateChanged;
         controller.TrafficModeChanged -= OnControllerStateChanged;
+        controller.DnsCryptStatusChanged -= OnControllerStateChanged;
         controller.TrafficChanged -= OnControllerTrafficChanged;
         controller.PACFileReadyToOpen -= OnControllerPathReadyToOpen;
         controller.UserRuleFileReadyToOpen -= OnControllerPathReadyToOpen;
@@ -424,7 +424,7 @@ public sealed partial class App : Application
         {
             _ = dispatcherQueue.TryEnqueue(() =>
             {
-                // Legacy Shadowsocks surfaced controller errors immediately even when
+                // Controller errors are surfaced immediately even when
                 // it was otherwise tray-only. Lazily activate the WinUI host only for
                 // that exceptional dialog path.
                 if (_window?.Content?.XamlRoot is null)
@@ -513,6 +513,10 @@ public sealed partial class App : Application
                 TraySystemProxyMode.Disabled,
                 TrayTrafficMode.User,
                 _localization["WinDivert: inactive"],
+                TrayDnsMode.System,
+                _localization["DNSCrypt: Not installed"],
+                false,
+                false,
                 Array.Empty<TrayStrategyMenuItem>(),
                 Array.Empty<TrayServerMenuItem>(),
                 false, false, false,
@@ -544,6 +548,20 @@ public sealed partial class App : Application
             _ => _localization["WinDivert: inactive"],
         };
 
+        DnsCryptManagementStatus dns = _controller.GetDnsCryptManagementStatus();
+        TrayDnsMode trayDnsMode = dns.Mode switch
+        {
+            DnsPolicyMode.Direct => TrayDnsMode.Direct,
+            DnsPolicyMode.Proxy => TrayDnsMode.Proxy,
+            DnsPolicyMode.CustomDoh => TrayDnsMode.CustomDoh,
+            DnsPolicyMode.DnsCrypt => TrayDnsMode.DnsCrypt,
+            _ => TrayDnsMode.System,
+        };
+        DnsCryptTrayPresentation dnsPresentation = DnsCryptPresentation.GetTrayPresentation(dns);
+        string dnsStatus = dnsPresentation.Version is null
+            ? _localization[dnsPresentation.LocalizationKey]
+            : _localization.Format(dnsPresentation.LocalizationKey, dnsPresentation.Version);
+
         var strategies = _controller.GetStrategies()
             .Select(strategy => new TrayStrategyMenuItem(
                 strategy.ID,
@@ -565,13 +583,17 @@ public sealed partial class App : Application
         string proxyText = proxyMode == SystemProxyMode.Disabled
             ? _localization.Format("Running: Port {0}", config.localPort)
             : _localization["System Proxy On:"] + " " + (proxyMode == SystemProxyMode.Global ? _localization["Global"] : _localization["PAC"]);
-        string tooltip = $"{_localization["shadowsocks-reborn"]} {UpdateChecker.Version}\n{proxyText}\n{serverInfo}";
+        string tooltip = $"{_localization["shadowsocks-reborn"]} {ApplicationInfo.Version}\n{proxyText}\n{serverInfo}";
 
         return new TrayMenuState(
             tooltip,
             trayProxyMode,
             trayTrafficMode,
             trafficStatus,
+            trayDnsMode,
+            dnsStatus,
+            dns.Component.IsInstalled,
+            dns.UpdateAvailable,
             strategies,
             servers,
             config.useOnlinePac,
@@ -604,8 +626,16 @@ public sealed partial class App : Application
                     _window.NavigateToServers();
                     ShowMainWindow();
                     break;
+                case TrayCommandKind.OpenPlugins:
+                    _window.NavigateToPlugins();
+                    ShowMainWindow();
+                    break;
                 case TrayCommandKind.OpenTraffic:
                     _window.NavigateToTraffic();
+                    ShowMainWindow();
+                    break;
+                case TrayCommandKind.OpenDns:
+                    _window.NavigateToDns();
                     ShowMainWindow();
                     break;
                 case TrayCommandKind.OpenSharing:
@@ -670,6 +700,48 @@ public sealed partial class App : Application
                     if (_controller is not null)
                     {
                         await _controller.SetTrafficCaptureModeAsync(TrafficCaptureMode.Admin);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsSystem:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.System);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsDirect:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.Direct);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsProxy:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.Proxy);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsDnsCrypt:
+                    if (_controller is not null)
+                    {
+                        if (_controller.GetDnsCryptManagementStatus().Component.IsInstalled)
+                        {
+                            await _controller.SetDnsPolicyAsync(DnsPolicyMode.DnsCrypt);
+                        }
+                        else
+                        {
+                            ShowMainWindow();
+                            await _window.NavigateToDnsAndEnableAsync();
+                        }
+                    }
+                    break;
+                case TrayCommandKind.CheckDnsCryptUpdate:
+                    if (_controller is not null)
+                    {
+                        DnsCryptReleaseInfo release = await _controller.CheckDnsCryptUpdateAsync();
+                        DnsCryptManagementStatus dns = _controller.GetDnsCryptManagementStatus();
+                        _window.SetShellStatus(dns.UpdateAvailable
+                            ? _localization.Format("DNSCrypt Proxy {0} is available.", release.Version)
+                            : _localization["DNSCrypt Proxy is up to date."]);
                     }
                     break;
                 case TrayCommandKind.SelectServer:
@@ -769,7 +841,7 @@ public sealed partial class App : Application
             return;
         }
 
-        // Preserve the legacy Online PAC scenario: if no URL exists, editing is
+        // For Online PAC, if no URL exists, editing is
         // performed first and Online PAC is enabled only after a non-empty URL is saved.
         ShowMainWindow();
         await Task.Yield();
@@ -838,16 +910,29 @@ public sealed partial class App : Application
 
     private void OnAutomaticUpdateAvailable(object? _, UpdateAvailableEventArgs e)
     {
-        _ = _dispatcherQueue?.TryEnqueue(() =>
+        _ = _dispatcherQueue?.TryEnqueue(async () =>
         {
-            if (_window is null || _startupUpdateChecker is null)
+            UpdateChecker? checker = _startupUpdateChecker;
+            if (_window is null || checker is null || _shuttingDown)
             {
                 return;
             }
 
-            _window.SetShellStatus(_localization.Format("Update available: {0}", _startupUpdateChecker.NewReleaseVersion));
-            ShowMainWindow();
-            _window.NavigateToAbout(checkNow: true);
+            try
+            {
+                _window.SetShellStatus(_localization.Format("Installing update {0}…", checker.NewReleaseVersion));
+                if (await checker.DoUpdate())
+                {
+                    ShutdownAndExit();
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Automatic application update failed.");
+                _window?.SetShellStatus(
+                    _localization.Format("Automatic update failed: {0}", exception.Message),
+                    InfoBarSeverity.Error);
+            }
         });
     }
 

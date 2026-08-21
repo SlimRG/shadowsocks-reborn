@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Shadowsocks.Controller;
@@ -57,6 +58,15 @@ public sealed class AboutPage : Page, IRefreshablePage
         _context.SetToolTip(issuesButton, "Open the GitHub issue tracker for bug reports and feature requests.");
         issuesButton.Click += (_, _) => OpenUrl(ApplicationInfo.IssuesUrl);
         links.Children.Add(issuesButton);
+        var licenseButton = new Button { Content = "License" };
+        _context.SetToolTip(licenseButton, "Show the Shadowsocks Reborn license bundled with this application.");
+        licenseButton.Click += async (_, _) => await ShowLicenseAsync();
+        links.Children.Add(licenseButton);
+
+        var noticesButton = new Button { Content = "Third-party notices" };
+        _context.SetToolTip(noticesButton, "Show third-party license and source notices bundled with this application.");
+        noticesButton.Click += async (_, _) => await ShowThirdPartyNoticesAsync();
+        links.Children.Add(noticesButton);
         identity.Children.Add(links);
         panel.Children.Add(WinUIStyles.CreateCard(identity));
 
@@ -66,11 +76,11 @@ public sealed class AboutPage : Page, IRefreshablePage
         updates.Children.Add(_updateStatus);
         _updateAtStartupToggle = new ToggleSwitch
         {
-            Header = "Check for Updates at Startup",
+            Header = "Automatically install updates",
             OnContent = "On",
             OffContent = "Off",
         };
-        _context.SetToolTip(_updateAtStartupToggle, "Check GitHub for a newer Shadowsocks Reborn release after the application starts.");
+        _context.SetToolTip(_updateAtStartupToggle, "Automatically download, verify and install a newer release after the application starts.");
         _updateAtStartupToggle.Toggled += OnUpdateAtStartupToggled;
         updates.Children.Add(_updateAtStartupToggle);
 
@@ -89,8 +99,8 @@ public sealed class AboutPage : Page, IRefreshablePage
         _context.SetToolTip(_checkButton, "Check GitHub for available updates now.");
         _checkButton.Click += OnCheckNowClicked;
         actions.Children.Add(_checkButton);
-        _downloadButton = new Button { Content = "Download update", Visibility = Visibility.Collapsed };
-        _context.SetToolTip(_downloadButton, "Download the selected release asset to the application update workspace.");
+        _downloadButton = new Button { Content = "Install update", Visibility = Visibility.Collapsed };
+        _context.SetToolTip(_downloadButton, "Download, verify and install the selected update automatically.");
         _downloadButton.Click += OnDownloadClicked;
         actions.Children.Add(_downloadButton);
         _skipButton = new Button { Content = "Skip this version", Visibility = Visibility.Collapsed };
@@ -155,7 +165,9 @@ public sealed class AboutPage : Page, IRefreshablePage
             await _updateChecker.CheckForVersionUpdate();
             if (!_updateFound)
             {
-                _updateStatus.Text = _context.LF("You are up to date · {0}", ApplicationInfo.Version);
+                _updateStatus.Text = string.IsNullOrWhiteSpace(_updateChecker.LastCheckError)
+                    ? _context.LF("You are up to date · {0}", ApplicationInfo.Version)
+                    : _context.LF("Update check failed: {0}", _updateChecker.LastCheckError);
             }
         }
         finally
@@ -193,9 +205,11 @@ public sealed class AboutPage : Page, IRefreshablePage
     {
         _ = DispatcherQueue.TryEnqueue(() =>
         {
-            if (!_updateFound)
+            if (!_updateFound && _updateChecker is not null)
             {
-                _updateStatus.Text = _context.LF("You are up to date · {0}", ApplicationInfo.Version);
+                _updateStatus.Text = string.IsNullOrWhiteSpace(_updateChecker.LastCheckError)
+                    ? _context.LF("You are up to date · {0}", ApplicationInfo.Version)
+                    : _context.LF("Update check failed: {0}", _updateChecker.LastCheckError);
             }
         });
     }
@@ -210,8 +224,11 @@ public sealed class AboutPage : Page, IRefreshablePage
         _downloadButton.IsEnabled = false;
         try
         {
-            await _updateChecker.DoUpdate();
-            _context.ShowInfo("Updates", "Update assets were downloaded to the temporary folder.", InfoBarSeverity.Success);
+            _updateStatus.Text = _context.LF("Installing update {0}…", _updateChecker.NewReleaseVersion);
+            if (await _updateChecker.DoUpdate())
+            {
+                _context.RequestApplicationExit();
+            }
         }
         catch (Exception exception)
         {
@@ -268,6 +285,58 @@ public sealed class AboutPage : Page, IRefreshablePage
         }
 
         _context.Controller.ToggleCheckingPreRelease(_preReleaseToggle.IsOn);
+    }
+
+    private Task ShowLicenseAsync()
+        => ShowEmbeddedTextAsync(
+            static () => EmbeddedResources.ProductLicense,
+            "License",
+            "License resource is unavailable.");
+
+    private Task ShowThirdPartyNoticesAsync()
+        => ShowEmbeddedTextAsync(
+            static () => EmbeddedResources.ThirdPartyNotices,
+            "Third-party notices",
+            "Third-party notices resource is unavailable.");
+
+    private async Task ShowEmbeddedTextAsync(Func<string> readText, string titleKey, string unavailableKey)
+    {
+        string text;
+        try
+        {
+            text = readText();
+        }
+        catch (InvalidOperationException exception)
+        {
+            _context.ShowInfo(_context.L(titleKey), $"{_context.L(unavailableKey)} {exception.Message}", InfoBarSeverity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _context.ShowInfo(_context.L(titleKey), _context.L(unavailableKey), InfoBarSeverity.Error);
+            return;
+        }
+        var content = new TextBox
+        {
+            Text = text,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinWidth = 620,
+            MinHeight = 320,
+            MaxHeight = 520,
+        };
+        ScrollViewer.SetVerticalScrollBarVisibility(content, ScrollBarVisibility.Auto);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = _context.L(titleKey),
+            Content = content,
+            CloseButtonText = _context.L("Close"),
+            DefaultButton = ContentDialogButton.Close,
+        };
+        await dialog.ShowAsync();
     }
 
     private void OpenUrl(string url)

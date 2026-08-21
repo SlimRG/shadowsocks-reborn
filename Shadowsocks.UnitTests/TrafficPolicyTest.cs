@@ -76,6 +76,25 @@ namespace Shadowsocks.UnitTests
             Configuration configuration = new();
             Assert.IsNotNull(configuration.dnsPolicy);
             Assert.AreEqual(DnsPolicyMode.System, configuration.dnsPolicy.mode);
+            Assert.IsNotNull(configuration.dnsPolicy.dnsCrypt);
+            Assert.IsTrue(configuration.dnsPolicy.dnsCrypt.autoUpdate);
+            Assert.IsTrue(configuration.dnsPolicy.dnsCrypt.requireDnssec);
+            Assert.IsTrue(configuration.dnsPolicy.dnsCrypt.requireNoLog);
+            Assert.IsTrue(configuration.dnsPolicy.dnsCrypt.failClosed);
+        }
+
+        [TestMethod]
+        public void ConfigurationProcessRepairsMissingDnsCryptSettingsFromOlderJson()
+        {
+            Configuration configuration = new()
+            {
+                dnsPolicy = new DnsPolicyConfig { dnsCrypt = null },
+            };
+
+            Configuration.Process(ref configuration);
+
+            Assert.IsNotNull(configuration.dnsPolicy.dnsCrypt);
+            Assert.IsNotNull(configuration.dnsPolicy.dnsCrypt.serverNames);
         }
     }
 }
