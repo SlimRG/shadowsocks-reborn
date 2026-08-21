@@ -268,18 +268,21 @@ namespace Shadowsocks.Controller
             string checksumText = (await File.ReadAllTextAsync(checksumPath).ConfigureAwait(false)).Trim();
             Match match = Regex.Match(
                 checksumText,
-                @"\A(?<hash>[0-9a-fA-F]{64})[ \t]+\*?(?<name>[^\r\n]+)\z",
+                @"\A(?<hash>[0-9a-fA-F]{64})(?:[ \t]+\*?(?<name>[^\r\n]+))?\z",
                 RegexOptions.CultureInvariant);
             if (!match.Success)
             {
                 throw new InvalidDataException($"Invalid SHA-256 sidecar: {Path.GetFileName(checksumPath)}.");
             }
 
-            string sidecarFileName = match.Groups["name"].Value.Trim();
-            if (!string.Equals(sidecarFileName, expectedFileName, StringComparison.Ordinal))
+            if (match.Groups["name"].Success)
             {
-                throw new InvalidDataException(
-                    $"SHA-256 sidecar names '{sidecarFileName}' instead of the required '{expectedFileName}'.");
+                string sidecarFileName = match.Groups["name"].Value.Trim();
+                if (!string.Equals(sidecarFileName, expectedFileName, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        $"SHA-256 sidecar names '{sidecarFileName}' instead of the required '{expectedFileName}'.");
+                }
             }
 
             await using FileStream payload = File.OpenRead(payloadPath);
@@ -365,18 +368,31 @@ namespace Shadowsocks.Controller
                 throw new InvalidDataException($"GitHub release asset '{asset["name"]}' has an invalid download URL.");
             }
 
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd($"Shadowsocks-Reborn/{ApplicationInfo.Version}");
+            using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            await WriteDownloadedAssetAsync(response.Content, destination).ConfigureAwait(false);
+        }
+
+        internal static async Task WriteDownloadedAssetAsync(HttpContent content, string destination)
+        {
+            ArgumentNullException.ThrowIfNull(content);
+            ArgumentException.ThrowIfNullOrWhiteSpace(destination);
+
             string partialPath = destination + ".download";
             try
             {
                 File.Delete(partialPath);
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.UserAgent.ParseAdd($"Shadowsocks-Reborn/{ApplicationInfo.Version}");
-                using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-                response.EnsureSuccessStatusCode();
+                await using (FileStream output = new(partialPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await content.CopyToAsync(output).ConfigureAwait(false);
+                    await output.FlushAsync().ConfigureAwait(false);
+                    output.Flush(flushToDisk: true);
+                }
 
-                await using FileStream output = new(partialPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await response.Content.CopyToAsync(output).ConfigureAwait(false);
-                await output.FlushAsync().ConfigureAwait(false);
+                // The temporary stream must be fully disposed before Windows can atomically
+                // promote the download to its canonical destination.
                 File.Move(partialPath, destination, overwrite: true);
             }
             finally

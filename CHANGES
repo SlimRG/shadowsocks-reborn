@@ -1,4 +1,5 @@
 ﻿5.2.22.0 2026-08-21
+- Fixed automatic update downloads on Windows: the .download stream is now disposed before File.Move promotion; SHA-256 sidecars accept both canonical sha256sum format and a plain 64-hex digest
 - Fixed DNSCrypt loopback-port allocation on Windows hosts with transport-specific dynamic/excluded port ranges by selecting UDP-first, verifying the same port over TCP, and using a dual-bind fallback below the default dynamic range.
 - Relaxed the Bouncy Castle Bzip2 notice validator to verify the legal contract (`modified Bzip2` + `Apache License 2.0`) instead of one obsolete wording.
 - Fixed the Phase 10 NetworkService version release-validator check after version response ownership moved from `Program.cs` to `NetworkServiceResponses.cs`; validation now also requires the versioned-ping regression test.

@@ -1633,11 +1633,22 @@ foreach ($updateCheckerToken in @(
     'SelfUpdater.CreateTransactionDirectory',
     'SelfUpdater.LaunchStagedUpdater',
     'X-GitHub-Api-Version',
-    'Shadowsocks-Reborn/')) {
+    'Shadowsocks-Reborn/',
+    'WriteDownloadedAssetAsync',
+    'File.Move(partialPath, destination, overwrite: true)')) {
     if ($updateCheckerSource -notmatch [regex]::Escape($updateCheckerToken)) {
         throw "Application updater is missing required release-contract token: $updateCheckerToken"
     }
 }
+$updateCheckerTestsSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\UpdateCheckerTests.cs') -Raw
+if ($updateCheckerTestsSource -notmatch 'DownloadedAssetIsClosedBeforePromotion' -or
+    $updateCheckerTestsSource -notmatch 'WriteDownloadedAssetAsync') {
+    throw 'UpdateChecker tests must guard Windows download promotion after the .download stream is disposed.'
+}
+if ($updateCheckerSource -notmatch '(?s)await using \(FileStream output.*?\}\s*File\.Move\(partialPath, destination, overwrite: true\)') {
+    throw 'UpdateChecker must dispose the partial download stream before promoting it with File.Move on Windows.'
+}
+
 if ($updateCheckerSource -match 'explorer\.exe' -or
     $updateCheckerSource -match 'continuing for backward compatibility' -or
     $updateCheckerSource -match 'return\s+x64Zip\s*\?\?\s*anyZip' -or

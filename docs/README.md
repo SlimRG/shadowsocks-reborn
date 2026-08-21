@@ -113,6 +113,8 @@ See [STORAGE_POLICY.md](STORAGE_POLICY.md) for the complete layout and cleanup r
 
 ## Application updates
 
+Update downloads are staged as `*.download`; the file handle is closed before the temporary file is atomically promoted to its canonical name on Windows. SHA-256 sidecars may contain either `<hash>  Shadowsocks-win-x64.zip` or just the 64-character hexadecimal digest.
+
 Application updates are automatic by default. After startup, the app checks GitHub Releases, selects an eligible newer version, requires the exact `Shadowsocks-win-x64.zip` plus `.sha256` sidecar, verifies the SHA-256, ZIP layout and payload file version, then stages the new single-file EXE under `%TEMP%\Shadowsocks\Updates`. Before launch, the staged updater receives its own SHA-256; the source process keeps that staged file open without write/delete sharing across `Process.Start`/UAC and passes the digest through the internal update handoff. The updater re-verifies its own staged image before replacing the installed product. It then waits for the current process to exit, preserves rollback state, replaces the product EXE and starts the installed new copy. That installed copy removes the temporary updater transaction. If Start with Windows launched the LocalAppData startup copy, the recorded primary EXE is updated instead of only the startup copy.
 
 ## Embedded NetworkService

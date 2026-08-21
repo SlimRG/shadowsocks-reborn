@@ -86,7 +86,7 @@ namespace Shadowsocks.UnitTests
         }
 
         [TestMethod]
-        public async Task Sha256SidecarRequiresMatchingCanonicalFileName()
+        public async Task Sha256SidecarAcceptsPlainDigestAndValidatesOptionalCanonicalFileName()
         {
             string root = CreateTempDirectory();
             try
@@ -102,6 +102,34 @@ namespace Shadowsocks.UnitTests
 
                 await File.WriteAllTextAsync(checksum, $"{hash}  {UpdateChecker.PreferredReleaseZipFilename}");
                 await UpdateChecker.VerifySha256Async(payload, checksum, UpdateChecker.PreferredReleaseZipFilename);
+
+                await File.WriteAllTextAsync(checksum, hash);
+                await UpdateChecker.VerifySha256Async(payload, checksum, UpdateChecker.PreferredReleaseZipFilename);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [TestMethod]
+        public async Task DownloadedAssetIsClosedBeforePromotion()
+        {
+            string root = CreateTempDirectory();
+            try
+            {
+                string destination = Path.Combine(root, UpdateChecker.PreferredReleaseZipFilename);
+                await File.WriteAllTextAsync(destination, "old");
+                byte[] expected = { 0x53, 0x53, 0x2D, 0x55, 0x50, 0x44, 0x41, 0x54, 0x45 };
+                using var content = new System.Net.Http.ByteArrayContent(expected);
+
+                await UpdateChecker.WriteDownloadedAssetAsync(content, destination);
+
+                CollectionAssert.AreEqual(expected, await File.ReadAllBytesAsync(destination));
+                Assert.IsFalse(File.Exists(destination + ".download"));
+
+                using FileStream exclusiveProbe = new(destination, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                Assert.AreEqual(expected.Length, exclusiveProbe.Length);
             }
             finally
             {
