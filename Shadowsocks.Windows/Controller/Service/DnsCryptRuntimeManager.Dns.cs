@@ -30,30 +30,64 @@ namespace Shadowsocks.Controller.Service
 
         internal static int AllocateLoopbackPort()
         {
-            for (int attempt = 0; attempt < 16; attempt++)
+            SocketException lastError = null;
+
+            // Windows maintains dynamic/excluded port state separately for TCP and UDP.
+            // Ask UDP for an ephemeral port first because dnscrypt-proxy must serve UDP DNS,
+            // then verify that the same numeric port can also be bound by TCP.
+            for (int attempt = 0; attempt < 32; attempt++)
             {
-                TcpListener tcp = null;
-                UdpClient udp = null;
-                try
-                {
-                    tcp = new TcpListener(IPAddress.Loopback, 0);
-                    tcp.Start();
-                    int port = ((IPEndPoint)tcp.LocalEndpoint).Port;
-                    udp = new UdpClient(AddressFamily.InterNetwork);
-                    udp.Client.ExclusiveAddressUse = true;
-                    udp.Client.Bind(new IPEndPoint(IPAddress.Loopback, port));
-                    return port;
-                }
-                catch (SocketException)
-                {
-                }
-                finally
-                {
-                    udp?.Dispose();
-                    try { tcp?.Stop(); } catch { }
-                }
+                if (TryReserveLoopbackPortPair(0, out int ephemeralPort, out lastError))
+                    return ephemeralPort;
             }
-            throw new InvalidOperationException("Unable to allocate a loopback port for DNSCrypt Proxy.");
+
+            // Hyper-V/container hosts can reserve large transport-specific chunks of the
+            // normal dynamic range. Fall back to random application ports below the
+            // default Windows dynamic range, but still prove both transports can bind.
+            for (int attempt = 0; attempt < 64; attempt++)
+            {
+                int candidate = RandomNumberGenerator.GetInt32(10000, 49152);
+                if (TryReserveLoopbackPortPair(candidate, out int fallbackPort, out lastError))
+                    return fallbackPort;
+            }
+
+            throw new InvalidOperationException(
+                "Unable to allocate a TCP/UDP loopback port for DNSCrypt Proxy.",
+                lastError);
+        }
+
+        private static bool TryReserveLoopbackPortPair(
+            int requestedPort,
+            out int port,
+            out SocketException error)
+        {
+            port = 0;
+            error = null;
+            UdpClient udp = null;
+            TcpListener tcp = null;
+            try
+            {
+                udp = new UdpClient(AddressFamily.InterNetwork);
+                udp.Client.ExclusiveAddressUse = true;
+                udp.Client.Bind(new IPEndPoint(IPAddress.Loopback, requestedPort));
+                port = ((IPEndPoint)udp.Client.LocalEndPoint).Port;
+
+                tcp = new TcpListener(IPAddress.Loopback, port);
+                tcp.Server.ExclusiveAddressUse = true;
+                tcp.Start();
+                return true;
+            }
+            catch (SocketException ex)
+            {
+                error = ex;
+                port = 0;
+                return false;
+            }
+            finally
+            {
+                try { tcp?.Stop(); } catch { }
+                udp?.Dispose();
+            }
         }
 
         internal static async Task<bool> DnsHealthCheckAsync(

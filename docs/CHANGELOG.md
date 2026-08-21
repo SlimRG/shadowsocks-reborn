@@ -6,6 +6,7 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [5.2.22] - 2026-08-21
 
+- Fixed DNSCrypt loopback-port allocation on Windows/GitHub Actions hosts where TCP and UDP dynamic/excluded ranges differ: allocation is now UDP-first, verifies the same numeric port over TCP, falls back to a dual-bind application-port candidate when needed, and preserves the last socket failure for diagnostics.
 - Relaxed the Bouncy Castle Bzip2 notice validator to verify the legal contract (`modified Bzip2` + `Apache License 2.0`) instead of one obsolete wording.
 - Fixed the Phase 10 NetworkService version release-validator check after version response ownership moved from `Program.cs` to `NetworkServiceResponses.cs`; validation now also requires the versioned-ping regression test.
 - Fixed invalid multiline PowerShell boolean expressions in `Validate-DnsCrypt.ps1`; the release parser gate now passes this DNSCrypt validation block instead of stopping before repository validation.

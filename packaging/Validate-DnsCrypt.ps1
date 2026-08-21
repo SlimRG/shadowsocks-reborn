@@ -18,6 +18,7 @@ function Read-RepoText {
 $componentSource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptComponentManager.cs'
 $componentPackageSource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptComponentManager.Package.cs'
 $runtimeSource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptRuntimeManager.cs'
+$runtimeDnsSource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptRuntimeManager.Dns.cs'
 $maintenancePolicySource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptMaintenancePolicy.cs'
 $maintenanceSource = Read-RepoText 'Shadowsocks.Windows\Controller\ShadowsocksController.DnsCrypt.Maintenance.cs'
 $bootstrapSource = Read-RepoText 'Shadowsocks.Windows\Controller\Service\DnsCryptBootstrapPolicy.cs'
@@ -133,6 +134,22 @@ if ($resolverLatencySource -notmatch 'ProbeAsync' -or $resolverLatencySource -no
 }
 if ($runtimeSource -notmatch 'GetActiveResolverNames' -or $runtimeSource -notmatch 'GetResolverLatencies') {
     throw 'DNSCrypt runtime must expose active resolver names and measured RTT to the UI.'
+}
+
+$udpBindIndex = $runtimeDnsSource.IndexOf('udp.Client.Bind(new IPEndPoint(IPAddress.Loopback, requestedPort))')
+$tcpStartIndex = $runtimeDnsSource.IndexOf('tcp.Start()')
+if ($runtimeDnsSource -notmatch 'TryReserveLoopbackPortPair\(0,' -or
+    $udpBindIndex -lt 0 -or $tcpStartIndex -lt 0 -or $udpBindIndex -gt $tcpStartIndex) {
+    throw 'DNSCrypt loopback-port allocation must obtain a UDP-usable port first and verify the same numeric port over TCP.'
+}
+foreach ($portAllocatorToken in @(
+    'udp.Client.ExclusiveAddressUse = true',
+    'tcp.Server.ExclusiveAddressUse = true',
+    'RandomNumberGenerator.GetInt32(10000, 49152)',
+    'Unable to allocate a TCP/UDP loopback port for DNSCrypt Proxy.')) {
+    if ($runtimeDnsSource -notmatch [regex]::Escape($portAllocatorToken)) {
+        throw "DNSCrypt loopback-port allocator hardening invariant is missing: $portAllocatorToken"
+    }
 }
 
 $dnsCryptControllerSource = Read-RepoText 'Shadowsocks.Windows\Controller\ShadowsocksController.DnsCrypt.cs'
