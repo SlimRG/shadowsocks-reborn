@@ -23,6 +23,7 @@ dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:P
 .\packaging\Build-Release.ps1 -Version 5.2.22
 ```
 
+- [ ] GitHub CI/release PowerShell parser gate passes for every `packaging/*.ps1` before any repository validator or release script is executed.
 - [ ] `dotnet --version` is 10.0.303 or newer and therefore includes the .NET 10.0.11 security fixes.
 - [ ] Restore/build/test succeeds on Windows x64; NuGet audit warnings NU1900-NU1904 are treated as release-blocking errors, so an unavailable vulnerability feed also blocks release.
 - [ ] Storage/rollback and PluginManager tests pass.
@@ -217,3 +218,4 @@ Use a clean Windows test account or remove test-only state:
 - [ ] Verify **Copy Local PAC URL** is available on PAC / GeoSite and is absent from the tray.
 - [ ] Verify QR screen scan and clipboard URL import are absent from the tray.
 - [ ] Verify Online Config is directly reachable from the main navigation.
+

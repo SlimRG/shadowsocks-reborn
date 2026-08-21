@@ -1,4 +1,5 @@
 ﻿5.2.22.0 2026-08-21
+- Fixed a release-validator PowerShell interpolation parser error and added a CI/release PowerShell parser gate for every `packaging/*.ps1` script.
 - Synchronized README/Wiki architecture, security, storage, WinUI and release-checklist documentation with the final 5.2.22 contracts
 - Fixed the release validator to match the current selectable RichTextBlock Logs viewer instead of retired ListView implementation tokens
 - Fixed release-blocking SelfUpdater compile errors in UpdateChecker/SelfUpdater

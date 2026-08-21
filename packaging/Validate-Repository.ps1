@@ -1896,7 +1896,7 @@ foreach ($versionedDoc in @(
     'docs\THIRD-PARTY-NOTICES.md')) {
     $versionedDocText = Get-Content -LiteralPath (Join-Path $repoRoot $versionedDoc) -Raw
     if ($versionedDocText -notmatch [regex]::Escape($winUiVersion)) {
-        throw "Living release documentation does not mention current product version $winUiVersion: $versionedDoc"
+        throw "Living release documentation does not mention current product version ${winUiVersion}: $versionedDoc"
     }
 }
 

@@ -26,6 +26,25 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $parseFailures = @(
+            foreach ($script in Get-ChildItem -LiteralPath .\packaging -Filter *.ps1 -File) {
+              $tokens = $null
+              $errors = $null
+              [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
+              foreach ($parseError in @($errors)) {
+                '{0}:{1}:{2}: {3}' -f $script.Name, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message
+              }
+            }
+          )
+          if ($parseFailures.Count -gt 0) {
+            $failureText = $parseFailures -join [Environment]::NewLine
+            throw "PowerShell parser validation failed:`n$failureText"
+          }
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
