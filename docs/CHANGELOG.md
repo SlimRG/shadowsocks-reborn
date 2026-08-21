@@ -6,6 +6,8 @@ Fork-specific changes are tracked here. Historical upstream Shadowsocks for Wind
 
 ## [5.2.22] - 2026-08-21
 
+- Relaxed the Bouncy Castle Bzip2 notice validator to verify the legal contract (`modified Bzip2` + `Apache License 2.0`) instead of one obsolete wording.
+- Fixed the Phase 10 NetworkService version release-validator check after version response ownership moved from `Program.cs` to `NetworkServiceResponses.cs`; validation now also requires the versioned-ping regression test.
 - Fixed invalid multiline PowerShell boolean expressions in `Validate-DnsCrypt.ps1`; the release parser gate now passes this DNSCrypt validation block instead of stopping before repository validation.
 - Fixed a release-validator PowerShell interpolation parser error and added a CI/release PowerShell parser gate for every `packaging/*.ps1` script.
 - Synchronized the living Markdown documentation with the final 5.2.22 implementation: updater integrity/UAC handoff, release security gates, current selectable `RichTextBlock` Logs contract, storage architecture and release verification are now documented consistently.

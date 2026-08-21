@@ -1,4 +1,6 @@
 ﻿5.2.22.0 2026-08-21
+- Relaxed the Bouncy Castle Bzip2 notice validator to verify the legal contract (`modified Bzip2` + `Apache License 2.0`) instead of one obsolete wording.
+- Fixed the Phase 10 NetworkService version release-validator check after version response ownership moved from `Program.cs` to `NetworkServiceResponses.cs`; validation now also requires the versioned-ping regression test.
 - Fixed invalid multiline PowerShell boolean expressions in `Validate-DnsCrypt.ps1` that were caught by the release parser gate.
 - Fixed a release-validator PowerShell interpolation parser error and added a CI/release PowerShell parser gate for every `packaging/*.ps1` script.
 - Synchronized README/Wiki architecture, security, storage, WinUI and release-checklist documentation with the final 5.2.22 contracts

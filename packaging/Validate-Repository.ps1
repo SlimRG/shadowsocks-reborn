@@ -1800,10 +1800,14 @@ if ($adminCaptureSource -match 'FindHelperPath\(' -or $adminCaptureSource -match
 }
 
 $networkServiceProtocolSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.NetworkService\Ipc\Protocol.cs') -Raw
-$networkServiceProgramSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.NetworkService\Program.cs') -Raw
+$networkServiceResponsesSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.NetworkService\NetworkServiceResponses.cs') -Raw
+$networkServiceVersionTestsSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.UnitTests\DnsCaptureStage4Tests.cs') -Raw
 if ($networkServiceProtocolSource -notmatch 'string\s+Version' -or
-    $networkServiceProgramSource -notmatch 'ServiceVersion') {
-    throw 'NetworkService must expose its assembly version through the control protocol.'
+    $networkServiceResponsesSource -notmatch 'ServiceVersion\s*=>[\s\S]{0,180}Assembly\.GetName\(\)\.Version' -or
+    $networkServiceResponsesSource -notmatch 'Version\s*=\s*ServiceVersion' -or
+    $networkServiceVersionTestsSource -notmatch 'CaptureChildSupervisor_InitialPingIsImmediateAndVersioned' -or
+    $networkServiceVersionTestsSource -notmatch 'Assert\.IsFalse\(string\.IsNullOrWhiteSpace\(response\.Version\)\)') {
+    throw 'NetworkService must expose its assembly version through the control protocol and keep a versioned-ping regression test.'
 }
 
 $winUiProgramSource = Get-Content -LiteralPath (Join-Path $repoRoot 'Shadowsocks.WinUI\Program.cs') -Raw

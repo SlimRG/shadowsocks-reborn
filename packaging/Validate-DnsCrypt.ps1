@@ -233,7 +233,7 @@ if ($coreProjectText -notmatch 'Shadowsocks\.Core\.THIRD-PARTY-NOTICES\.md') {
 if ($coreProjectText -notmatch 'Shadowsocks\.Core\.LICENSE\.txt') {
     throw 'The one-file product must embed LICENSE.txt so the product license remains accessible from Shadowsocks.exe.'
 }
-if ($notices -notmatch 'modified Bzip2 library' -or $notices -notmatch 'Apache License 2\.0') {
+if ($notices -notmatch 'modified Bzip2' -or $notices -notmatch 'Apache License 2\.0') {
     throw 'THIRD-PARTY-NOTICES.md must preserve the Bouncy Castle modified-Bzip2 Apache-2.0 notice.'
 }
 
