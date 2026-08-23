@@ -12,6 +12,7 @@ internal sealed class ApplicationPolicy
     private readonly string? _dnsCryptComponentRoot;
     private readonly int _dnsCryptProcessId;
     private readonly DnsPolicyMode _dnsPolicyMode;
+    private readonly bool _managedRoutingEnabled;
 
     public ApplicationPolicy(StartRequest request)
     {
@@ -24,6 +25,7 @@ internal sealed class ApplicationPolicy
         _dnsCryptComponentRoot = NormalizeDirectory(request.DnsPolicy?.DnsCryptComponentRoot);
         _dnsCryptProcessId = request.DnsPolicy?.DnsCryptProcessId ?? 0;
         _dnsPolicyMode = request.DnsPolicy?.Mode ?? DnsPolicyMode.System;
+        _managedRoutingEnabled = request.ManagedRouting?.Enabled == true;
     }
 
     public bool IsExcludedProcess(int processId, string? processPath = null)
@@ -59,7 +61,12 @@ internal sealed class ApplicationPolicy
             || IsManagedDnsCryptExecutable(processPath);
     }
 
-    public RouteAction Evaluate(int processId, string? processPath, string? processName)
+    public RouteAction Evaluate(
+        byte protocol,
+        ushort remotePort,
+        int processId,
+        string? processPath,
+        string? processName)
     {
         if (IsExcludedProcess(processId, processPath))
         {
@@ -75,12 +82,29 @@ internal sealed class ApplicationPolicy
 
             if (Matches(rule.Application.Trim(), processPath, processName))
             {
-                return rule.Action == RouteAction.Default ? _defaultRoute : rule.Action;
+                if (rule.Action != RouteAction.Default)
+                {
+                    return rule.Action;
+                }
+
+                // Default means "continue through the shared routing policy", matching
+                // TrafficPolicyEngine in the main process rather than bypassing ABP rules.
+                break;
             }
+        }
+
+        // Only ordinary TCP is deferred for Host/SNI inspection. DNS has its own policy,
+        // UDP has no reliable hostname at this layer, and explicit application rules above
+        // remain authoritative without any payload inspection.
+        if (_managedRoutingEnabled && protocol == 6 && remotePort != 53)
+        {
+            return RouteAction.Deferred;
         }
 
         return _defaultRoute;
     }
+
+    public RouteAction DefaultRoute => _defaultRoute;
 
     private bool IsManagedDnsCryptExecutable(string? processPath)
     {

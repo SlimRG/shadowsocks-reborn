@@ -190,13 +190,13 @@ namespace Shadowsocks.UnitTests
 
         private static Task ConnectProxyAsync(Socks5Proxy proxy, EndPoint endpoint)
         {
-            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             proxy.BeginConnectProxy(endpoint, ar =>
             {
                 try
                 {
                     proxy.EndConnectProxy(ar);
-                    completion.TrySetResult(null);
+                    completion.TrySetResult();
                 }
                 catch (Exception ex)
                 {
@@ -208,13 +208,13 @@ namespace Shadowsocks.UnitTests
 
         private static Task ConnectDestinationAsync(Socks5Proxy proxy, EndPoint endpoint, NetworkCredential credential)
         {
-            var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             proxy.BeginConnectDest(endpoint, ar =>
             {
                 try
                 {
                     proxy.EndConnectDest(ar);
-                    completion.TrySetResult(null);
+                    completion.TrySetResult();
                 }
                 catch (Exception ex)
                 {

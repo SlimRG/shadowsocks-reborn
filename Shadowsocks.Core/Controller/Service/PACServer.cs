@@ -15,7 +15,7 @@ namespace Shadowsocks.Controller
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-        public const string RESOURCE_NAME = "pac";
+        public const string ResourceName = "pac";
 
         private string PacSecret
         {
@@ -47,7 +47,7 @@ namespace Shadowsocks.Controller
             _config = config;
             string usedSecret = _config.secureLocalPac ? $"&secret={PacSecret}" : "";
             string contentHash = GetHash(GetContentForHash());
-            PacUrl = $"http://{config.LocalHost}:{config.localPort}/{RESOURCE_NAME}?hash={contentHash}{usedSecret}";
+            PacUrl = $"http://{config.LocalHost}:{config.localPort}/{ResourceName}?hash={contentHash}{usedSecret}";
             logger.Debug("Set PAC URL:" + PacUrl);
         }
 
@@ -62,11 +62,11 @@ namespace Shadowsocks.Controller
                 return BuildProxyAllPac(proxy);
             }
 
-            return _pacDaemon.GetPACContent();
+            return PACDaemon.GetPACContent();
         }
 
         private static string GetHash(string content)
-            => HttpServerUtilityUrlToken.Encode(MD5.HashData(Encoding.UTF8.GetBytes(content)));
+            => HttpServerUtilityUrlToken.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(content)));
 
         public override bool Handle(byte[] firstPacket, int length, Socket socket, object state)
         {
@@ -91,13 +91,13 @@ namespace Shadowsocks.Controller
                     if (index < 0)
                         index = requestItems[1].Length;
 
-                    string resourceString = requestItems[1].Substring(0, index).Remove(0, 1);
-                    if (string.Equals(resourceString, RESOURCE_NAME, StringComparison.OrdinalIgnoreCase))
+                    string resourceString = requestItems[1][1..index];
+                    if (string.Equals(resourceString, ResourceName, StringComparison.OrdinalIgnoreCase))
                     {
                         pathMatch = true;
                         if (!secretMatch)
                         {
-                            string queryString = requestItems[1].Substring(index);
+                            string queryString = requestItems[1][index..];
                             if (queryString.Contains(PacSecret))
                                 secretMatch = true;
                         }
@@ -109,7 +109,7 @@ namespace Shadowsocks.Controller
                     if (string.IsNullOrEmpty(lines[i]))
                         continue;
 
-                    string[] kv = lines[i].Split(new[] { ':' }, 2);
+                    string[] kv = lines[i].Split(':', 2);
                     if (kv.Length == 2 && kv[0] == "Host" &&
                         kv[1].Trim() == ((IPEndPoint)socket.LocalEndPoint).ToString())
                     {
@@ -152,7 +152,7 @@ namespace Shadowsocks.Controller
                 }
                 else
                 {
-                    pacContent = $"var __PROXY__ = '{proxy}';\n" + _pacDaemon.GetPACContent();
+                    pacContent = $"var __PROXY__ = '{proxy}';\n" + PACDaemon.GetPACContent();
                 }
 
                 byte[] body = Encoding.UTF8.GetBytes(pacContent);

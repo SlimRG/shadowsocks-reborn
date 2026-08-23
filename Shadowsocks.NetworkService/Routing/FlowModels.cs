@@ -27,4 +27,5 @@ internal sealed record FlowState(
     string? ProcessPath,
     string? ProcessName,
     RouteAction Route,
+    RouteAction FallbackRoute,
     DateTime LastSeenUtc);

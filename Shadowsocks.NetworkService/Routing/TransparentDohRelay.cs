@@ -37,7 +37,8 @@ internal sealed class TransparentDohRelay : IAsyncDisposable
         string localProxyHost = "127.0.0.1",
         int localProxyPort = 1080)
     {
-        _flows = flows ?? throw new ArgumentNullException(nameof(flows));
+        ArgumentNullException.ThrowIfNull(flows);
+        _flows = flows;
         if (!Uri.TryCreate(endpoint?.Trim(), UriKind.Absolute, out Uri? uri)
             || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {

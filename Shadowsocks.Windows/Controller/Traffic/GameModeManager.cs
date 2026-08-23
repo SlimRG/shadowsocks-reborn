@@ -31,7 +31,8 @@ namespace Shadowsocks.Controller.Traffic
 
         public GameModeManager(AdminCaptureManager adminCapture)
         {
-            _adminCapture = adminCapture ?? throw new ArgumentNullException(nameof(adminCapture));
+            ArgumentNullException.ThrowIfNull(adminCapture);
+            _adminCapture = adminCapture;
             _adminCapture.StatusChanged += AdminCapture_StatusChanged;
             _timer = new Timer(static state => ((GameModeManager)state).QueuePoll(), this, Timeout.Infinite, Timeout.Infinite);
         }
@@ -247,7 +248,7 @@ namespace Shadowsocks.Controller.Traffic
             StatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private static string[] FindRunningConfiguredGames(IReadOnlyCollection<string> patterns)
+        private static string[] FindRunningConfiguredGames(List<string> patterns)
         {
             if (patterns is null || patterns.Count == 0)
             {

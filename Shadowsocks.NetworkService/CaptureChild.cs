@@ -22,7 +22,9 @@ internal sealed class CaptureChild : IAsyncDisposable
         int tcpRedirectPort,
         int udpRedirectPort,
         bool dnsInterceptionActive,
-        bool dnsFailClosedActive)
+        bool dnsFailClosedActive,
+        bool managedRoutingActive,
+        int managedRoutingRuleCount)
     {
         _process = process;
         _pipe = pipe;
@@ -32,6 +34,8 @@ internal sealed class CaptureChild : IAsyncDisposable
         UdpRedirectPort = udpRedirectPort;
         DnsInterceptionActive = dnsInterceptionActive;
         DnsFailClosedActive = dnsFailClosedActive;
+        ManagedRoutingActive = managedRoutingActive;
+        ManagedRoutingRuleCount = managedRoutingRuleCount;
         StartedUtc = DateTime.UtcNow;
     }
 
@@ -40,6 +44,8 @@ internal sealed class CaptureChild : IAsyncDisposable
     public DateTime StartedUtc { get; }
     public bool DnsInterceptionActive { get; }
     public bool DnsFailClosedActive { get; }
+    public bool ManagedRoutingActive { get; }
+    public int ManagedRoutingRuleCount { get; }
 
     public bool IsAlive
     {
@@ -99,9 +105,7 @@ internal sealed class CaptureChild : IAsyncDisposable
             request.Command = "start";
             await writer.WriteLineAsync(
                 JsonSerializer.Serialize(request, NetworkServiceJsonContext.Default.StartRequest)).ConfigureAwait(false);
-            string? line = await reader.ReadLineAsync()
-                .WaitAsync(TimeSpan.FromSeconds(15), cancellationToken)
-                .ConfigureAwait(false);
+            string? line = await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false);
             ServiceResponse? response = string.IsNullOrWhiteSpace(line)
                 ? null
                 : JsonSerializer.Deserialize(line, NetworkServiceJsonContext.Default.ServiceResponse);
@@ -118,7 +122,9 @@ internal sealed class CaptureChild : IAsyncDisposable
                 response.TcpRedirectPort,
                 response.UdpRedirectPort,
                 response.DnsInterceptionActive,
-                response.DnsFailClosedActive);
+                response.DnsFailClosedActive,
+                response.ManagedRoutingActive,
+                response.ManagedRoutingRuleCount);
         }
         catch
         {
@@ -147,7 +153,7 @@ internal sealed class CaptureChild : IAsyncDisposable
             if (_pipe.IsConnected && !_process.HasExited)
             {
                 await _writer.WriteLineAsync("{\"command\":\"stop\"}").ConfigureAwait(false);
-                Task<string?> readTask = _reader.ReadLineAsync();
+                Task<string?> readTask = _reader.ReadLineAsync(CancellationToken.None).AsTask();
                 await Task.WhenAny(readTask, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false);
             }
         }

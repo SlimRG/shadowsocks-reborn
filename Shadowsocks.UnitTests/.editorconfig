@@ -1,0 +1,6 @@
+﻿# Unit tests intentionally use Method_Scenario_Result names for scanability.
+# Small literal arrays are local fixtures; hoisting them to static fields reduces test readability
+# without a meaningful runtime benefit. These rules remain enabled for production projects.
+[*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none

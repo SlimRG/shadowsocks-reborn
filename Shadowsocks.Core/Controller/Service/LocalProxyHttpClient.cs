@@ -14,8 +14,7 @@ namespace Shadowsocks.Controller.Service
     {
         public static HttpClient Create(Configuration config)
         {
-            if (config == null)
-                throw new ArgumentNullException(nameof(config));
+            ArgumentNullException.ThrowIfNull(config);
 
             var handler = new HttpClientHandler
             {

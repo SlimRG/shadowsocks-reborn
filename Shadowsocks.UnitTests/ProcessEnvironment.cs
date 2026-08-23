@@ -42,6 +42,7 @@ THE SOFTWARE.
 using System;
 using System.Collections.Specialized;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -110,7 +111,7 @@ namespace Shadowsocks.UnitTests
 
             public override string ToString()
             {
-                return Value.ToString();
+                return Value.ToString(CultureInfo.InvariantCulture);
             }
 
             public bool FitsInNativePointer
@@ -154,7 +155,7 @@ namespace Shadowsocks.UnitTests
             {
                 int dataSize;
                 if (!_HasReadAccess(hProcess, penv, out dataSize))
-                    throw new Exception("Unable to read environment block.");
+                    throw new InvalidOperationException("Unable to read environment block.");
 
                 if (dataSize > maxEnvSize)
                     dataSize = maxEnvSize;
@@ -168,8 +169,8 @@ namespace Shadowsocks.UnitTests
                     new IntPtr(dataSize),
                     ref res_len);
 
-                if (!b || (int)res_len != dataSize)
-                    throw new Exception("Unable to read environment block data.");
+                if (!b || res_len.ToInt64() != dataSize)
+                    throw new InvalidOperationException("Unable to read environment block data.");
             }
             else if (penv.Size == 8 && IntPtr.Size == 4)
             {
@@ -177,7 +178,7 @@ namespace Shadowsocks.UnitTests
 
                 int dataSize;
                 if (!_HasReadAccessWow64(hProcess, penv.ToInt64(), out dataSize))
-                    throw new Exception("Unable to read environment block with WOW64 API.");
+                    throw new InvalidOperationException("Unable to read environment block with WOW64 API.");
 
                 if (dataSize > maxEnvSize)
                     dataSize = maxEnvSize;
@@ -192,11 +193,11 @@ namespace Shadowsocks.UnitTests
                     ref res_len);
 
                 if (result != WindowsApi.STATUS_SUCCESS || res_len != dataSize)
-                    throw new Exception("Unable to read environment block data with WOW64 API.");
+                    throw new InvalidOperationException("Unable to read environment block data with WOW64 API.");
             }
             else
             {
-                throw new Exception("Unable to access process memory due to unsupported bitness cardinality.");
+                throw new InvalidOperationException("Unable to access process memory due to unsupported bitness cardinality.");
             }
 
             return _EnvToDictionary(envData);
@@ -280,7 +281,7 @@ namespace Shadowsocks.UnitTests
                     ref res_len);
                 readPtr = new IntPtr(Marshal.ReadInt32(data));
                 Marshal.FreeHGlobal(data);
-                if (!b || (int)res_len != dataSize)
+                if (!b || res_len.ToInt64() != dataSize)
                     result = false;
                 else
                     result = true;
@@ -307,7 +308,7 @@ namespace Shadowsocks.UnitTests
                     ref res_len);
                 readPtr = Marshal.ReadIntPtr(data);
                 Marshal.FreeHGlobal(data);
-                if (!b || (int)res_len != dataSize)
+                if (!b || res_len.ToInt64() != dataSize)
                     result = false;
                 else
                     result = true;
@@ -356,11 +357,11 @@ namespace Shadowsocks.UnitTests
 
                     IntPtr ptr;
                     if (!_TryReadIntPtr(hProcess, pPeb + 0x20, out ptr))
-                        throw new Exception("Unable to read PEB.");
+                        throw new InvalidOperationException("Unable to read PEB.");
 
                     IntPtr penv;
                     if (!_TryReadIntPtr(hProcess, ptr + 0x80, out penv))
-                        throw new Exception("Unable to read RTL_USER_PROCESS_PARAMETERS.");
+                        throw new InvalidOperationException("Unable to read RTL_USER_PROCESS_PARAMETERS.");
 
                     return penv;
                 }
@@ -372,11 +373,11 @@ namespace Shadowsocks.UnitTests
 
                     long ptr;
                     if (!_TryReadIntPtrWow64(hProcess, pPeb.ToInt64() + 0x20, out ptr))
-                        throw new Exception("Unable to read PEB.");
+                        throw new InvalidOperationException("Unable to read PEB.");
 
                     long penv;
                     if (!_TryReadIntPtrWow64(hProcess, ptr + 0x80, out penv))
-                        throw new Exception("Unable to read RTL_USER_PROCESS_PARAMETERS.");
+                        throw new InvalidOperationException("Unable to read RTL_USER_PROCESS_PARAMETERS.");
 
                     return new UniPtr(penv);
                 }
@@ -389,11 +390,11 @@ namespace Shadowsocks.UnitTests
 
                 IntPtr ptr;
                 if (!_TryReadIntPtr32(hProcess, pPeb + 0x10, out ptr))
-                    throw new Exception("Unable to read PEB.");
+                    throw new InvalidOperationException("Unable to read PEB.");
 
                 IntPtr penv;
                 if (!_TryReadIntPtr32(hProcess, ptr + 0x48, out penv))
-                    throw new Exception("Unable to read RTL_USER_PROCESS_PARAMETERS.");
+                    throw new InvalidOperationException("Unable to read RTL_USER_PROCESS_PARAMETERS.");
 
                 return penv;
             }
@@ -430,7 +431,7 @@ namespace Shadowsocks.UnitTests
                     pbiSize,
                     ref res_len);
                 if (res_len != pbiSize)
-                    throw new Exception("Unable to query process information.");
+                    throw new InvalidOperationException("Unable to query process information.");
                 return ptr;
             }
             else
@@ -451,7 +452,7 @@ namespace Shadowsocks.UnitTests
                 pbiSize,
                 ref res_len);
             if (res_len != pbiSize)
-                throw new Exception("Unable to query process information.");
+                throw new InvalidOperationException("Unable to query process information.");
             return pbi.PebBaseAddress;
         }
 
@@ -474,7 +475,7 @@ namespace Shadowsocks.UnitTests
                     pbiSize,
                     ref res_len);
                 if (res_len != pbiSize)
-                    throw new Exception("Unable to query process information.");
+                    throw new InvalidOperationException("Unable to query process information.");
                 return new UniPtr(pbi.PebBaseAddress);
             }
         }

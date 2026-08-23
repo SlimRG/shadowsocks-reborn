@@ -67,6 +67,17 @@ internal static class WinUIStyles
         return CreateText(text, "BodyStrongTextBlockStyle");
     }
 
+    public static FontIcon CreateWindows10Icon(string glyph, double fontSize = 16)
+    {
+        return new FontIcon
+        {
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            Glyph = glyph,
+            FontSize = fontSize,
+        };
+    }
+
+
     public static Grid CreateKeyValueRow(string label, out TextBlock value)
     {
         var grid = new Grid { ColumnSpacing = 24 };

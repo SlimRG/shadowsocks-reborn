@@ -18,67 +18,68 @@ namespace Shadowsocks.Model
         [JsonIgnore]
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-        public string version;
+        public string version { get; set; }
 
-        public List<Server> configs;
+        public List<Server> configs { get; set; }
 
-        public List<string> onlineConfigSource;
+        public List<string> onlineConfigSource { get; set; }
 
         // when strategy is set, index is ignored
-        public string strategy;
-        public int index;
-        public bool global;
-        public bool enabled;
-        public bool shareOverLan;
-        public bool firstRun;
-        public int localPort;
-        public bool showPluginOutput;
-        public bool showDnsLogs;
-        public string pacUrl;
+        public string strategy { get; set; }
+        public int index { get; set; }
+        public bool global { get; set; }
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; }
+        public bool shareOverLan { get; set; }
+        public bool firstRun { get; set; }
+        public int localPort { get; set; }
+        public bool showPluginOutput { get; set; }
+        public bool showDnsLogs { get; set; }
+        public string pacUrl { get; set; }
 
-        public bool useOnlinePac;
-        public bool secureLocalPac; // enable secret for PAC server
-        public bool regeneratePacOnUpdate; // regenerate pac.txt on version update
-        public bool autoCheckUpdate;
-        public bool checkPreRelease;
-        public string skippedUpdateVersion; // skip the update with this version number
-        public bool isVerboseLogging;
-        public string uiTheme; // System, Light, or Dark. Presentation preference shared by UI shells.
+        public bool useOnlinePac { get; set; }
+        public bool secureLocalPac { get; set; } // enable secret for PAC server
+        public bool regeneratePacOnUpdate { get; set; } // regenerate pac.txt on version update
+        public bool autoCheckUpdate { get; set; }
+        public bool checkPreRelease { get; set; }
+        public string skippedUpdateVersion { get; set; } // skip the update with this version number
+        public bool isVerboseLogging { get; set; }
+        public string uiTheme { get; set; } // System, Light, or Dark. Presentation preference shared by UI shells.
 
         // hidden options
-        public bool isIPv6Enabled; // for experimental ipv6 support
+        public bool isIPv6Enabled { get; set; } // for experimental ipv6 support
         // GeoSite sources are used only by Local PAC. Every source is cached independently
         // and all successfully loaded databases are merged. The checksum URL is derived as
         // <source>.sha256sum; checksum absence is non-fatal.
-        public List<string> geositeUrls;
+        public List<string> geositeUrls { get; set; }
 
-        public List<string> geositeDirectGroups;  // groups of domains that we connect without the proxy
-        public List<string> geositeProxiedGroups; // groups of domains that we connect via the proxy
-        public bool geositePreferDirect; // a.k.a blacklist mode
-        public string userAgent;
+        public List<string> geositeDirectGroups { get; set; }  // groups of domains that we connect without the proxy
+        public List<string> geositeProxiedGroups { get; set; } // groups of domains that we connect via the proxy
+        public bool geositePreferDirect { get; set; } // a.k.a blacklist mode
+        public string userAgent { get; set; }
 
-        public LogViewerConfig logViewer;
-        public ForwardProxyConfig proxy;
-        public HotkeyConfig hotkey;
+        public LogViewerConfig logViewer { get; set; }
+        public ForwardProxyConfig proxy { get; set; }
+        public HotkeyConfig hotkey { get; set; }
 
         // Traffic capture/routing. User Mode requires no elevation and can identify
         // applications that connect to the managed local HTTP proxy. Admin Mode is
         // implemented by the optional elevated WinDivert helper.
-        public TrafficCaptureMode trafficCaptureMode;
-        public List<ApplicationRouteRule> applicationRules;
-        public DnsPolicyConfig dnsPolicy;
-        public List<string> gameModeApplications;
+        public TrafficCaptureMode trafficCaptureMode { get; set; }
+        public List<ApplicationRouteRule> applicationRules { get; set; }
+        public DnsPolicyConfig dnsPolicy { get; set; }
+        public List<string> gameModeApplications { get; set; }
 
         [JsonIgnore]
-        public bool firstRunOnNewVersion;
+        public bool firstRunOnNewVersion { get; set; }
 
         public Configuration()
         {
             version = ApplicationInfo.Version;
             strategy = "";
-            index = 0;
+            index = -1;
             global = false;
-            enabled = false;
+            Enabled = false;
             shareOverLan = false;
             firstRun = true;
             localPort = 1080;
@@ -129,17 +130,18 @@ namespace Shadowsocks.Model
         }
 
         [JsonIgnore]
-        public string userAgentString; // $version substituted with numeral version in it
+        public string userAgentString { get; set; } // $version substituted with numeral version in it
 
         public const string SettingsValueName = "Configuration";
         public const string SettingsBackupValueName = "ConfigurationBackup";
         public const string SettingsSchemaVersionName = "SchemaVersion";
-        public const int SettingsSchemaVersion = 1;
+        public const int SettingsSchemaVersion = 3;
         private static ISettingsStore settingsStore;
 
         public static void ConfigureSettingsStore(ISettingsStore store)
         {
-            settingsStore = store ?? throw new ArgumentNullException(nameof(store));
+            ArgumentNullException.ThrowIfNull(store);
+            settingsStore = store;
         }
         [JsonIgnore]
         public string LocalHost => isIPv6Enabled ? "[::1]" : "127.0.0.1";
@@ -152,7 +154,7 @@ namespace Shadowsocks.Model
                 return GetDefaultServer();
         }
 
-        public WebProxy WebProxy => enabled
+        public WebProxy WebProxy => Enabled
             ? new WebProxy(
                     isIPv6Enabled
                     ? $"[{IPAddress.IPv6Loopback}]"
@@ -183,7 +185,7 @@ namespace Shadowsocks.Model
         public static void CheckServer(Server server)
         {
             CheckServer(server.server);
-            CheckPort(server.server_port);
+            CheckPort(server.ServerPort);
             CheckPassword(server.password);
             CheckTimeout(server.timeout, Server.MaxServerTimeoutSec);
         }
@@ -208,6 +210,7 @@ namespace Shadowsocks.Model
 
             if (TryDeserialize(configContent, out Configuration config))
             {
+                MigrateSettingsSchemaIfNeeded(config);
                 return config;
             }
 
@@ -223,6 +226,7 @@ namespace Shadowsocks.Model
                 {
                     logger.LogUsefulException(restoreException);
                 }
+                MigrateSettingsSchemaIfNeeded(config);
                 return config;
             }
 
@@ -269,10 +273,9 @@ namespace Shadowsocks.Model
             config.dnsPolicy ??= new DnsPolicyConfig();
             config.dnsPolicy.dnsCrypt ??= new DnsCryptConfig();
             config.dnsPolicy.dnsCrypt.serverNames ??= new List<string>();
-            // DNSCrypt is a secure-DNS mode: never retain a fail-open setting.
-            // A plaintext system-DNS fallback would defeat the security contract and can
-            // leak queries while the runtime is starting, restarting, or recovering.
-            config.dnsPolicy.dnsCrypt.failClosed = true;
+            // Persisted DNSCrypt preferences are user state. Do not rewrite legacy/custom
+            // values here; effective Administrator-mode DNSCrypt interception remains
+            // fail-closed independently in the NetworkService request contract.
             if (config.dnsPolicy.dnsCrypt.automaticResolvers)
                 config.dnsPolicy.dnsCrypt.serverNames.Clear();
             config.gameModeApplications ??= new List<string>();
@@ -288,17 +291,33 @@ namespace Shadowsocks.Model
             {
                 config.firstRunOnNewVersion = true;
             }
-            // Add an empty server configuration
-            if (config.configs.Count == 0)
-                config.configs.Add(GetDefaultServer());
-
+            // Empty placeholder servers were historically persisted to keep a synthetic
+            // "Server 1" row alive. Zero configured servers is now a first-class state.
+            RemovePersistedEmptyServers(config);
             EnsureServerNames(config.configs);
 
-            // Selected server
-            if (config.index == -1 && string.IsNullOrEmpty(config.strategy))
-                config.index = 0;
-            if (config.index >= config.configs.Count)
-                config.index = config.configs.Count - 1;
+            // Selected server. With no servers there is deliberately no selection and the
+            // system proxy is disabled so Windows is never pointed at an inactive relay.
+            if (config.configs.Count == 0)
+            {
+                config.index = -1;
+                config.strategy = string.Empty;
+                config.Enabled = false;
+            }
+            else
+            {
+                if (config.index < 0 && string.IsNullOrEmpty(config.strategy))
+                    config.index = 0;
+                if (config.index >= config.configs.Count)
+                    config.index = config.configs.Count - 1;
+
+                if (!config.HasConfiguredServer)
+                {
+                    // Preserve the user's DNS preference. Dependent runtime/UI paths are
+                    // gated by HasConfiguredServer and remain inactive until a server exists.
+                    config.Enabled = false;
+                }
+            }
             // Check OS IPv6 support
             if (!System.Net.Sockets.Socket.OSSupportsIPv6)
                 config.isIPv6Enabled = false;
@@ -319,9 +338,37 @@ namespace Shadowsocks.Model
                 throw new InvalidOperationException("The settings store must be configured before saving configuration.");
 
             config.configs ??= new List<Server>();
+            RemovePersistedEmptyServers(config);
             EnsureServerNames(config.configs);
+
+            Server selectedServer = null;
+            if (string.IsNullOrEmpty(config.strategy)
+                && config.index >= 0
+                && config.index < config.configs.Count)
+            {
+                selectedServer = config.configs[config.index];
+            }
+
             config.configs = SortByOnlineConfig(config.configs);
-            string jsonString = JsonConvert.SerializeObject(config, Formatting.Indented);
+            if (config.configs.Count == 0)
+            {
+                config.index = -1;
+                config.strategy = string.Empty;
+            }
+            else if (string.IsNullOrEmpty(config.strategy))
+            {
+                int sortedIndex = selectedServer is null ? -1 : config.configs.FindIndex(server => ReferenceEquals(server, selectedServer));
+                config.index = sortedIndex >= 0
+                    ? sortedIndex
+                    : Math.Clamp(config.index, 0, config.configs.Count - 1);
+            }
+            if (!config.HasConfiguredServer)
+            {
+                // Persist the selected DNS policy even while no server is available. The
+                // controller applies inactive runtime behavior until a server exists.
+                config.Enabled = false;
+            }
+            string jsonString = SerializeConfiguration(config);
 
             try
             {
@@ -341,6 +388,107 @@ namespace Shadowsocks.Model
                 throw;
             }
         }
+
+        private static void MigrateSettingsSchemaIfNeeded(Configuration config)
+        {
+            if (settingsStore is null)
+            {
+                return;
+            }
+
+            int schemaVersion = settingsStore.TryGetInt32(SettingsSchemaVersionName, out int storedVersion)
+                ? storedVersion
+                : 0;
+            if (schemaVersion >= SettingsSchemaVersion)
+            {
+                return;
+            }
+
+            try
+            {
+                // Schema v3 removes the historical synthetic empty server without changing
+                // any persisted DNSCrypt preferences. New DNSCrypt defaults come only from
+                // constructing a new DnsCryptConfig.
+                RemovePersistedEmptyServers(config);
+
+                // Re-serializing the typed model is the schema migration boundary: properties
+                // no longer represented by Configuration are removed without carrying a list
+                // of historical field names forever. Keep a valid rollback snapshot canonical too.
+                settingsStore.SetString(SettingsValueName, SerializeConfiguration(config));
+
+                if (settingsStore.TryGetString(SettingsBackupValueName, out string backupJson)
+                    && TryDeserialize(backupJson, out Configuration backupConfig))
+                {
+                    RemovePersistedEmptyServers(backupConfig);
+                    settingsStore.SetString(SettingsBackupValueName, SerializeConfiguration(backupConfig));
+                }
+
+                settingsStore.SetInt32(SettingsSchemaVersionName, SettingsSchemaVersion);
+            }
+            catch (Exception exception)
+            {
+                // Migration failure must not prevent startup; the in-memory configuration is
+                // already valid and a later successful save will persist the current schema.
+                logger.LogUsefulException(exception);
+            }
+        }
+
+        private static void RemovePersistedEmptyServers(Configuration config)
+        {
+            config.configs ??= new List<Server>();
+            int selectedIndex = config.index;
+            int removedBeforeSelection = 0;
+            bool selectedWasRemoved = false;
+
+            for (int index = config.configs.Count - 1; index >= 0; index--)
+            {
+                if (!IsPersistedEmptyServer(config.configs[index]))
+                    continue;
+
+                if (selectedIndex >= 0)
+                {
+                    if (index < selectedIndex)
+                        removedBeforeSelection++;
+                    else if (index == selectedIndex)
+                        selectedWasRemoved = true;
+                }
+
+                config.configs.RemoveAt(index);
+            }
+
+            if (config.configs.Count == 0)
+            {
+                config.index = -1;
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(config.strategy))
+                return;
+
+            if (selectedIndex < 0)
+            {
+                config.index = 0;
+                return;
+            }
+
+            int adjustedIndex = selectedIndex - removedBeforeSelection;
+            if (selectedWasRemoved && adjustedIndex >= config.configs.Count)
+                adjustedIndex = config.configs.Count - 1;
+            config.index = Math.Clamp(adjustedIndex, 0, config.configs.Count - 1);
+        }
+
+        private static bool IsPersistedEmptyServer(Server server)
+            => server is null
+               || (string.IsNullOrWhiteSpace(server.server)
+                   && string.IsNullOrWhiteSpace(server.password)
+                   && string.IsNullOrWhiteSpace(server.remarks)
+                   && string.IsNullOrWhiteSpace(server.plugin)
+                   && string.IsNullOrWhiteSpace(server.PluginOptions)
+                   && string.IsNullOrWhiteSpace(server.PluginArguments)
+                   && string.IsNullOrWhiteSpace(server.group));
+
+        private static string SerializeConfiguration(Configuration config)
+            => JsonConvert.SerializeObject(config, Formatting.Indented);
 
         /// <summary>
         /// Gives every configured server a stable display name when the source did not

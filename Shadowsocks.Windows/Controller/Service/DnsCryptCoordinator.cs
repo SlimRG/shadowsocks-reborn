@@ -11,7 +11,7 @@ namespace Shadowsocks.Controller.Service
     /// the higher-level transaction from interleaving with another user or background operation.
     /// The lifecycle token additionally cancels queued work during suspend/application shutdown.
     /// </summary>
-    internal sealed class DnsCryptCoordinator
+    internal sealed class DnsCryptCoordinator : IDisposable
     {
         private readonly SemaphoreSlim _managementGate = new(1, 1);
         private readonly object _stateLock = new();
@@ -19,6 +19,7 @@ namespace Shadowsocks.Controller.Service
         private string? _currentOperation;
         private CancellationTokenSource? _currentCancellation;
         private bool _acceptingOperations = true;
+        private bool _disposed;
 
         public string? CurrentOperation
         {
@@ -184,6 +185,32 @@ namespace Shadowsocks.Controller.Service
                     return null;
                 },
                 cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            CancellationTokenSource lifecycleCancellation;
+            CancellationTokenSource? currentCancellation;
+            lock (_stateLock)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _acceptingOperations = false;
+                lifecycleCancellation = _lifecycleCancellation;
+                currentCancellation = _currentCancellation;
+                _currentCancellation = null;
+                _currentOperation = null;
+            }
+
+            TryCancel(lifecycleCancellation);
+            TryCancel(currentCancellation);
+            lifecycleCancellation.Dispose();
+            _managementGate.Dispose();
+            GC.SuppressFinalize(this);
         }
 
         private static void TryCancel(CancellationTokenSource? cancellation)

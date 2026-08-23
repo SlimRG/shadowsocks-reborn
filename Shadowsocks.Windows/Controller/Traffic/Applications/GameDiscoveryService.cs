@@ -354,7 +354,7 @@ namespace Shadowsocks.Controller.Traffic.Applications
             }
         }
 
-        private static IEnumerable<string> SafeEnumerateFiles(string directory, string pattern, SearchOption option)
+        private static string[] SafeEnumerateFiles(string directory, string pattern, SearchOption option)
         {
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             {
@@ -370,7 +370,7 @@ namespace Shadowsocks.Controller.Traffic.Applications
             }
         }
 
-        private static IEnumerable<string> SafeEnumerateDirectories(string directory)
+        private static string[] SafeEnumerateDirectories(string directory)
         {
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
             {

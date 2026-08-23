@@ -321,7 +321,7 @@ namespace Shadowsocks.Controller.Service
             return queryType == 1 && queryClass == 1;
         }
 
-        private static void WriteUInt16NetworkOrder(Stream stream, ushort value)
+        private static void WriteUInt16NetworkOrder(MemoryStream stream, ushort value)
         {
             stream.WriteByte((byte)(value >> 8));
             stream.WriteByte((byte)(value & 0xFF));
@@ -478,7 +478,7 @@ namespace Shadowsocks.Controller.Service
                     continue;
 
                 string payload = line[(markerIndex + marker.Length)..].TrimStart();
-                if (payload.StartsWith("[", StringComparison.Ordinal))
+                if (payload.StartsWith('['))
                     return true;
             }
 

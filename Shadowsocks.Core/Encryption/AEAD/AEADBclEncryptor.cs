@@ -10,7 +10,7 @@ namespace Shadowsocks.Encryption.AEAD
         private const int CIPHER_AES_GCM = 1;
         private const int CIPHER_CHACHA20_POLY1305 = 2;
 
-        private static readonly Dictionary<string, EncryptorInfo> _ciphers = new Dictionary<string, EncryptorInfo>
+        private static readonly Dictionary<string, EncryptorInfo> CipherTypes = new Dictionary<string, EncryptorInfo>
         {
             {"aes-128-gcm", new EncryptorInfo(16, 16, 12, 16, CIPHER_AES_GCM)},
             {"aes-192-gcm", new EncryptorInfo(24, 24, 12, 16, CIPHER_AES_GCM)},
@@ -29,18 +29,18 @@ namespace Shadowsocks.Encryption.AEAD
         public AEADBclEncryptor(string method, string password)
             : base(method, password)
         {
-            _encryptSubkey = new byte[keyLen];
-            _decryptSubkey = new byte[keyLen];
+            _encryptSubkey = new byte[KeyLength];
+            _decryptSubkey = new byte[KeyLength];
         }
 
         public static List<string> SupportedCiphers()
         {
-            return new List<string>(_ciphers.Keys);
+            return new List<string>(CipherTypes.Keys);
         }
 
-        protected override Dictionary<string, EncryptorInfo> getCiphers()
+        protected override IReadOnlyDictionary<string, EncryptorInfo> GetCiphers()
         {
-            return _ciphers;
+            return CipherTypes;
         }
 
         public override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
@@ -48,20 +48,20 @@ namespace Shadowsocks.Encryption.AEAD
             base.InitCipher(salt, isEncrypt, isUdp);
 
             byte[] subkey = isEncrypt ? _encryptSubkey : _decryptSubkey;
-            DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt, _masterKey, subkey);
+            DeriveSessionKey(isEncrypt ? EncryptSalt : DecryptSalt, MasterKey, subkey);
 
-            switch (_cipher)
+            switch (CipherType)
             {
                 case CIPHER_AES_GCM:
                     if (isEncrypt)
                     {
                         _encryptAes?.Dispose();
-                        _encryptAes = new AesGcm(subkey, tagLen);
+                        _encryptAes = new AesGcm(subkey, TagLength);
                     }
                     else
                     {
                         _decryptAes?.Dispose();
-                        _decryptAes = new AesGcm(subkey, tagLen);
+                        _decryptAes = new AesGcm(subkey, TagLength);
                     }
                     break;
 
@@ -85,40 +85,40 @@ namespace Shadowsocks.Encryption.AEAD
                     break;
 
                 default:
-                    throw new NotSupportedException($"Encryption method '{_method}' is not supported.");
+                    throw new NotSupportedException($"Encryption method '{MethodName}' is not supported.");
             }
         }
 
         public override void cipherEncrypt(byte[] plaintext, uint plen, byte[] ciphertext, ref uint clen)
         {
             int plainLength = checked((int)plen);
-            if (ciphertext.Length < plainLength + tagLen)
+            if (ciphertext.Length < plainLength + TagLength)
             {
                 throw new ArgumentException("Ciphertext buffer is too small.", nameof(ciphertext));
             }
 
             ReadOnlySpan<byte> plain = plaintext.AsSpan(0, plainLength);
             Span<byte> encrypted = ciphertext.AsSpan(0, plainLength);
-            Span<byte> tag = ciphertext.AsSpan(plainLength, tagLen);
+            Span<byte> tag = ciphertext.AsSpan(plainLength, TagLength);
 
             try
             {
-                switch (_cipher)
+                switch (CipherType)
                 {
                     case CIPHER_AES_GCM:
                         if (_encryptAes == null)
                             throw new InvalidOperationException("Encryption cipher is not initialized.");
-                        _encryptAes.Encrypt(_encNonce, plain, encrypted, tag);
+                        _encryptAes.Encrypt(EncryptNonce, plain, encrypted, tag);
                         break;
 
                     case CIPHER_CHACHA20_POLY1305:
                         if (_encryptChaCha == null)
                             throw new InvalidOperationException("Encryption cipher is not initialized.");
-                        _encryptChaCha.Encrypt(_encNonce, plain, encrypted, tag);
+                        _encryptChaCha.Encrypt(EncryptNonce, plain, encrypted, tag);
                         break;
 
                     default:
-                        throw new NotSupportedException($"Encryption method '{_method}' is not supported.");
+                        throw new NotSupportedException($"Encryption method '{MethodName}' is not supported.");
                 }
             }
             catch (CryptographicException e)
@@ -126,45 +126,45 @@ namespace Shadowsocks.Encryption.AEAD
                 throw new CryptoErrorException("AEAD encryption failed.", e);
             }
 
-            clen = plen + (uint)tagLen;
+            clen = plen + (uint)TagLength;
         }
 
         public override void cipherDecrypt(byte[] ciphertext, uint clen, byte[] plaintext, ref uint plen)
         {
             int cipherLength = checked((int)clen);
-            if (cipherLength < tagLen)
+            if (cipherLength < TagLength)
             {
                 throw new CryptoErrorException("AEAD ciphertext is shorter than the authentication tag.");
             }
 
-            int plainLength = cipherLength - tagLen;
+            int plainLength = cipherLength - TagLength;
             if (plaintext.Length < plainLength)
             {
                 throw new ArgumentException("Plaintext buffer is too small.", nameof(plaintext));
             }
 
             ReadOnlySpan<byte> encrypted = ciphertext.AsSpan(0, plainLength);
-            ReadOnlySpan<byte> tag = ciphertext.AsSpan(plainLength, tagLen);
+            ReadOnlySpan<byte> tag = ciphertext.AsSpan(plainLength, TagLength);
             Span<byte> plain = plaintext.AsSpan(0, plainLength);
 
             try
             {
-                switch (_cipher)
+                switch (CipherType)
                 {
                     case CIPHER_AES_GCM:
                         if (_decryptAes == null)
                             throw new InvalidOperationException("Decryption cipher is not initialized.");
-                        _decryptAes.Decrypt(_decNonce, encrypted, tag, plain);
+                        _decryptAes.Decrypt(DecryptNonce, encrypted, tag, plain);
                         break;
 
                     case CIPHER_CHACHA20_POLY1305:
                         if (_decryptChaCha == null)
                             throw new InvalidOperationException("Decryption cipher is not initialized.");
-                        _decryptChaCha.Decrypt(_decNonce, encrypted, tag, plain);
+                        _decryptChaCha.Decrypt(DecryptNonce, encrypted, tag, plain);
                         break;
 
                     default:
-                        throw new NotSupportedException($"Encryption method '{_method}' is not supported.");
+                        throw new NotSupportedException($"Encryption method '{MethodName}' is not supported.");
                 }
             }
             catch (CryptographicException e)
@@ -194,8 +194,8 @@ namespace Shadowsocks.Encryption.AEAD
                 CryptographicOperations.ZeroMemory(_encryptSubkey);
             if (_decryptSubkey != null)
                 CryptographicOperations.ZeroMemory(_decryptSubkey);
-            if (_masterKey != null)
-                CryptographicOperations.ZeroMemory(_masterKey);
+            if (MasterKey != null)
+                CryptographicOperations.ZeroMemory(MasterKey);
         }
     }
 }

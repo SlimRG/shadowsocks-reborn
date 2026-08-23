@@ -19,11 +19,13 @@ namespace Shadowsocks.Controller
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string Key = "Shadowsocks Reborn";
-        private const string StartupArguments = "--start-hidden";
+        internal const string StartupHiddenOption = "--start-hidden";
+        internal const string StartupVisibleOption = "--start-visible";
         internal const string StartupOriginOption = "--startup-origin";
         private static bool StartupCopySynchronized;
+        private static int TrackedWindowVisibility = -1;
 
-        public static bool Set(bool enabled, string arguments = null)
+        public static bool Set(bool enabled, bool windowVisible = false)
         {
             if (AppStoragePaths.IsCleanMode)
             {
@@ -48,7 +50,7 @@ namespace Shadowsocks.Controller
                         return false;
                     }
 
-                    runKey.SetValue(Key, BuildStartupCommand(arguments));
+                    runKey.SetValue(Key, BuildStartupCommand(windowVisible));
                     RemoveDuplicateStartupEntries(runKey);
                 }
                 else
@@ -62,7 +64,7 @@ namespace Shadowsocks.Controller
                 }
 
                 // When autostartup setting changes, change RegisterForRestart state to avoid starting twice.
-                RegisterForRestart(!enabled);
+                RegisterForRestart(!enabled, windowVisible);
                 return true;
             }
             catch (Exception exception)
@@ -115,7 +117,7 @@ namespace Shadowsocks.Controller
                         return false;
                     }
 
-                    command = BuildStartupCommand(StartupArguments);
+                    command = BuildStartupCommand(windowVisible: false);
                     runKey.SetValue(Key, command);
                     Logger.Info("Migrated legacy Start with Windows command to the stable LocalAppData startup executable.");
                 }
@@ -132,7 +134,9 @@ namespace Shadowsocks.Controller
                     }
                 }
 
-                string canonical = BuildStartupCommand(StartupArguments);
+                string[] commandArguments = WindowsCommandLine.ParseArguments(command ?? string.Empty);
+                bool windowVisible = !IsHiddenStartup(commandArguments) && IsVisibleStartup(commandArguments);
+                string canonical = BuildStartupCommand(windowVisible);
                 if (!string.Equals(command?.Trim(), canonical, StringComparison.OrdinalIgnoreCase))
                 {
                     runKey.SetValue(Key, canonical);
@@ -229,12 +233,12 @@ namespace Shadowsocks.Controller
             return CryptographicOperations.FixedTimeEquals(firstHash, secondHash);
         }
 
-        private static string BuildStartupCommand(string arguments)
+        private static string BuildStartupCommand(bool windowVisible)
         {
             string executable = $"\"{AppStoragePaths.StartupExecutableFile}\"";
-            string normalizedArguments = string.IsNullOrWhiteSpace(arguments) ? StartupArguments : arguments.Trim();
+            string uiStateArgument = windowVisible ? StartupVisibleOption : StartupHiddenOption;
             string primaryExecutable = GetPrimaryExecutablePath();
-            return $"{executable} {normalizedArguments} {StartupOriginOption} \"{primaryExecutable}\"";
+            return $"{executable} {uiStateArgument} {StartupOriginOption} \"{primaryExecutable}\"";
         }
 
         /// <summary>
@@ -454,7 +458,92 @@ namespace Shadowsocks.Controller
             RestartNoReboot = 8,
         }
 
-        public static void RegisterForRestart(bool register)
+        internal static bool IsHiddenStartup(IReadOnlyList<string> arguments)
+            => HasStartupOption(arguments, StartupHiddenOption);
+
+        internal static bool IsVisibleStartup(IReadOnlyList<string> arguments)
+            => HasStartupOption(arguments, StartupVisibleOption);
+
+        private static bool HasStartupOption(IReadOnlyList<string> arguments, string option)
+            => arguments?.Any(argument =>
+                string.Equals(argument, option, StringComparison.OrdinalIgnoreCase)) == true;
+
+        internal static string BuildRestartCommandLine(IReadOnlyList<string> arguments, bool windowVisible)
+        {
+            var restartArguments = new List<string>();
+            foreach (string argument in arguments ?? Array.Empty<string>())
+            {
+                if (string.Equals(argument, StartupHiddenOption, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(argument, StartupVisibleOption, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                restartArguments.Add(argument);
+            }
+
+            restartArguments.Add(windowVisible ? StartupVisibleOption : StartupHiddenOption);
+
+            return string.Join(
+                " ",
+                restartArguments
+                    .Select(argument => argument.Replace("\"", "\\\""))
+                    .Select(argument => argument.Contains(' ') ? "\"" + argument + "\"" : argument));
+        }
+
+        /// <summary>
+        /// Keeps Windows reboot/session restoration synchronized with the shell's
+        /// actual visibility. Start with Windows owns restoration when enabled;
+        /// otherwise Restart Manager owns it. The mechanisms remain mutually exclusive.
+        /// </summary>
+        public static void SynchronizeUiState(bool windowVisible)
+        {
+            System.Threading.Volatile.Write(ref TrackedWindowVisibility, windowVisible ? 1 : 0);
+            if (AppStoragePaths.IsCleanMode)
+            {
+                return;
+            }
+
+            RegistryKey runKey = null;
+            try
+            {
+                bool startupEnabled = Check();
+                if (!startupEnabled)
+                {
+                    RegisterForRestart(true, windowVisible);
+                    return;
+                }
+
+                runKey = WindowsSystemUtilities.OpenRegistryKey(RunKeyPath, true);
+                if (runKey == null)
+                {
+                    Logger.Error(@"Cannot find HKCU\Software\Microsoft\Windows\CurrentVersion\Run");
+                    RegisterForRestart(true, windowVisible);
+                    return;
+                }
+
+                runKey.SetValue(Key, BuildStartupCommand(windowVisible));
+                RemoveDuplicateStartupEntries(runKey);
+                RegisterForRestart(false, windowVisible);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogUsefulException(exception);
+            }
+            finally
+            {
+                runKey?.Dispose();
+            }
+        }
+
+        internal static bool TryGetTrackedWindowVisibility(out bool windowVisible)
+        {
+            int tracked = System.Threading.Volatile.Read(ref TrackedWindowVisibility);
+            windowVisible = tracked == 1;
+            return tracked >= 0;
+        }
+
+        public static void RegisterForRestart(bool register, bool windowVisible = false)
         {
             if (AppStoragePaths.IsCleanMode)
             {
@@ -465,23 +554,24 @@ namespace Shadowsocks.Controller
                 return;
             }
 
-            if (register && !Check())
-            {
-                string[] args = new List<string>(AppRuntimeEnvironment.Arguments)
-                    .Select(p => p.Replace("\"", "\\\""))
-                    .Select(p => p.IndexOf(' ') >= 0 ? "\"" + p + "\"" : p)
-                    .ToArray();
-                string cmdline = string.Join(" ", args);
-                RegisterApplicationRestart(
-                    cmdline,
-                    (int)(ApplicationRestartFlags.RestartNoCrash | ApplicationRestartFlags.RestartNoHang));
-                Logger.Debug("Register restart after system reboot, command line:" + cmdline);
-            }
-            else if (!register)
+            if (!register)
             {
                 UnregisterApplicationRestart();
                 Logger.Debug("Unregister restart after system reboot");
+                return;
             }
+
+            string cmdline = BuildRestartCommandLine(AppRuntimeEnvironment.Arguments, windowVisible);
+            int result = RegisterApplicationRestart(
+                cmdline,
+                (int)(ApplicationRestartFlags.RestartNoCrash | ApplicationRestartFlags.RestartNoHang));
+            if (result != 0)
+            {
+                Logger.Warn("RegisterApplicationRestart failed with HRESULT 0x{0:X8}.", result);
+                return;
+            }
+
+            Logger.Debug("Register restart after system reboot, command line: " + cmdline);
         }
     }
 }

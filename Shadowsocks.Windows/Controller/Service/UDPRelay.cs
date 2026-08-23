@@ -11,11 +11,12 @@ using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller
 {
-    class UDPRelay : Listener.Service
+    internal sealed class UDPRelay : Listener.Service, IDisposable
     {
         private const int MaxUdpAssociations = 512;
         private readonly ShadowsocksController _controller;
         private readonly UdpAssociationCache _cache = new(MaxUdpAssociations);
+        private bool _disposed;
 
         public UDPRelay(ShadowsocksController controller)
         {
@@ -33,7 +34,7 @@ namespace Shadowsocks.Controller
                 return false;
             }
             Listener.UDPState udpState = (Listener.UDPState)state;
-            IPEndPoint remoteEndPoint = (IPEndPoint)udpState.remoteEndPoint;
+            IPEndPoint remoteEndPoint = (IPEndPoint)udpState.RemoteEndPoint;
             if (firstPacket[0] != 0 || firstPacket[1] != 0 || firstPacket[2] != 0)
             {
                 return true; // SOCKS5 UDP fragmentation is intentionally unsupported; drop invalid/fragmented datagrams.
@@ -60,6 +61,23 @@ namespace Shadowsocks.Controller
             }
             handler.Send(firstPacket, length);
             return true;
+        }
+
+        public override void Shutdown()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _cache.Dispose();
+            _disposed = true;
+            GC.SuppressFinalize(this);
         }
 
         internal static EndPoint TryParseDestination(byte[] packet, int length)
@@ -106,7 +124,7 @@ namespace Shadowsocks.Controller
                 : new DnsEndPoint(host, port);
         }
 
-        public class UDPHandler
+        public sealed class UDPHandler : IDisposable
         {
             private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -134,7 +152,7 @@ namespace Shadowsocks.Controller
                 _server = server;
                 _localEndPoint = localEndPoint;
 
-                _remoteEndPoint = controller.ResolveOutboundEndpoint(server.server, server.server_port);
+                _remoteEndPoint = controller.ResolveOutboundEndpoint(server.server, server.ServerPort);
                 _remote = new Socket(_remoteEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
                 _remote.Bind(new IPEndPoint(GetBindAddress(_remote.AddressFamily), 0));
             }
@@ -224,10 +242,16 @@ namespace Shadowsocks.Controller
                     logger.LogUsefulException(exception);
                 }
             }
+
+            public void Dispose()
+            {
+                Close();
+                GC.SuppressFinalize(this);
+            }
         }
     }
 
-    internal sealed class UdpAssociationCache
+    internal sealed class UdpAssociationCache : IDisposable
     {
         private readonly int _capacity;
         private readonly object _sync = new();
@@ -236,10 +260,7 @@ namespace Shadowsocks.Controller
 
         public UdpAssociationCache(int capacity)
         {
-            if (capacity <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(capacity));
-            }
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
             _capacity = capacity;
         }
 
@@ -282,7 +303,30 @@ namespace Shadowsocks.Controller
                 _entries.Add(key, node);
             }
 
-            toClose?.Close();
+            toClose?.Dispose();
+        }
+
+        public void Dispose()
+        {
+            List<UDPRelay.UDPHandler> handlers;
+            lock (_sync)
+            {
+                handlers = new List<UDPRelay.UDPHandler>(_entries.Count);
+                foreach (LinkedListNode<Entry> node in _entries.Values)
+                {
+                    handlers.Add(node.Value.Handler);
+                }
+
+                _entries.Clear();
+                _lru.Clear();
+            }
+
+            foreach (UDPRelay.UDPHandler handler in handlers)
+            {
+                handler.Dispose();
+            }
+
+            GC.SuppressFinalize(this);
         }
 
         private sealed class Entry

@@ -1,4 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 using Shadowsocks.Model;
 
 namespace Shadowsocks.UnitTests
@@ -7,16 +9,86 @@ namespace Shadowsocks.UnitTests
     public class ConfigurationStateTest
     {
         [TestMethod]
-        public void EmptyPlaceholderServerIsNotConfigured()
+        public void EmptyConfigurationHasNoSyntheticServer()
         {
             Configuration configuration = new();
             Configuration.Process(ref configuration);
 
-            Assert.AreEqual(1, configuration.configs.Count);
+            Assert.AreEqual(0, configuration.configs.Count);
+            Assert.AreEqual(-1, configuration.index);
+            Assert.IsFalse(configuration.Enabled);
             Assert.IsFalse(configuration.GetCurrentServer().IsConfigured);
             Assert.IsFalse(configuration.HasConfiguredServer);
         }
 
+        [TestMethod]
+        public void LegacyBlankPlaceholderIsRemovedWithoutChangingSelectedRealServer()
+        {
+            Configuration configuration = new()
+            {
+                index = 1,
+                configs =
+                [
+                    new Server(),
+                    new Server
+                    {
+                        server = "127.0.0.1",
+                        ServerPort = 8388,
+                        password = "test",
+                        method = Server.DefaultMethod,
+                    },
+                ],
+            };
+
+            Configuration.Process(ref configuration);
+
+            Assert.AreEqual(1, configuration.configs.Count);
+            Assert.AreEqual(0, configuration.index);
+            Assert.AreEqual("127.0.0.1", configuration.GetCurrentServer().server);
+            Assert.IsTrue(configuration.HasConfiguredServer);
+        }
+
+        [TestMethod]
+        public void IncompleteServerCredentialsAreNotConfigured()
+        {
+            Server server = new()
+            {
+                server = "127.0.0.1",
+                ServerPort = 8388,
+                password = string.Empty,
+                method = Server.DefaultMethod,
+            };
+
+            Assert.IsFalse(server.IsConfigured);
+            server.password = "test";
+            Assert.IsTrue(server.IsConfigured);
+        }
+
+
+        [TestMethod]
+        public void IncompleteSelectedServerDisablesProxyButPreservesDnsPreference()
+        {
+            Configuration configuration = new()
+            {
+                Enabled = true,
+                dnsPolicy = new Shadowsocks.Controller.Traffic.DnsPolicyConfig
+                {
+                    mode = Shadowsocks.Controller.Traffic.DnsPolicyMode.DnsCrypt,
+                },
+            };
+            configuration.configs.Add(new Server
+            {
+                server = "127.0.0.1",
+                ServerPort = 8388,
+                password = string.Empty,
+            });
+
+            Configuration.Process(ref configuration);
+
+            Assert.IsFalse(configuration.HasConfiguredServer);
+            Assert.IsFalse(configuration.Enabled);
+            Assert.AreEqual(Shadowsocks.Controller.Traffic.DnsPolicyMode.DnsCrypt, configuration.dnsPolicy.mode);
+        }
 
         [TestMethod]
         [DataRow("System", "System")]
@@ -49,6 +121,21 @@ namespace Shadowsocks.UnitTests
             Assert.IsFalse(configuration.showDnsLogs);
         }
 
+
+        [TestMethod]
+        public void EnabledUsesLegacyJsonPropertyName()
+        {
+            Configuration configuration = new() { Enabled = true };
+
+            string json = JsonConvert.SerializeObject(configuration);
+            Configuration roundTrip = JsonConvert.DeserializeObject<Configuration>(json);
+
+            StringAssert.Contains(json, "\"enabled\":true");
+            Assert.IsFalse(json.Contains("\"Enabled\"", StringComparison.Ordinal));
+            Assert.IsNotNull(roundTrip);
+            Assert.IsTrue(roundTrip.Enabled);
+        }
+
         [TestMethod]
         public void RealServerIsConfigured()
         {
@@ -56,7 +143,7 @@ namespace Shadowsocks.UnitTests
             configuration.configs.Add(new Server
             {
                 server = "127.0.0.1",
-                server_port = 8388,
+                ServerPort = 8388,
                 password = "test",
                 method = Server.DefaultMethod,
             });

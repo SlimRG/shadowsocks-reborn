@@ -101,14 +101,16 @@ namespace Shadowsocks.UnitTests
 
             await manager.ValidatePreparedAsync(
                 prepared,
-                new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
+                new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             int versionCommandIndex = platform.Commands.FindIndex(command => command.Contains("-version"));
             int listCommandIndex = platform.Commands.FindIndex(command => command.Contains("-list-all") && command.Contains("-json"));
             Assert.IsTrue(versionCommandIndex >= 0);
             Assert.IsTrue(listCommandIndex > versionCommandIndex, "Prepared binary version must be verified before signed-catalog discovery.");
             Assert.IsTrue(platform.StartedConfigText.Contains("server_names = ['test-resolver']", StringComparison.Ordinal));
-            Assert.IsFalse(platform.StartedConfigText.Contains("[static.cloudflare]", StringComparison.Ordinal));
+            Assert.IsTrue(platform.StartedConfigText.Contains("[static.'test-resolver']", StringComparison.Ordinal));
+            Assert.IsTrue(platform.StartedConfigText.Contains("stamp = 'sdns://test'", StringComparison.Ordinal));
+            Assert.IsFalse(platform.StartedConfigText.Contains("[sources.public-resolvers]", StringComparison.Ordinal));
         }
 
         [TestMethod]
@@ -119,7 +121,7 @@ namespace Shadowsocks.UnitTests
             DnsCryptPreparedComponent prepared = CreatePreparedComponent();
 
             await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
-                manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(new DnsCryptConfig())));
+                manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig())));
 
             Assert.IsTrue(platform.Commands.Any(command => command.Contains("-version")));
             Assert.IsFalse(platform.Commands.Any(command => command.Contains("-list-all")),
@@ -135,7 +137,7 @@ namespace Shadowsocks.UnitTests
             DnsCryptPreparedComponent prepared = CreatePreparedComponent();
 
             await Assert.ThrowsExactlyAsync<InvalidDataException>(() =>
-                manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(new DnsCryptConfig())));
+                manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig())));
 
             Assert.AreEqual(0, platform.Processes.Count);
         }
@@ -147,7 +149,7 @@ namespace Shadowsocks.UnitTests
             using var manager = CreateManager(platform, health: true, port: 38471);
             DnsCryptPreparedComponent prepared = CreatePreparedComponent();
 
-            await manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
+            await manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             Assert.IsTrue(platform.Commands.Any(command => command.Contains("-check")));
             Assert.AreEqual(1, platform.Processes.Count);
@@ -160,7 +162,7 @@ namespace Shadowsocks.UnitTests
             var platform = new FakeRuntimePlatform();
             using var manager = CreateManager(platform, health: false, port: 38471);
 
-            await Assert.ThrowsExactlyAsync<TimeoutException>(() =>
+            await Assert.ThrowsExactlyAsync<DnsCryptRuntimeStartupException>(() =>
                 manager.StartAsync(CreateConcreteRuntimeOptions()));
 
             Assert.AreEqual(DnsCryptRuntimeState.Failed, manager.GetStatus().State);
@@ -282,7 +284,7 @@ namespace Shadowsocks.UnitTests
 
             DnsCryptPreparedComponent prepared = CreatePreparedComponent();
 
-            await manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
+            await manager.ValidatePreparedAsync(prepared, new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             DnsCryptRuntimeStatus after = manager.GetStatus();
             Assert.AreEqual(DnsCryptRuntimeState.Running, after.State);
@@ -330,12 +332,11 @@ namespace Shadowsocks.UnitTests
         [TestMethod]
         public void ResolverListParserReadsCurrentDnsCryptJsonShape()
         {
-            const string json = """
-                [
-                  {"name":"cloudflare","proto":"DNSCrypt","ipv6":false,"addrs":["1.1.1.1"],"ports":[443],"dnssec":true,"nolog":true,"nofilter":true,"description":"Cloudflare","stamp":"sdns://test"},
-                  {"name":"quad9-doh","proto":"DoH","ipv6":true,"addrs":["[2620:fe::fe]"],"ports":[443],"dnssec":true,"nolog":true,"nofilter":false,"description":"Quad9","stamp":"sdns://test2"}
-                ]
-                """;
+            const string json =
+                "[" +
+                "{\"name\":\"cloudflare\",\"proto\":\"DNSCrypt\",\"ipv6\":false,\"addrs\":[\"1.1.1.1\"],\"ports\":[443],\"dnssec\":true,\"nolog\":true,\"nofilter\":true,\"description\":\"Cloudflare\",\"stamp\":\"sdns://test\"}," +
+                "{\"name\":\"quad9-doh\",\"proto\":\"DoH\",\"ipv6\":true,\"addrs\":[\"[2620:fe::fe]\"],\"ports\":[443],\"dnssec\":true,\"nolog\":true,\"nofilter\":false,\"description\":\"Quad9\",\"stamp\":\"sdns://test2\"}" +
+                "]";
 
             IReadOnlyList<DnsCryptResolverInfo> resolvers = DnsCryptRuntimeManager.ParseResolverList(json);
 
@@ -346,6 +347,7 @@ namespace Shadowsocks.UnitTests
             Assert.IsTrue(resolvers[0].NoLog);
             Assert.AreEqual(443, resolvers[0].Ports[0]);
             Assert.AreEqual("1.1.1.1", resolvers[0].Addresses[0]);
+            Assert.AreEqual("sdns://test", resolvers[0].Stamp);
             Assert.AreEqual("quad9-doh", resolvers[1].Name);
             Assert.IsTrue(resolvers[1].IPv6);
         }
@@ -407,6 +409,20 @@ namespace Shadowsocks.UnitTests
         }
 
         [TestMethod]
+        public async Task ActiveRuntimeUsesPinnedStaticResolverWithoutRemoteSources()
+        {
+            var platform = new FakeRuntimePlatform();
+            using var manager = CreateManager(platform, health: true, port: 38471);
+
+            await manager.StartAsync(CreateConcreteRuntimeOptions());
+
+            StringAssert.Contains(platform.StartedConfigText, "[static.'test-resolver']");
+            StringAssert.Contains(platform.StartedConfigText, "stamp = 'sdns://test'");
+            Assert.IsFalse(platform.StartedConfigText.Contains("[sources.public-resolvers]", StringComparison.Ordinal));
+            StringAssert.Contains(platform.StartedConfigText, "bootstrap_resolvers = []");
+        }
+
+        [TestMethod]
         public void ResolverProbeDiagnosticsAreVerboseOnly()
         {
             Assert.IsTrue(DnsCryptRuntimeManager.IsResolverProbeDiagnostic(
@@ -433,7 +449,7 @@ namespace Shadowsocks.UnitTests
             using var manager = CreateManager(platform, health: true, port: 38471);
 
             IReadOnlyList<DnsCryptResolverInfo> resolvers = await manager.ListResolversAsync(
-                new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
+                new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             Assert.AreEqual(1, resolvers.Count);
             Assert.AreEqual("cloudflare", resolvers[0].Name);
@@ -442,7 +458,25 @@ namespace Shadowsocks.UnitTests
         }
 
         [TestMethod]
-        public async Task ResolverCatalogRefreshPersistsSignedCacheForActiveRuntime()
+        public async Task ResolverCatalogBootstrapRunsBeforeDnscryptListCommand()
+        {
+            var platform = new FakeRuntimePlatform { ListOutput = "[]" };
+            var bootstrapper = new FakeCatalogBootstrapper();
+            using var manager = CreateManager(platform, health: true, port: 38471, bootstrapper: bootstrapper);
+
+            await manager.ListResolversAsync(new DnsCryptRuntimeStartOptions(new DnsCryptConfig(), 1080)
+            {
+                ShadowsocksSocks5Host = "127.0.0.1",
+            });
+
+            Assert.AreEqual(1, bootstrapper.CallCount);
+            Assert.AreEqual("127.0.0.1", bootstrapper.LastHost);
+            Assert.AreEqual(1080, bootstrapper.LastPort);
+            Assert.IsTrue(platform.ListCommandHadResolverCache);
+        }
+
+        [TestMethod]
+        public async Task ResolverCatalogRefreshPersistsSignedCacheForFutureMaintenance()
         {
             var platform = new FakeRuntimePlatform
             {
@@ -451,31 +485,31 @@ namespace Shadowsocks.UnitTests
             };
             using var manager = CreateManager(platform, health: true, port: 38471);
 
-            await manager.ListResolversAsync(new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
+            await manager.ListResolversAsync(new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             string persisted = Path.Combine(runtimeRoot, "public-resolvers.md");
+            string persistedSignature = Path.Combine(runtimeRoot, "public-resolvers.md.minisig");
             Assert.IsTrue(File.Exists(persisted));
+            Assert.IsTrue(File.Exists(persistedSignature));
             Assert.AreEqual("signed resolver cache", File.ReadAllText(persisted));
+            Assert.AreEqual("signed resolver signature", File.ReadAllText(persistedSignature));
         }
 
         [TestMethod]
-        public async Task TemporaryResolverOperationsReuseExistingSignedSourceCache()
+        public async Task ResolverCatalogListingReusesExistingSignedSourceCache()
         {
             Directory.CreateDirectory(runtimeRoot);
             File.WriteAllText(Path.Combine(runtimeRoot, "public-resolvers.md"), "cached signed source");
+            File.WriteAllText(Path.Combine(runtimeRoot, "public-resolvers.md.minisig"), "cached signed signature");
             var platform = new FakeRuntimePlatform
             {
                 ListOutput = "[]",
             };
             using var manager = CreateManager(platform, health: true, port: 38471);
 
-            await manager.ListResolversAsync(new DnsCryptRuntimeStartOptions(new DnsCryptConfig()));
-            await manager.ValidateSettingsAsync(
-                CreateConcreteRuntimeOptions(),
-                TimeSpan.FromMilliseconds(100));
+            await manager.ListResolversAsync(new DnsCryptRuntimeStartOptions(CreateDirectDnsCryptConfig()));
 
             Assert.IsTrue(platform.ListCommandHadResolverCache);
-            Assert.IsTrue(platform.StartedWithResolverCache);
         }
 
         [TestMethod]
@@ -546,18 +580,32 @@ namespace Shadowsocks.UnitTests
             return new DnsCryptPreparedComponent(new Version(2, 1, 18), preparedDirectory, preparedExecutable);
         }
 
+        private static DnsCryptConfig CreateDirectDnsCryptConfig()
+            => new()
+            {
+                routeThroughShadowsocks = false,
+            };
+
         private static DnsCryptRuntimeStartOptions CreateConcreteRuntimeOptions()
             => new(new DnsCryptConfig
             {
+                routeThroughShadowsocks = false,
                 automaticResolvers = false,
                 serverNames = new List<string> { "test-resolver" },
-            });
+            })
+            {
+                StaticResolverStamps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["test-resolver"] = "sdns://test",
+                },
+            };
 
         private DnsCryptRuntimeManager CreateManager(
             FakeRuntimePlatform platform,
             bool health,
             int port,
-            IReadOnlyList<TimeSpan> restartDelays = null)
+            IReadOnlyList<TimeSpan> restartDelays = null,
+            IDnsCryptResolverCatalogBootstrapper bootstrapper = null)
         {
             return new DnsCryptRuntimeManager(
                 () => new DnsCryptComponentStatus(true, new Version(2, 1, 18), null, executablePath, true, null),
@@ -566,7 +614,8 @@ namespace Shadowsocks.UnitTests
                 () => port,
                 (_, _, _) => Task.FromResult(health),
                 restartDelays ?? [TimeSpan.Zero],
-                startupTimeout: TimeSpan.FromMilliseconds(40));
+                startupTimeout: TimeSpan.FromMilliseconds(40),
+                resolverCatalogBootstrapper: bootstrapper);
         }
 
         private static async Task WaitUntilAsync(Func<bool> condition)
@@ -577,6 +626,29 @@ namespace Shadowsocks.UnitTests
                 if (DateTime.UtcNow >= deadline)
                     Assert.Fail("Timed out waiting for DNSCrypt runtime state change.");
                 await Task.Delay(10);
+            }
+        }
+
+        private sealed class FakeCatalogBootstrapper : IDnsCryptResolverCatalogBootstrapper
+        {
+            public int CallCount { get; private set; }
+            public string LastHost { get; private set; } = string.Empty;
+            public int LastPort { get; private set; }
+
+            public Task EnsureFreshAsync(
+                string cacheDirectory,
+                string shadowsocksHost,
+                int shadowsocksPort,
+                CancellationToken cancellationToken)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                CallCount++;
+                LastHost = shadowsocksHost;
+                LastPort = shadowsocksPort;
+                Directory.CreateDirectory(cacheDirectory);
+                File.WriteAllText(Path.Combine(cacheDirectory, "public-resolvers.md"), "verified resolver cache");
+                File.WriteAllText(Path.Combine(cacheDirectory, "public-resolvers.md.minisig"), "verified resolver signature");
+                return Task.CompletedTask;
             }
         }
 
@@ -607,9 +679,14 @@ namespace Shadowsocks.UnitTests
                 Commands.Add(arguments.ToArray());
                 if (arguments.Contains("-list-all"))
                 {
-                    ListCommandHadResolverCache |= File.Exists(Path.Combine(workingDirectory, "public-resolvers.md"));
+                    ListCommandHadResolverCache |=
+                        File.Exists(Path.Combine(workingDirectory, "public-resolvers.md"))
+                        && File.Exists(Path.Combine(workingDirectory, "public-resolvers.md.minisig"));
                     if (WriteResolverCacheOnList)
+                    {
                         File.WriteAllText(Path.Combine(workingDirectory, "public-resolvers.md"), "signed resolver cache");
+                        File.WriteAllText(Path.Combine(workingDirectory, "public-resolvers.md.minisig"), "signed resolver signature");
+                    }
                 }
                 if (arguments.Contains("-version"))
                     return Task.FromResult(new DnsCryptCommandResult(0, VersionOutput, string.Empty));
@@ -628,7 +705,9 @@ namespace Shadowsocks.UnitTests
                 Action<string> standardError)
             {
                 StartArguments.Add(arguments.ToArray());
-                StartedWithResolverCache |= File.Exists(Path.Combine(workingDirectory, "public-resolvers.md"));
+                StartedWithResolverCache |=
+                    File.Exists(Path.Combine(workingDirectory, "public-resolvers.md"))
+                    && File.Exists(Path.Combine(workingDirectory, "public-resolvers.md.minisig"));
                 int configIndex = arguments.ToList().FindIndex(argument => string.Equals(argument, "-config", StringComparison.Ordinal));
                 if (configIndex >= 0 && configIndex + 1 < arguments.Count && File.Exists(arguments[configIndex + 1]))
                     StartedConfigText = File.ReadAllText(arguments[configIndex + 1]);

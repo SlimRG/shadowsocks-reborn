@@ -7,7 +7,7 @@ using Shadowsocks.Controller.Traffic;
 
 namespace Shadowsocks.Controller
 {
-    public partial class ShadowsocksController
+    public sealed partial class ShadowsocksController
     {
         private readonly object _dnsCryptMaintenanceLock = new();
         private CancellationTokenSource? _dnsCryptMaintenanceCancellation;

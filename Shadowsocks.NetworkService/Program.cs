@@ -78,6 +78,8 @@ internal static class Program
                 CaptureActive = true,
                 DnsInterceptionActive = router.DnsInterceptionActive,
                 DnsFailClosedActive = router.DnsFailClosedActive,
+                ManagedRoutingActive = router.ManagedRoutingActive,
+                ManagedRoutingRuleCount = router.ManagedRoutingRuleCount,
             }).ConfigureAwait(false);
 
             while (true)

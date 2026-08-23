@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Shadowsocks.Controller;
 using Shadowsocks.Controller.Service;
 
 namespace Shadowsocks.UnitTests
@@ -13,9 +14,9 @@ namespace Shadowsocks.UnitTests
         {
             string[] arguments =
             {
-                "--start-hidden",
+                "--start-visible",
                 SelfUpdater.CleanupSwitch,
-                SelfUpdater.ResumeHiddenSwitch,
+                SelfUpdater.ResumeVisibleSwitch,
                 SelfUpdater.TransactionOption,
                 @"C:\Temp\Shadowsocks\Updates\tx",
                 SelfUpdater.BackupOption + @"=C:\Apps\.Shadowsocks.exe.tx.update-backup",
@@ -30,8 +31,17 @@ namespace Shadowsocks.UnitTests
             string[] publicArguments = SelfUpdater.RemoveInternalArguments(arguments);
 
             CollectionAssert.AreEqual(
-                new[] { "--start-hidden", "--open-url", "ss://example" },
+                new[] { "--start-visible", "--open-url", "ss://example" },
                 publicArguments);
+        }
+
+        [TestMethod]
+        public void ResumeStartupOptionPreservesCurrentUiStateAndHiddenWinsConflicts()
+        {
+            Assert.AreEqual(AutoStartup.StartupHiddenOption, SelfUpdater.ResolveResumeStartupOption(resumeHidden: true, resumeVisible: false));
+            Assert.AreEqual(AutoStartup.StartupVisibleOption, SelfUpdater.ResolveResumeStartupOption(resumeHidden: false, resumeVisible: true));
+            Assert.AreEqual(AutoStartup.StartupHiddenOption, SelfUpdater.ResolveResumeStartupOption(resumeHidden: true, resumeVisible: true));
+            Assert.AreEqual(string.Empty, SelfUpdater.ResolveResumeStartupOption(resumeHidden: false, resumeVisible: false));
         }
 
         [TestMethod]
@@ -49,6 +59,16 @@ namespace Shadowsocks.UnitTests
             string transaction = Path.Combine(SelfUpdater.UpdatesRoot, "abc");
             string updater = SelfUpdater.GetTemporaryUpdaterPath(transaction);
             Assert.AreEqual(SelfUpdater.TemporaryUpdaterFileName, Path.GetFileName(updater));
+        }
+
+        [TestMethod]
+        public void ReplacementRequiresStrictlyNewerPayloadVersion()
+        {
+            var installed = new Version(5, 2, 31, 0);
+
+            Assert.IsFalse(SelfUpdater.IsStrictlyNewerReplacement(new Version(5, 2, 22, 0), installed));
+            Assert.IsFalse(SelfUpdater.IsStrictlyNewerReplacement(new Version(5, 2, 31, 0), installed));
+            Assert.IsTrue(SelfUpdater.IsStrictlyNewerReplacement(new Version(5, 2, 32, 0), installed));
         }
 
         [TestMethod]

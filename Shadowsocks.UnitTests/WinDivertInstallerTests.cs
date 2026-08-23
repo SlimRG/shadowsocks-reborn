@@ -12,6 +12,31 @@ namespace Shadowsocks.UnitTests
     public class WinDivertInstallerTests
     {
         [TestMethod]
+        public void SecurityPinsMatchReviewedWinDivertRelease()
+        {
+            Assert.AreEqual("2.2.2", ReadWinDivertConstant(nameof(WinDivertInstaller.Version)));
+            Assert.AreEqual(
+                "https://github.com/basil00/WinDivert/releases/download/v2.2.2/WinDivert-2.2.2-A.zip",
+                ReadWinDivertConstant(nameof(WinDivertInstaller.PackageUrl)));
+            Assert.AreEqual(
+                "c1e060ee19444a259b2162f8af0f3fe8c4428a1c6f694dce20de194ac8d7d9a2",
+                ReadWinDivertConstant(nameof(WinDivertInstaller.DllSha256)));
+            Assert.AreEqual(
+                "8da085332782708d8767bcace5327a6ec7283c17cfb85e40b03cd2323a90ddc2",
+                ReadWinDivertConstant(nameof(WinDivertInstaller.DriverSha256)));
+        }
+
+        private static string ReadWinDivertConstant(string fieldName)
+        {
+            System.Reflection.FieldInfo field = typeof(WinDivertInstaller).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                ?? throw new AssertFailedException($"Missing public constant '{fieldName}'.");
+            return (string)(field.GetRawConstantValue()
+                ?? throw new AssertFailedException($"Constant '{fieldName}' has no value."));
+        }
+
+        [TestMethod]
         public void ExtractRuntimeAcceptsOnlyExpectedX64Entries()
         {
             string root = CreateTempDirectory();

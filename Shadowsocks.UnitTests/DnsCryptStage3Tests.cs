@@ -12,6 +12,22 @@ namespace Shadowsocks.UnitTests
     public class DnsCryptStage3Tests
     {
         [TestMethod]
+        public void FirstUseDefaultsEnableEverythingExceptIpv6()
+        {
+            DnsCryptConfig dns = new();
+
+            Assert.IsTrue(dns.autoUpdate);
+            Assert.IsTrue(dns.requireDnssec);
+            Assert.IsTrue(dns.requireNoLog);
+            Assert.IsTrue(dns.requireNoFilter);
+            Assert.IsTrue(dns.ipv4Servers);
+            Assert.IsFalse(dns.ipv6Servers);
+            Assert.IsTrue(dns.routeThroughShadowsocks);
+            Assert.IsTrue(dns.automaticResolvers);
+            Assert.IsTrue(dns.failClosed);
+        }
+
+        [TestMethod]
         public void OlderConfigurationWithoutDnsCryptSettingsIsRepaired()
         {
             string json = $"{{\"version\":\"{ApplicationInfo.Version}\",\"dnsPolicy\":{{\"mode\":0,\"customDohUrl\":\"\"}}}}";
@@ -81,7 +97,7 @@ namespace Shadowsocks.UnitTests
             Assert.IsTrue(restored.dnsPolicy.dnsCrypt.ipv6Servers);
             Assert.IsTrue(restored.dnsPolicy.dnsCrypt.routeThroughShadowsocks);
             Assert.IsFalse(restored.dnsPolicy.dnsCrypt.automaticResolvers);
-            Assert.IsTrue(restored.dnsPolicy.dnsCrypt.failClosed);
+            Assert.IsFalse(restored.dnsPolicy.dnsCrypt.failClosed);
             CollectionAssert.AreEqual(new[] { "cloudflare", "quad9-dnscrypt-ip4-filter-pri" }, restored.dnsPolicy.dnsCrypt.serverNames);
         }
 

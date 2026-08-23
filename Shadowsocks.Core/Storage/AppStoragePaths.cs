@@ -48,7 +48,6 @@ namespace Shadowsocks.Core.Storage
         public static string PacDataDirectory => Path.Combine(DataRoot, "PAC");
         public static string LocalPacFile => Path.Combine(PacDataDirectory, "pac.txt");
         public static string UserRuleFile => Path.Combine(PacDataDirectory, "user-rule.txt");
-        public static string UserAbpFile => Path.Combine(PacDataDirectory, "abp.txt");
 
         public static string PluginsDirectory => Path.Combine(StorageRoot, "Plugins");
         public static string ComponentsDirectory => Path.Combine(StorageRoot, "Components");

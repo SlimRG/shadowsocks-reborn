@@ -24,13 +24,16 @@ namespace Shadowsocks.Controller.Service
         private static readonly TimeSpan ResolverListTimeout = TimeSpan.FromSeconds(45);
         private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(3);
+        private static readonly JsonSerializerOptions s_resolverJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true,
+        };
         private static readonly TimeSpan[] DefaultRestartDelays =
         [
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(3),
             TimeSpan.FromSeconds(10),
         ];
-
         private readonly Func<DnsCryptComponentStatus> componentStatusProvider;
         private readonly DnsCryptComponentManager ownedComponentManager;
         private readonly string runtimeDirectory;
@@ -39,7 +42,8 @@ namespace Shadowsocks.Controller.Service
         private readonly Func<int, TimeSpan, CancellationToken, Task<bool>> healthChecker;
         private readonly Func<bool> diagnosticLoggingEnabled;
         private readonly Func<bool> verboseLoggingEnabled;
-        private readonly IReadOnlyList<TimeSpan> restartDelays;
+        private readonly IDnsCryptResolverCatalogBootstrapper resolverCatalogBootstrapper;
+        private readonly TimeSpan[] restartDelays;
         private readonly TimeSpan startupTimeout;
         private readonly SemaphoreSlim lifecycleLock = new(1, 1);
         private readonly object stateLock = new();
@@ -72,6 +76,7 @@ namespace Shadowsocks.Controller.Service
             healthChecker = DnsHealthCheckAsync;
             this.diagnosticLoggingEnabled = diagnosticLoggingEnabled ?? (() => true);
             this.verboseLoggingEnabled = verboseLoggingEnabled ?? (() => true);
+            resolverCatalogBootstrapper = new DnsCryptResolverCatalogBootstrapper();
             restartDelays = DefaultRestartDelays;
             startupTimeout = StartupTimeout;
             CleanupTransientRuntimeDirectories();
@@ -87,19 +92,26 @@ namespace Shadowsocks.Controller.Service
             IReadOnlyList<TimeSpan> restartDelays = null,
             TimeSpan? startupTimeout = null,
             Func<bool> diagnosticLoggingEnabled = null,
-            Func<bool> verboseLoggingEnabled = null)
+            Func<bool> verboseLoggingEnabled = null,
+            IDnsCryptResolverCatalogBootstrapper resolverCatalogBootstrapper = null)
         {
-            this.componentStatusProvider = componentStatusProvider ?? throw new ArgumentNullException(nameof(componentStatusProvider));
+            ArgumentNullException.ThrowIfNull(componentStatusProvider);
+            ArgumentNullException.ThrowIfNull(platform);
+            ArgumentNullException.ThrowIfNull(portAllocator);
+            ArgumentNullException.ThrowIfNull(healthChecker);
+
+            this.componentStatusProvider = componentStatusProvider;
             if (string.IsNullOrWhiteSpace(runtimeDirectory))
                 throw new ArgumentException("A DNSCrypt runtime directory is required.", nameof(runtimeDirectory));
             this.runtimeDirectory = Path.GetFullPath(runtimeDirectory);
-            this.platform = platform ?? throw new ArgumentNullException(nameof(platform));
-            this.portAllocator = portAllocator ?? throw new ArgumentNullException(nameof(portAllocator));
-            this.healthChecker = healthChecker ?? throw new ArgumentNullException(nameof(healthChecker));
+            this.platform = platform;
+            this.portAllocator = portAllocator;
+            this.healthChecker = healthChecker;
             this.diagnosticLoggingEnabled = diagnosticLoggingEnabled ?? (() => true);
             this.verboseLoggingEnabled = verboseLoggingEnabled ?? (() => true);
+            this.resolverCatalogBootstrapper = resolverCatalogBootstrapper ?? NoOpDnsCryptResolverCatalogBootstrapper.Instance;
             this.restartDelays = (restartDelays ?? DefaultRestartDelays).ToArray();
-            if (this.restartDelays.Count == 0 || this.restartDelays.Any(delay => delay < TimeSpan.Zero))
+            if (this.restartDelays.Length == 0 || this.restartDelays.Any(delay => delay < TimeSpan.Zero))
                 throw new ArgumentException("DNSCrypt restart delays must contain at least one non-negative delay.", nameof(restartDelays));
             this.startupTimeout = startupTimeout ?? StartupTimeout;
             if (this.startupTimeout <= TimeSpan.Zero)
@@ -314,8 +326,9 @@ namespace Shadowsocks.Controller.Service
         }
 
         /// <summary>
-        /// Uses dnscrypt-proxy's own signed resolver sources and -list-all -json command to obtain
-        /// the current upstream resolver catalog. No catalog is maintained by Shadowsocks itself.
+        /// Uses dnscrypt-proxy's signed resolver source in an isolated maintenance profile and
+        /// -list-all -json to obtain the current resolver catalog before active runtime startup.
+        /// dnscrypt-proxy receives no remote source URL and no plaintext/system-DNS bootstrap path.
         /// </summary>
         public async Task<IReadOnlyList<DnsCryptResolverInfo>> ListResolversAsync(
             DnsCryptRuntimeStartOptions options,
@@ -328,6 +341,7 @@ namespace Shadowsocks.Controller.Service
                 throw new InvalidOperationException("DNSCrypt Proxy is not installed.");
 
             DnsCryptRuntimeStartOptions snapshot = SnapshotOptions(options);
+            await EnsureResolverCatalogCacheAsync(snapshot, cancellationToken).ConfigureAwait(false);
             string listDirectory = Path.Combine(runtimeDirectory, $".list-{Guid.NewGuid():N}");
             Directory.CreateDirectory(listDirectory);
             SeedResolverSourceCache(listDirectory);
@@ -396,8 +410,8 @@ namespace Shadowsocks.Controller.Service
 
             try
             {
-                List<ResolverSummaryDto> summaries = JsonSerializer.Deserialize<List<ResolverSummaryDto>>(
-                    json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+                List<ResolverSummaryDto> summaries =
+                    JsonSerializer.Deserialize<List<ResolverSummaryDto>>(json, s_resolverJsonOptions) ?? [];
                 return summaries
                     .Where(item => !string.IsNullOrWhiteSpace(item.Name))
                     .Select(item => new DnsCryptResolverInfo(
@@ -411,6 +425,7 @@ namespace Shadowsocks.Controller.Service
                         item.Addrs?.Where(address => !string.IsNullOrWhiteSpace(address)).Select(address => address.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [])
                     {
                         Ports = item.Ports?.Where(port => port is >= 1 and <= 65535).Distinct().ToArray() ?? Array.Empty<int>(),
+                        Stamp = item.Stamp?.Trim() ?? string.Empty,
                     })
                     .GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(group => group.First())
@@ -443,7 +458,6 @@ namespace Shadowsocks.Controller.Service
             DnsCryptRuntimeStartOptions snapshot = SnapshotOptions(options);
             string validationDirectory = Path.Combine(runtimeDirectory, $".validate-{Guid.NewGuid():N}");
             Directory.CreateDirectory(validationDirectory);
-            SeedResolverSourceCache(validationDirectory);
             IDnsCryptRunningProcess candidate = null;
             try
             {
@@ -469,7 +483,11 @@ namespace Shadowsocks.Controller.Service
                     throw new InvalidOperationException("DNSCrypt runtime port allocator returned an invalid port.");
 
                 string configPath = Path.Combine(validationDirectory, "dnscrypt-proxy.toml");
-                string toml = DnsCryptTomlGenerator.Generate(port, snapshot.Config, snapshot.ShadowsocksSocks5Port);
+                string toml = DnsCryptTomlGenerator.Generate(
+                    port,
+                    snapshot.Config,
+                    snapshot.ShadowsocksSocks5Port,
+                    staticResolverStamps: snapshot.StaticResolverStamps);
                 await File.WriteAllTextAsync(configPath, toml, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
 
                 await CheckConfigurationAsync(
@@ -531,8 +549,7 @@ namespace Shadowsocks.Controller.Service
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
-            if (timeout <= TimeSpan.Zero)
-                throw new ArgumentOutOfRangeException(nameof(timeout));
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
 
             DnsCryptComponentStatus componentStatus = componentStatusProvider();
             if (componentStatus is null || !componentStatus.IsInstalled || componentStatus.ActiveVersion is null
@@ -544,7 +561,6 @@ namespace Shadowsocks.Controller.Service
             DnsCryptRuntimeStartOptions snapshot = SnapshotOptions(options);
             string validationDirectory = Path.Combine(runtimeDirectory, $".settings-{Guid.NewGuid():N}");
             Directory.CreateDirectory(validationDirectory);
-            SeedResolverSourceCache(validationDirectory);
             IDnsCryptRunningProcess candidate = null;
             string candidateError = string.Empty;
             object candidateErrorLock = new();
@@ -555,7 +571,11 @@ namespace Shadowsocks.Controller.Service
                     throw new InvalidOperationException("DNSCrypt runtime port allocator returned an invalid port.");
 
                 string configPath = Path.Combine(validationDirectory, "dnscrypt-proxy.toml");
-                string toml = DnsCryptTomlGenerator.Generate(port, snapshot.Config, snapshot.ShadowsocksSocks5Port);
+                string toml = DnsCryptTomlGenerator.Generate(
+                    port,
+                    snapshot.Config,
+                    snapshot.ShadowsocksSocks5Port,
+                    staticResolverStamps: snapshot.StaticResolverStamps);
                 await File.WriteAllTextAsync(configPath, toml, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
 
                 candidate = platform.Start(
@@ -639,7 +659,11 @@ namespace Shadowsocks.Controller.Service
                 throw new InvalidOperationException("DNSCrypt runtime port allocator returned an invalid port.");
 
             string configPath = GetConfigPath();
-            string toml = DnsCryptTomlGenerator.Generate(port, options.Config, options.ShadowsocksSocks5Port);
+            string toml = DnsCryptTomlGenerator.Generate(
+                port,
+                options.Config,
+                options.ShadowsocksSocks5Port,
+                staticResolverStamps: options.StaticResolverStamps);
             await File.WriteAllTextAsync(configPath, toml, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
 
             SetStatus(new DnsCryptRuntimeStatus(
@@ -700,8 +724,15 @@ namespace Shadowsocks.Controller.Service
                 if (!healthy)
                 {
                     if (startedProcess.HasExited)
-                        throw new InvalidOperationException("DNSCrypt Proxy exited before the DNS health-check succeeded.");
-                    throw new TimeoutException(BuildStartupTimeoutMessage());
+                    {
+                        string upstreamError;
+                        lock (stateLock)
+                            upstreamError = lastRuntimeUpstreamError;
+                        throw new DnsCryptRuntimeStartupException(AppendDnsCryptUpstreamError(
+                            "DNSCrypt Proxy exited before the DNS health-check succeeded.",
+                            upstreamError));
+                    }
+                    throw new DnsCryptRuntimeStartupException(BuildStartupTimeoutMessage());
                 }
 
                 DnsCryptRuntimeStatus runningStatus = PromoteStartedProcessToRunning(
@@ -717,7 +748,7 @@ namespace Shadowsocks.Controller.Service
             {
                 if (startedProcess is not null)
                     await TerminateProcessAsync(startedProcess, CancellationToken.None).ConfigureAwait(false);
-                throw new TimeoutException(BuildStartupTimeoutMessage());
+                throw new DnsCryptRuntimeStartupException(BuildStartupTimeoutMessage());
             }
             catch
             {
@@ -751,8 +782,8 @@ namespace Shadowsocks.Controller.Service
             }
             catch (TimeoutException exception)
             {
-                // dnscrypt-proxy -check may fetch/update signed resolver sources and perform
-                // network initialization. A slow/filtered network must not produce a false
+                // dnscrypt-proxy -check may perform resolver certificate/network initialization.
+                // A slow/filtered network must not produce a false
                 // configuration failure: the real process startup + DNS probe below is the
                 // authoritative readiness check. Syntax/config errors still fail immediately
                 // because dnscrypt-proxy exits non-zero before this timeout.
@@ -884,7 +915,7 @@ namespace Shadowsocks.Controller.Service
                 "DNSCrypt Proxy exited unexpectedly."));
             Logger.Warn("DNSCryptProxy | RUNTIME | Process exited unexpectedly; starting recovery sequence.");
 
-            for (int attempt = 0; attempt < restartDelays.Count; attempt++)
+            for (int attempt = 0; attempt < restartDelays.Length; attempt++)
             {
                 if (options is null || recoveryToken.IsCancellationRequested || stopRequested)
                     return;
@@ -897,7 +928,7 @@ namespace Shadowsocks.Controller.Service
                     {
                         if (stopRequested || process is not null)
                             return;
-                        Logger.Warn($"DNSCryptProxy | RUNTIME | Restart attempt {attempt + 1}/{restartDelays.Count}.");
+                        Logger.Warn($"DNSCryptProxy | RUNTIME | Restart attempt {attempt + 1}/{restartDelays.Length}.");
                         await StartProcessCoreAsync(options, recoveryToken).ConfigureAwait(false);
                         return;
                     }
@@ -923,7 +954,7 @@ namespace Shadowsocks.Controller.Service
                 0,
                 null,
                 GetConfigPath(),
-                $"DNSCrypt Proxy failed after {restartDelays.Count} automatic restart attempts."));
+                $"DNSCrypt Proxy failed after {restartDelays.Length} automatic restart attempts."));
         }
 
         private void CleanupTransientRuntimeDirectories()
@@ -1018,16 +1049,14 @@ namespace Shadowsocks.Controller.Service
             DnsCryptRuntimeStartOptions options,
             CancellationToken cancellationToken)
         {
-            if (!options.Config.automaticResolvers
-                || DnsCryptTomlGenerator.NormalizeServerNames(options.Config.serverNames).Length > 0)
-            {
+            string[] requestedNames = DnsCryptTomlGenerator.NormalizeServerNames(options.Config.serverNames);
+            if (requestedNames.Length > 0 && HasStaticResolverStamps(options, requestedNames))
                 return options;
-            }
 
-            // A persisted Automatic configuration intentionally has no server_names. Validate a
-            // not-yet-active dnscrypt-proxy without a provider-specific fallback by asking that
-            // exact candidate to load the signed public catalog first, then pin one resolver that
-            // satisfies the user's DNSSEC/privacy/address-family constraints for the health check.
+            // Prepared-runtime validation is self-contained too: discover resolver stamps through
+            // the signed catalog in the isolated maintenance directory, then validate the exact
+            // selected resolver(s) as local [static.*] entries. The candidate runtime never
+            // performs a remote resolver-source refresh.
             DnsCryptRuntimeStartOptions catalogOptions = SnapshotOptions(options);
             catalogOptions.Config.serverNames = [];
             catalogOptions.Config.routeThroughShadowsocks = false;
@@ -1035,6 +1064,9 @@ namespace Shadowsocks.Controller.Service
             int catalogPort = portAllocator();
             if (catalogPort is < 1 or > 65535)
                 throw new InvalidOperationException("DNSCrypt runtime port allocator returned an invalid port.");
+
+            await EnsureResolverCatalogCacheAsync(options, cancellationToken).ConfigureAwait(false);
+            SeedResolverSourceCache(validationDirectory);
 
             string catalogConfigPath = Path.Combine(validationDirectory, "dnscrypt-proxy.catalog.toml");
             string catalogToml = DnsCryptTomlGenerator.Generate(
@@ -1044,31 +1076,120 @@ namespace Shadowsocks.Controller.Service
             await File.WriteAllTextAsync(
                 catalogConfigPath, catalogToml, new UTF8Encoding(false), cancellationToken).ConfigureAwait(false);
 
-            DnsCryptCommandResult listResult = await platform.ExecuteAsync(
-                executablePath,
-                validationDirectory,
-                ["-list-all", "-json", "-config", catalogConfigPath],
-                ResolverListTimeout,
-                cancellationToken).ConfigureAwait(false);
+            DnsCryptCommandResult listResult;
+            try
+            {
+                listResult = await platform.ExecuteAsync(
+                    executablePath,
+                    validationDirectory,
+                    ["-list-all", "-json", "-config", catalogConfigPath],
+                    ResolverListTimeout,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new DnsCryptBootstrapException(
+                    "Prepared DNSCrypt could not refresh or load the signed resolver catalog.",
+                    exception);
+            }
             if (listResult.ExitCode != 0)
             {
                 LogCommandOutput("VALIDATE-LIST", listResult);
-                throw new InvalidOperationException(
+                throw new DnsCryptBootstrapException(
                     $"Prepared dnscrypt-proxy -list-all failed with exit code {listResult.ExitCode}: {listResult.StandardError?.Trim()}");
             }
 
-            IReadOnlyList<DnsCryptResolverInfo> resolvers = ParseResolverList(listResult.StandardOutput);
-            IReadOnlyList<string> selected = DnsCryptCountrySelector.SelectFallback(resolvers, options.Config);
+            IReadOnlyList<DnsCryptResolverInfo> resolvers;
+            try
+            {
+                resolvers = ParseResolverList(listResult.StandardOutput);
+            }
+            catch (InvalidDataException exception)
+            {
+                throw new DnsCryptBootstrapException(
+                    "Prepared DNSCrypt returned an invalid signed resolver catalog.",
+                    exception);
+            }
+            IReadOnlyList<string> selected = requestedNames.Length > 0
+                ? requestedNames
+                : DnsCryptCountrySelector.SelectFallback(resolvers, options.Config);
             if (selected.Count == 0)
             {
                 throw new InvalidOperationException(
                     "No DNSCrypt/DoH resolver in the signed catalog matches the selected automatic filters for prepared-runtime validation.");
             }
 
+            Dictionary<string, string> stamps = BuildStaticResolverStampMap(resolvers, selected);
             PersistResolverSourceCache(validationDirectory);
             DnsCryptRuntimeStartOptions resolved = SnapshotOptions(options);
             resolved.Config.serverNames = selected.ToList();
-            return resolved;
+            return resolved with { StaticResolverStamps = stamps };
+        }
+
+        private static bool HasStaticResolverStamps(
+            DnsCryptRuntimeStartOptions options,
+            string[] serverNames)
+        {
+            if (options.StaticResolverStamps is null)
+                return false;
+            return serverNames.All(name =>
+                options.StaticResolverStamps.TryGetValue(name, out string stamp)
+                && !string.IsNullOrWhiteSpace(stamp)
+                && stamp.StartsWith("sdns://", StringComparison.Ordinal));
+        }
+
+        internal static Dictionary<string, string> BuildStaticResolverStampMap(
+            IReadOnlyList<DnsCryptResolverInfo> resolvers,
+            IReadOnlyList<string> serverNames)
+        {
+            ArgumentNullException.ThrowIfNull(resolvers);
+            ArgumentNullException.ThrowIfNull(serverNames);
+            var byName = resolvers
+                .Where(resolver => resolver is not null && !string.IsNullOrWhiteSpace(resolver.Name))
+                .GroupBy(resolver => resolver.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string serverName in serverNames)
+            {
+                if (!byName.TryGetValue(serverName, out DnsCryptResolverInfo resolver)
+                    || string.IsNullOrWhiteSpace(resolver.Stamp)
+                    || !resolver.Stamp.StartsWith("sdns://", StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        $"The signed resolver catalog does not contain a usable stamp for '{serverName}'.");
+                }
+                result[serverName] = resolver.Stamp.Trim();
+            }
+            return result;
+        }
+
+
+        private async Task EnsureResolverCatalogCacheAsync(
+            DnsCryptRuntimeStartOptions options,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            if (ReferenceEquals(resolverCatalogBootstrapper, NoOpDnsCryptResolverCatalogBootstrapper.Instance))
+                return;
+            if (!options.ShadowsocksSocks5Port.HasValue
+                || options.ShadowsocksSocks5Port.Value is < 1 or > IPEndPoint.MaxPort)
+            {
+                throw new DnsCryptBootstrapException(
+                    "A working local Shadowsocks SOCKS5 endpoint is required to refresh the DNSCrypt resolver catalog through DoH.");
+            }
+
+            string host = string.IsNullOrWhiteSpace(options.ShadowsocksSocks5Host)
+                ? "127.0.0.1"
+                : options.ShadowsocksSocks5Host;
+            await resolverCatalogBootstrapper.EnsureFreshAsync(
+                runtimeDirectory,
+                host,
+                options.ShadowsocksSocks5Port.Value,
+                cancellationToken).ConfigureAwait(false);
         }
 
         private static DnsCryptRuntimeStartOptions SnapshotOptions(DnsCryptRuntimeStartOptions options)
@@ -1086,10 +1207,16 @@ namespace Shadowsocks.Controller.Service
                 ipv6Servers = source.ipv6Servers,
                 routeThroughShadowsocks = source.routeThroughShadowsocks,
                 automaticResolvers = source.automaticResolvers,
-                failClosed = true,
+                failClosed = source.failClosed,
                 serverNames = source.serverNames?.ToList() ?? [],
             };
-            return new DnsCryptRuntimeStartOptions(copy, options.ShadowsocksSocks5Port);
+            return new DnsCryptRuntimeStartOptions(copy, options.ShadowsocksSocks5Port)
+            {
+                ShadowsocksSocks5Host = options.ShadowsocksSocks5Host,
+                StaticResolverStamps = options.StaticResolverStamps is null
+                    ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(options.StaticResolverStamps, StringComparer.OrdinalIgnoreCase),
+            };
         }
 
         private void PersistResolverSourceCache(string sourceDirectory)
@@ -1099,23 +1226,47 @@ namespace Shadowsocks.Controller.Service
 
             try
             {
-                string source = Path.Combine(sourceDirectory, "public-resolvers.md");
-                if (!File.Exists(source))
-                    return;
-
-                Directory.CreateDirectory(runtimeDirectory);
-                string destination = Path.Combine(runtimeDirectory, "public-resolvers.md");
-                string temporary = destination + $".{Guid.NewGuid():N}.new";
-                File.Copy(source, temporary, overwrite: false);
-                File.Move(temporary, destination, overwrite: true);
+                // dnscrypt-proxy treats the resolver source as an authenticated pair. Persisting
+                // only the markdown file makes the offline catalog cache unusable; the catalog
+                // profile intentionally has no remote URLs or plaintext/system-DNS fallback.
+                PersistResolverSourceCacheFile(sourceDirectory, "public-resolvers.md");
+                PersistResolverSourceCacheFile(sourceDirectory, "public-resolvers.md.minisig");
             }
             catch (IOException exception)
             {
-                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not persist signed resolver cache for runtime reuse.");
+                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not persist signed resolver cache pair for runtime reuse.");
             }
             catch (UnauthorizedAccessException exception)
             {
-                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not persist signed resolver cache for runtime reuse.");
+                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not persist signed resolver cache pair for runtime reuse.");
+            }
+        }
+
+        private void PersistResolverSourceCacheFile(string sourceDirectory, string fileName)
+        {
+            string source = Path.Combine(sourceDirectory, fileName);
+            if (!File.Exists(source))
+                return;
+
+            Directory.CreateDirectory(runtimeDirectory);
+            string destination = Path.Combine(runtimeDirectory, fileName);
+            string temporary = destination + $".{Guid.NewGuid():N}.new";
+            try
+            {
+                File.Copy(source, temporary, overwrite: false);
+                File.Move(temporary, destination, overwrite: true);
+                File.SetLastWriteTimeUtc(destination, File.GetLastWriteTimeUtc(source));
+            }
+            finally
+            {
+                try
+                {
+                    if (File.Exists(temporary))
+                        File.Delete(temporary);
+                }
+                catch
+                {
+                }
             }
         }
 
@@ -1126,21 +1277,31 @@ namespace Shadowsocks.Controller.Service
 
             try
             {
-                string source = Path.Combine(runtimeDirectory, "public-resolvers.md");
-                if (!File.Exists(source))
-                    return;
+                SeedResolverSourceCacheFile(destinationDirectory, "public-resolvers.md");
+                SeedResolverSourceCacheFile(destinationDirectory, "public-resolvers.md.minisig");
+            }
+            catch (IOException exception)
+            {
+                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not seed signed resolver cache pair.");
+            }
+            catch (UnauthorizedAccessException exception)
+            {
+                Logger.Debug(exception, "DNSCryptProxy | LIST | Could not seed signed resolver cache pair.");
+            }
+        }
 
-                string destination = Path.Combine(destinationDirectory, "public-resolvers.md");
-                if (!File.Exists(destination))
-                    File.Copy(source, destination, overwrite: false);
-            }
-            catch (IOException)
-            {
-                // Cache reuse is an optimization only. dnscrypt-proxy can refresh its signed source.
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
+        private void SeedResolverSourceCacheFile(string destinationDirectory, string fileName)
+        {
+            string source = Path.Combine(runtimeDirectory, fileName);
+            if (!File.Exists(source))
+                return;
+
+            string destination = Path.Combine(destinationDirectory, fileName);
+            if (File.Exists(destination))
+                return;
+
+            File.Copy(source, destination, overwrite: false);
+            File.SetLastWriteTimeUtc(destination, File.GetLastWriteTimeUtc(source));
         }
 
         private string GetConfigPath() => Path.Combine(runtimeDirectory, "dnscrypt-proxy.toml");
@@ -1182,6 +1343,7 @@ namespace Shadowsocks.Controller.Service
             public string Description { get; set; }
             public string[] Addrs { get; set; }
             public int[] Ports { get; set; }
+            public string Stamp { get; set; }
         }
     }
 }

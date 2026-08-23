@@ -77,7 +77,7 @@ public sealed class OverviewPage : Page, IRefreshablePage
         _serverValue.Text = server?.IsConfigured == true ? server.ToString() : _context.L("Not configured");
         _statusValue.Text = controller.IsProxyListenerRunning ? _context.L("Running") : _context.L("Stopped");
         _modeValue.Text = _context.L(controller.GetTrafficRuntimeMode().ToString());
-        _proxyValue.Text = configuration.enabled
+        _proxyValue.Text = configuration.Enabled
             ? configuration.global ? _context.L("Enabled · Global") : _context.L("Enabled · PAC")
             : _context.L("Disabled");
     }

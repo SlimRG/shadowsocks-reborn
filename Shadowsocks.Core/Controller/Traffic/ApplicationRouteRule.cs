@@ -1,12 +1,18 @@
 ﻿using System;
+using Newtonsoft.Json;
 
 namespace Shadowsocks.Controller.Traffic
 {
     [Serializable]
     public sealed class ApplicationRouteRule
     {
-        public bool enabled = true;
-        public string application = string.Empty;
-        public TrafficRouteAction action = TrafficRouteAction.Proxy;
+        [JsonProperty("enabled")]
+        public bool Enabled { get; set; } = true;
+
+        [JsonProperty("application")]
+        public string Application { get; set; } = string.Empty;
+
+        [JsonProperty("action")]
+        public TrafficRouteAction Action { get; set; } = TrafficRouteAction.Proxy;
     }
 }

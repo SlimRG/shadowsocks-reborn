@@ -13,7 +13,7 @@ using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller
 {
-    public partial class ShadowsocksController
+    public sealed partial class ShadowsocksController
     {
 
 
@@ -160,7 +160,7 @@ namespace Shadowsocks.Controller
             bool activated = false;
             try
             {
-                prepared = await _dnsCryptComponentManager.PrepareLatestAsync(progress, cancellationToken).ConfigureAwait(false);
+                prepared = await _dnsCryptComponentManager.PrepareLatestAsync(progress, cancellationToken: cancellationToken).ConfigureAwait(false);
                 progress?.Report(new DnsCryptComponentProgress(DnsCryptComponentStage.ValidatingRuntime));
                 await _dnsCryptRuntimeManager.ValidatePreparedAsync(
                     prepared, CreateDnsCryptRuntimeOptions(_config.dnsPolicy?.dnsCrypt), cancellationToken).ConfigureAwait(false);
@@ -182,8 +182,9 @@ namespace Shadowsocks.Controller
                 DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
                 return GetDnsCryptManagementStatus();
             }
-            catch
+            catch (Exception exception)
             {
+                logger.Error(exception, "DNSCrypt Proxy installation failed.");
                 if (activation is not null && !activation.Completed)
                 {
                     try
@@ -261,7 +262,7 @@ namespace Shadowsocks.Controller
                 // This avoids a second GitHub "latest" request changing underneath the
                 // transaction and keeps automatic checks to their 24-hour cadence.
                 prepared = await _dnsCryptComponentManager
-                    .PrepareReleaseAsync(release, progress, cancellationToken)
+                    .PrepareReleaseAsync(release, progress, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
                 progress?.Report(new DnsCryptComponentProgress(DnsCryptComponentStage.ValidatingRuntime));
                 await _dnsCryptRuntimeManager.ValidatePreparedAsync(prepared, options, cancellationToken).ConfigureAwait(false);
@@ -287,8 +288,9 @@ namespace Shadowsocks.Controller
                 DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
                 return GetDnsCryptManagementStatus();
             }
-            catch
+            catch (Exception exception)
             {
+                logger.Error(exception, "DNSCrypt Proxy update failed.");
                 bool componentRolledBack = false;
                 if (activation is not null && !activation.Completed)
                 {
@@ -395,7 +397,7 @@ namespace Shadowsocks.Controller
                 // Keep the active runtime serving DNS while the replacement is downloaded and
                 // validated on its isolated loopback port. Downtime begins only at activation.
                 prepared = await _dnsCryptComponentManager.PrepareLatestAsync(
-                    progress, cancellationToken, forceDownload: true).ConfigureAwait(false);
+                    progress, forceDownload: true, cancellationToken: cancellationToken).ConfigureAwait(false);
                 progress?.Report(new DnsCryptComponentProgress(DnsCryptComponentStage.ValidatingRuntime));
                 await _dnsCryptRuntimeManager.ValidatePreparedAsync(prepared, options, cancellationToken).ConfigureAwait(false);
 
@@ -419,8 +421,9 @@ namespace Shadowsocks.Controller
                 DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
                 return GetDnsCryptManagementStatus();
             }
-            catch
+            catch (Exception exception)
             {
+                logger.Error(exception, "DNSCrypt Proxy reinstall failed.");
                 bool componentRolledBack = false;
                 if (activation is not null && !activation.Completed)
                 {
@@ -484,8 +487,23 @@ namespace Shadowsocks.Controller
             }
         }
 
+        private void EnsureConfiguredServerForDnsPolicy()
+        {
+            if (!_config.HasConfiguredServer)
+            {
+                throw new InvalidOperationException(
+                    "A configured Shadowsocks server is required before enabling a non-system DNS policy.");
+            }
+        }
+
         public Task SetDnsPolicyAsync(DnsPolicyMode mode, CancellationToken cancellationToken = default)
         {
+            if (mode != DnsPolicyMode.System && !_config.HasConfiguredServer)
+            {
+                return Task.FromException(new InvalidOperationException(
+                    "A configured Shadowsocks server is required before enabling a non-system DNS policy."));
+            }
+
             return _dnsCryptCoordinator.ExecuteExclusiveAsync(
                 "Set DNS policy",
                 token => SetDnsPolicyCoreAsync(mode, token),
@@ -507,28 +525,31 @@ namespace Shadowsocks.Controller
                     if (!component.IsInstalled)
                         throw new InvalidOperationException("DNSCrypt Proxy is not installed.");
 
-                    // Arm a fail-closed capture policy BEFORE starting/recovering DNSCrypt.
-                    // Previously the old System/Direct policy remained active while startup
-                    // took several seconds, creating a real plaintext DNS leak window.
-                    _config.dnsPolicy.dnsCrypt.failClosed = true;
-                    _config.dnsPolicy.mode = DnsPolicyMode.DnsCrypt;
-                    _trafficPolicyEngine.UpdateConfiguration(_config);
-                    if (_config.trafficCaptureMode == TrafficCaptureMode.Admin
-                        && !_dnsCryptRuntimeManager.GetStatus().IsServing)
+                    // Resolve and pin the signed resolver catalog while the previous DNS policy
+                    // is still active. Catalog maintenance resolves source hosts with Cloudflare DoH
+                    // over the local Shadowsocks tunnel and falls back to Google DoH. It must finish
+                    // before DNSCrypt fail-closed capture is armed. The active runtime itself receives
+                    // only local [static.*] stamps and performs no source refresh or plaintext DNS.
+                    DnsCryptRuntimeStartOptions startupOptions = null;
+                    if (!_dnsCryptRuntimeManager.GetStatus().IsServing)
                     {
-                        await ApplyTrafficCaptureConfigurationCoreAsync(
-                            _config,
-                            cancellationToken,
-                            ensureDnsRuntime: false).ConfigureAwait(false);
+                        startupOptions = await CreateDnsCryptRuntimeOptionsForStartAsync(
+                            _config.dnsPolicy.dnsCrypt, cancellationToken).ConfigureAwait(false);
                     }
 
+                    // Start and health-check the pinned runtime while the previous DNS policy is
+                    // still active. Only after it is serving do we arm DNSCrypt fail-closed capture.
+                    // This avoids both bootstrap deadlocks and an unnecessary DNS outage during start.
                     if (!_dnsCryptRuntimeManager.GetStatus().IsServing)
                     {
                         Interlocked.Increment(ref _suppressDnsCaptureRefresh);
                         try
                         {
-                            await StartDnsCryptWithResolvedResolversAsync(
-                                _config.dnsPolicy.dnsCrypt, cancellationToken).ConfigureAwait(false);
+                            await _dnsCryptRuntimeManager.StartAsync(
+                                startupOptions ?? throw new InvalidOperationException("DNSCrypt startup options were not prepared."),
+                                cancellationToken).ConfigureAwait(false);
+                            if (_config.dnsPolicy.dnsCrypt.automaticResolvers)
+                                RememberAutomaticDnsCryptRuntimeResolver();
                             startedForNewPolicy = true;
                         }
                         finally
@@ -539,8 +560,6 @@ namespace Shadowsocks.Controller
                 }
 
                 _config.dnsPolicy.mode = mode;
-                if (mode == DnsPolicyMode.DnsCrypt)
-                    _config.dnsPolicy.dnsCrypt.failClosed = true;
                 _trafficPolicyEngine.UpdateConfiguration(_config);
                 Configuration.Save(_config);
 
@@ -548,8 +567,8 @@ namespace Shadowsocks.Controller
                 // Leaving DNSCrypt: Admin redirect is disabled before the runtime stops.
                 await ApplyTrafficCaptureConfigurationCoreAsync(
                     _config,
-                    cancellationToken,
-                    ensureDnsRuntime: false).ConfigureAwait(false);
+                    ensureDnsRuntime: false,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
                 await StopDnsCryptRuntimeWhenNotRequiredAsync(cancellationToken).ConfigureAwait(false);
 
 
@@ -565,8 +584,8 @@ namespace Shadowsocks.Controller
                 {
                     await ApplyTrafficCaptureConfigurationCoreAsync(
                         _config,
-                        CancellationToken.None,
-                        ensureDnsRuntime: false).ConfigureAwait(false);
+                        ensureDnsRuntime: false,
+                        cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 }
                 catch (Exception restoreException)
                 {
@@ -601,6 +620,7 @@ namespace Shadowsocks.Controller
             bool routeThroughShadowsocks,
             CancellationToken cancellationToken = default)
         {
+            EnsureConfiguredServerForDnsPolicy();
             string primary = NormalizeDirectDnsServer(primaryServerAddress, nameof(primaryServerAddress));
             string fallback = NormalizeDirectDnsServer(fallbackServerAddress, nameof(fallbackServerAddress));
             if (primary.Length == 0 && fallback.Length > 0)
@@ -662,6 +682,7 @@ namespace Shadowsocks.Controller
             bool routeThroughShadowsocks,
             CancellationToken cancellationToken = default)
         {
+            EnsureConfiguredServerForDnsPolicy();
             if (!Uri.TryCreate(url?.Trim(), UriKind.Absolute, out Uri uri)
                 || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             {
@@ -716,20 +737,8 @@ namespace Shadowsocks.Controller
             // prevents persisting a configuration that can only fail when Admin Mode is enabled.
             DnsCryptBootstrapPolicy.Validate(_config, next);
 
-            // Manual mode already has a concrete resolver set and can be validated immediately.
-            // Automatic mode intentionally persists an empty serverNames list and is resolved
-            // against the signed catalog before any runtime TOML is generated.
-            if (!next.automaticResolvers)
-            {
-                _ = DnsCryptTomlGenerator.Generate(
-                    5300,
-                    next,
-                    next.routeThroughShadowsocks ? _config.localPort : null);
-            }
-            else if (!next.ipv4Servers && !next.ipv6Servers)
-            {
+            if (!next.ipv4Servers && !next.ipv6Servers)
                 throw new ArgumentException("At least one DNSCrypt address family must be enabled.", nameof(config));
-            }
 
             _config.dnsPolicy ??= new DnsPolicyConfig();
             DnsCryptConfig previous = CloneDnsCryptConfig(_config.dnsPolicy.dnsCrypt ?? new DnsCryptConfig());
@@ -803,8 +812,8 @@ namespace Shadowsocks.Controller
             {
                 await ApplyTrafficCaptureConfigurationCoreAsync(
                     _config,
-                    cancellationToken,
-                    ensureDnsRuntime: false).ConfigureAwait(false);
+                    ensureDnsRuntime: false,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             ConfigChanged?.Invoke(this, EventArgs.Empty);
             DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
@@ -867,9 +876,10 @@ namespace Shadowsocks.Controller
 
         private bool IsDnsCryptRuntimeRequired()
         {
-            return ShouldRunDnsCryptRuntime(
-                _config.trafficCaptureMode,
-                _config.dnsPolicy?.mode ?? DnsPolicyMode.System);
+            return _config.HasConfiguredServer
+                && ShouldRunDnsCryptRuntime(
+                    _config.trafficCaptureMode,
+                    _config.dnsPolicy?.mode ?? DnsPolicyMode.System);
         }
 
         internal static bool ShouldRunDnsCryptRuntime(
@@ -904,19 +914,22 @@ namespace Shadowsocks.Controller
                     .GetAwaiter()
                     .GetResult();
                 IPAddress address = resolved.FirstOrDefault(candidate => candidate.AddressFamily == AddressFamily.InterNetwork)
-                    ?? resolved.First();
+                    ?? (resolved.Count > 0
+                        ? resolved[0]
+                        : throw new SocketException((int)SocketError.HostNotFound));
                 return new IPEndPoint(address, port);
             }
 
             IPAddress[] systemAddresses = Dns.GetHostAddresses(normalizedHost);
             IPAddress selected = systemAddresses.FirstOrDefault(candidate => candidate.AddressFamily == AddressFamily.InterNetwork)
-                ?? systemAddresses.FirstOrDefault()
-                ?? throw new SocketException((int)SocketError.HostNotFound);
+                ?? (systemAddresses.Length > 0
+                    ? systemAddresses[0]
+                    : throw new SocketException((int)SocketError.HostNotFound));
             return new IPEndPoint(selected, port);
         }
 
 #nullable enable
-        public Task<IpCountryInfo?> GetServerCountryAsync(Server server, CancellationToken cancellationToken = default)
+        public static Task<IpCountryInfo?> GetServerCountryAsync(Server server, CancellationToken cancellationToken = default)
         {
             if (server is null || string.IsNullOrWhiteSpace(server.server))
                 return Task.FromResult<IpCountryInfo?>(null);
@@ -951,7 +964,10 @@ namespace Shadowsocks.Controller
             bool adminInterception = traffic.RuntimeMode == TrafficRuntimeMode.Admin
                 && traffic.WinDivertActive
                 && traffic.DnsInterceptionActive;
-            bool plaintextFallbackBlocked = config.failClosed;
+            // Administrator-mode DNSCrypt interception is an effective fail-closed
+            // security invariant even when an older persisted preference contains false.
+            bool plaintextFallbackBlocked = (_config.dnsPolicy?.mode ?? DnsPolicyMode.System) == DnsPolicyMode.DnsCrypt
+                || config.failClosed;
 
             bool bootstrapDisabled = false;
             bool systemDnsIgnored = false;
@@ -960,12 +976,15 @@ namespace Shadowsocks.Controller
                 && File.Exists(management.Runtime.ConfigPath))
             {
                 string toml = await File.ReadAllTextAsync(management.Runtime.ConfigPath, cancellationToken).ConfigureAwait(false);
-                bootstrapDisabled = !DnsCryptTomlGenerator.RuntimeUsesPlaintextBootstrap(toml);
+                bootstrapDisabled = !DnsCryptTomlGenerator.RuntimeUsesPlaintextBootstrap(toml)
+                    && !toml.Contains("[sources.public-resolvers]", StringComparison.Ordinal);
                 systemDnsIgnored = toml.Contains("ignore_system_dns = true", StringComparison.Ordinal);
                 if (config.automaticResolvers)
                 {
                     automaticResolverPinned = toml.Contains("server_names = [", StringComparison.Ordinal)
-                        && toml.Contains("[sources.public-resolvers]", StringComparison.Ordinal)
+                        && toml.Contains("[static.'", StringComparison.Ordinal)
+                        && toml.Contains("stamp = 'sdns://", StringComparison.Ordinal)
+                        && !toml.Contains("[sources.public-resolvers]", StringComparison.Ordinal)
                         && !toml.Contains("9.9.9.11:53", StringComparison.Ordinal)
                         && !toml.Contains("8.8.8.8:53", StringComparison.Ordinal);
                 }
@@ -997,7 +1016,7 @@ namespace Shadowsocks.Controller
             if (!plaintextFallbackBlocked)
                 failures.Add("Plaintext DNS fallback is not blocked.");
             if (!bootstrapDisabled)
-                failures.Add("The active DNS runtime still permits plaintext bootstrap DNS.");
+                failures.Add("The active DNS runtime still permits plaintext bootstrap DNS or remote resolver-source refresh.");
             if (!systemDnsIgnored)
                 failures.Add("The active DNS runtime does not ignore system DNS.");
             if (!automaticResolverPinned)
@@ -1041,21 +1060,38 @@ namespace Shadowsocks.Controller
         private async Task<IReadOnlyList<DnsCryptResolverInfo>> GetAndCacheDnsCryptResolversAsync(
             DnsCryptConfig config, CancellationToken cancellationToken)
         {
-            if (_dnsCryptResolverCatalog.Count > 0
+            if (_dnsCryptResolverCatalog.Length > 0
                 && DateTimeOffset.UtcNow - _dnsCryptResolverCatalogLoadedUtc < TimeSpan.FromHours(6))
                 return _dnsCryptResolverCatalog;
 
-            IReadOnlyList<DnsCryptResolverInfo> resolvers = await _dnsCryptRuntimeManager
-                .ListResolversAsync(CreateDnsCryptRuntimeOptions(config), cancellationToken)
-                .ConfigureAwait(false);
+            IReadOnlyList<DnsCryptResolverInfo> resolvers;
+            try
+            {
+                resolvers = await _dnsCryptRuntimeManager
+                    .ListResolversAsync(CreateDnsCryptRuntimeOptions(config), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.Warn(exception, "DNSCrypt signed resolver catalog could not be refreshed or loaded.");
+                throw new DnsCryptBootstrapException(
+                    "DNSCrypt could not refresh or load the signed resolver catalog.",
+                    exception);
+            }
             resolvers = await EnrichResolverCountriesAsync(resolvers, cancellationToken).ConfigureAwait(false);
             IReadOnlyDictionary<string, int> runtimeLatencies = _dnsCryptRuntimeManager.GetResolverLatencies();
-            resolvers = resolvers.Select(resolver => runtimeLatencies.TryGetValue(resolver.Name, out int latencyMs)
-                ? resolver with { LatencyMs = latencyMs }
-                : resolver).ToArray();
-            _dnsCryptResolverCatalog = resolvers;
+            DnsCryptResolverInfo[] enrichedResolvers = resolvers
+                .Select(resolver => runtimeLatencies.TryGetValue(resolver.Name, out int latencyMs)
+                    ? resolver with { LatencyMs = latencyMs }
+                    : resolver)
+                .ToArray();
+            _dnsCryptResolverCatalog = enrichedResolvers;
             _dnsCryptResolverCatalogLoadedUtc = DateTimeOffset.UtcNow;
-            return resolvers;
+            return enrichedResolvers;
         }
 
         private async Task<IReadOnlyList<DnsCryptResolverInfo>> EnrichResolverCountriesAsync(
@@ -1071,6 +1107,7 @@ namespace Shadowsocks.Controller
             // authoritative geography and Anycast is not a country.
             var resolverIps = new Dictionary<string, IReadOnlyList<System.Net.IPAddress>>(StringComparer.OrdinalIgnoreCase);
             var allIps = new List<System.Net.IPAddress>();
+            using var catalogDohResolver = new ShadowsocksDohResolver(_config.LocalHost, _config.localPort);
 
             foreach (DnsCryptResolverInfo resolver in resolvers)
             {
@@ -1101,8 +1138,9 @@ namespace Shadowsocks.Controller
                     {
                         try
                         {
-                            System.Net.IPAddress[] resolved = await System.Net.Dns.GetHostAddressesAsync(host)
-                                .WaitAsync(cancellationToken).ConfigureAwait(false);
+                            System.Net.IPAddress[] resolved = await catalogDohResolver
+                                .ResolveAsync(host, cancellationToken)
+                                .ConfigureAwait(false);
                             resolvedHostAddresses.AddRange(resolved.Where(IpCountryService.IsPublicAddress));
                         }
                         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
@@ -1164,12 +1202,13 @@ namespace Shadowsocks.Controller
             DnsCryptConfig config, CancellationToken cancellationToken)
         {
             DnsCryptConfig snapshot = CloneDnsCryptConfig(config ?? new DnsCryptConfig());
+            IReadOnlyList<DnsCryptResolverInfo> catalog;
             if (snapshot.automaticResolvers)
             {
                 var listingConfig = CloneDnsCryptConfig(snapshot);
                 listingConfig.serverNames = [];
                 listingConfig.routeThroughShadowsocks = false;
-                IReadOnlyList<DnsCryptResolverInfo> catalog = await GetAndCacheDnsCryptResolversAsync(
+                catalog = await GetAndCacheDnsCryptResolversAsync(
                     listingConfig, cancellationToken).ConfigureAwait(false);
                 IReadOnlyList<IpCountryInfo> targetCountries = await GetDnsCryptTargetCountriesAsync(
                     cancellationToken).ConfigureAwait(false);
@@ -1214,12 +1253,23 @@ namespace Shadowsocks.Controller
                     Configuration.Save(_config);
                     DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
                 }
+
+                var listingConfig = CloneDnsCryptConfig(snapshot);
+                listingConfig.serverNames = [];
+                listingConfig.routeThroughShadowsocks = false;
+                catalog = await GetAndCacheDnsCryptResolversAsync(listingConfig, cancellationToken).ConfigureAwait(false);
             }
 
             if (snapshot.routeThroughShadowsocks)
                 DnsCryptBootstrapPolicy.Validate(_config, snapshot);
-            return new DnsCryptRuntimeStartOptions(
-                snapshot, snapshot.routeThroughShadowsocks ? _config.localPort : null);
+
+            Dictionary<string, string> stamps = DnsCryptRuntimeManager.BuildStaticResolverStampMap(
+                catalog, snapshot.serverNames);
+            return new DnsCryptRuntimeStartOptions(snapshot, _config.localPort)
+            {
+                ShadowsocksSocks5Host = _config.LocalHost,
+                StaticResolverStamps = stamps,
+            };
         }
 
         private async Task<IReadOnlyList<IpCountryInfo>> GetDnsCryptTargetCountriesAsync(CancellationToken cancellationToken)
@@ -1265,9 +1315,10 @@ namespace Shadowsocks.Controller
             DnsCryptConfig snapshot = CloneDnsCryptConfig(config ?? new DnsCryptConfig());
             if (snapshot.routeThroughShadowsocks)
                 DnsCryptBootstrapPolicy.Validate(_config, snapshot);
-            return new DnsCryptRuntimeStartOptions(
-                snapshot,
-                snapshot.routeThroughShadowsocks ? _config.localPort : null);
+            return new DnsCryptRuntimeStartOptions(snapshot, _config.localPort)
+            {
+                ShadowsocksSocks5Host = _config.LocalHost,
+            };
         }
 
         private async Task<DnsCryptConfig> SanitizeDnsCryptConfigForSupportedResolversAsync(
@@ -1364,7 +1415,7 @@ namespace Shadowsocks.Controller
                 ipv6Servers = source.ipv6Servers,
                 routeThroughShadowsocks = source.routeThroughShadowsocks,
                 automaticResolvers = source.automaticResolvers,
-                failClosed = true,
+                failClosed = source.failClosed,
                 serverNames = source.serverNames?
                     .Where(name => !string.IsNullOrWhiteSpace(name))
                     .Select(name => name.Trim())

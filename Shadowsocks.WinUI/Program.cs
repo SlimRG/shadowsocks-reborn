@@ -26,6 +26,7 @@ internal static partial class Program
     private static Action<AppActivationArguments>? _activationHandler;
     private static ILocalizationService? _localization;
     private static ProcessSingleInstanceGuard? _processInstanceGuard;
+    private static App? _application;
 
     [STAThread]
     public static int Main()
@@ -81,12 +82,14 @@ internal static partial class Program
             {
                 var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
                 SynchronizationContext.SetSynchronizationContext(context);
-                new App();
+                _application = new App();
             });
             return 0;
         }
         finally
         {
+            _application?.Dispose();
+            _application = null;
             _processInstanceGuard?.Dispose();
             _processInstanceGuard = null;
         }
@@ -159,7 +162,8 @@ internal static partial class Program
 
         string arguments = launchArguments.Arguments?.Trim() ?? string.Empty;
         return !arguments.Contains("--open-url", StringComparison.OrdinalIgnoreCase)
-            && !arguments.Contains("--start-hidden", StringComparison.OrdinalIgnoreCase)
+            && !arguments.Contains(AutoStartup.StartupHiddenOption, StringComparison.OrdinalIgnoreCase)
+            && !arguments.Contains(AutoStartup.StartupVisibleOption, StringComparison.OrdinalIgnoreCase)
             && !arguments.Contains(AutoStartup.StartupOriginOption, StringComparison.OrdinalIgnoreCase);
     }
 

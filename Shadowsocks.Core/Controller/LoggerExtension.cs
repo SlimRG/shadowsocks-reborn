@@ -1,5 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -12,12 +13,19 @@ namespace NLog
         {
             if (logger.IsTraceEnabled)
             {
-                var sb = new StringBuilder($"{Environment.NewLine}{tag}: ");
+                ArgumentNullException.ThrowIfNull(arr);
+                if ((uint)length > (uint)arr.Length || length <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(length));
+                }
+
+                var sb = new StringBuilder();
+                sb.Append(CultureInfo.InvariantCulture, $"{Environment.NewLine}{tag}: ");
                 for (int i = 0; i < length - 1; i++)
                 {
-                    sb.Append($"0x{arr[i]:X2}, ");
+                    sb.Append(CultureInfo.InvariantCulture, $"0x{arr[i]:X2}, ");
                 }
-                sb.Append($"0x{arr[length - 1]:X2}");
+                sb.Append(CultureInfo.InvariantCulture, $"0x{arr[length - 1]:X2}");
                 sb.Append(Environment.NewLine);
                 logger.Trace(sb.ToString());
             }

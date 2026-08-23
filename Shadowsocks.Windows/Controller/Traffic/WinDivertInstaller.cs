@@ -17,7 +17,7 @@ namespace Shadowsocks.Controller.Traffic
     /// Downloads the official WinDivert runtime only when Admin Mode is requested.
     /// The driver is not embedded in Shadowsocks and is not touched by User Mode.
     /// </summary>
-    internal sealed class WinDivertInstaller
+    internal sealed class WinDivertInstaller : IDisposable
     {
         public const string Version = "2.2.2";
         public const string PackageUrl = "https://github.com/basil00/WinDivert/releases/download/v2.2.2/WinDivert-2.2.2-A.zip";
@@ -30,9 +30,11 @@ namespace Shadowsocks.Controller.Traffic
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly SemaphoreSlim _installLock = new(1, 1);
+        private bool _disposed;
 
         public async Task<string> EnsureInstalledAsync(Configuration configuration, CancellationToken cancellationToken)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentNullException.ThrowIfNull(configuration);
 
             string installDirectory = GetInstallDirectory(configuration);
@@ -315,5 +317,17 @@ namespace Shadowsocks.Controller.Traffic
                 Logger.Warn(exception, "Unable to clear the invalid WinDivert runtime directory before reinstalling.");
             }
         }
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _installLock.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
     }
 }

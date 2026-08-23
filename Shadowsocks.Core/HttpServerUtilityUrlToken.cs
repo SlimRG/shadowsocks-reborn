@@ -11,7 +11,7 @@ namespace Shadowsocks
     {
         public static string Encode(byte[] bytes)
         {
-            if (bytes == null) throw new ArgumentNullException(nameof(bytes));
+            ArgumentNullException.ThrowIfNull(bytes);
             if (bytes.Length == 0) return string.Empty;
 
             string base64 = Convert.ToBase64String(bytes);
@@ -30,7 +30,7 @@ namespace Shadowsocks
 
         public static byte[] Decode(string input)
         {
-            if (input == null) throw new ArgumentNullException(nameof(input));
+            ArgumentNullException.ThrowIfNull(input);
             if (input.Length == 0) return Array.Empty<byte>();
 
             int padding = input[input.Length - 1] - '0';

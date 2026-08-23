@@ -1,4 +1,6 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using System;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 using Shadowsocks.Model;
 
 namespace Shadowsocks.UnitTests
@@ -14,7 +16,7 @@ namespace Shadowsocks.UnitTests
             var expected = new Server
             {
                 server = "192.168.100.1",
-                server_port = 8888,
+                ServerPort = 8888,
                 password = "test",
                 method = Server.DefaultMethod,
                 remarks = "example-server 1",
@@ -34,11 +36,11 @@ namespace Shadowsocks.UnitTests
             var expected = new Server
             {
                 server = "192.168.1.1",
-                server_port = 8388,
+                ServerPort = 8388,
                 password = "test",
                 method = Server.DefaultMethod,
                 plugin = "v2ray-plugin",
-                plugin_opts = "mode=websocket;host=example.com",
+                PluginOptions = "mode=websocket;host=example.com",
             };
 
             string url = $"ss://{BaseUserInfo}@192.168.1.1:8388/?plugin=v2ray-plugin%3bmode%3dwebsocket%3bhost%3dexample.com";
@@ -46,6 +48,32 @@ namespace Shadowsocks.UnitTests
 
             AssertServerEquals(expected, actual);
             Assert.AreEqual(url, actual.GetURL());
+        }
+
+
+        [TestMethod]
+        public void ServerUsesStableJsonPropertyNames()
+        {
+            Server server = new()
+            {
+                ServerPort = 8388,
+                PluginOptions = "mode=websocket",
+                PluginArguments = "--fast-open",
+            };
+
+            string json = JsonConvert.SerializeObject(server);
+            Server roundTrip = JsonConvert.DeserializeObject<Server>(json);
+
+            StringAssert.Contains(json, "\"server_port\":8388");
+            StringAssert.Contains(json, "\"plugin_opts\":\"mode=websocket\"");
+            StringAssert.Contains(json, "\"plugin_args\":\"--fast-open\"");
+            Assert.IsFalse(json.Contains("\"ServerPort\"", StringComparison.Ordinal));
+            Assert.IsFalse(json.Contains("\"PluginOptions\"", StringComparison.Ordinal));
+            Assert.IsFalse(json.Contains("\"PluginArguments\"", StringComparison.Ordinal));
+            Assert.IsNotNull(roundTrip);
+            Assert.AreEqual(8388, roundTrip.ServerPort);
+            Assert.AreEqual("mode=websocket", roundTrip.PluginOptions);
+            Assert.AreEqual("--fast-open", roundTrip.PluginArguments);
         }
 
         [TestMethod]
@@ -71,11 +99,11 @@ namespace Shadowsocks.UnitTests
         {
             Assert.IsNotNull(actual);
             Assert.AreEqual(expected.server, actual.server);
-            Assert.AreEqual(expected.server_port, actual.server_port);
+            Assert.AreEqual(expected.ServerPort, actual.ServerPort);
             Assert.AreEqual(expected.password, actual.password);
             Assert.AreEqual(expected.method, actual.method);
             Assert.AreEqual(expected.plugin, actual.plugin);
-            Assert.AreEqual(expected.plugin_opts, actual.plugin_opts);
+            Assert.AreEqual(expected.PluginOptions, actual.PluginOptions);
             Assert.AreEqual(expected.remarks, actual.remarks);
         }
     }

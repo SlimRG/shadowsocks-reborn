@@ -31,7 +31,8 @@ namespace Shadowsocks.Controller.Traffic
                 string runDirectory,
                 bool deleteOnDispose)
             {
-                Path = path ?? throw new ArgumentNullException(nameof(path));
+                ArgumentNullException.ThrowIfNull(path);
+                Path = path;
                 ExpectedSha256 = expectedSha256 ?? string.Empty;
                 this.guardStream = guardStream;
                 this.runDirectory = runDirectory;

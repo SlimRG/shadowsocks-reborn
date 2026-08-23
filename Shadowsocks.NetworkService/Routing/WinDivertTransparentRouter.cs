@@ -28,7 +28,7 @@ internal sealed class WinDivertTransparentRouter : IAsyncDisposable
         WinDivertNative.ConfigureDirectory(request.WinDivertDirectory);
         ApplicationPolicy policy = new(request);
         _flows = new FlowRegistry(policy);
-        _tcpRelay = new TransparentTcpRelay(_flows, request.LocalProxyHost, request.LocalProxyPort);
+        _tcpRelay = new TransparentTcpRelay(_flows, request);
         _udpRelay = new TransparentUdpRelay(_flows, request.LocalProxyHost, request.LocalProxyPort);
         _dnsPolicy = request.DnsPolicy ?? new DnsPolicyDto();
 
@@ -74,6 +74,8 @@ internal sealed class WinDivertTransparentRouter : IAsyncDisposable
 
     public int TcpRedirectPort => _tcpRelay.Port;
     public int UdpRedirectPort => _udpRelay.Port;
+    public bool ManagedRoutingActive => _tcpRelay.ManagedRoutingActive;
+    public int ManagedRoutingRuleCount => _tcpRelay.ManagedRoutingRuleCount;
     public bool DnsInterceptionActive => _dnsPolicy.Mode switch
     {
         DnsPolicyMode.Direct => _dnsRelay is not null || _dnsPolicy.DirectDnsRouteThroughShadowsocks,
@@ -294,6 +296,7 @@ internal sealed class WinDivertTransparentRouter : IAsyncDisposable
                     case RouteAction.Block:
                         break;
                     case RouteAction.Proxy:
+                    case RouteAction.Deferred:
                         view.ReflectToLocal(proxyRedirectPort);
                         address.Outbound = false;
                         RecalculateChecksumsOrThrow(packetPtr, length, ref address);

@@ -1,10 +1,10 @@
 ﻿# Third-party notices
 
-This document records third-party software that is compiled into, linked by, derived into, or downloaded by Shadowsocks Reborn 2.2.31.
+This document records third-party software that is compiled into, linked by, derived into, or downloaded by Shadowsocks Reborn 5.2.31.
 
 The Shadowsocks Reborn application itself is licensed under **GPL-3.0-or-later**. Third-party components remain under their own licenses. A dependency listed here is not relicensed under the Shadowsocks Reborn license.
 
-> Russian note / Примечание: названия лицензий и юридические условия ниже сохраняются на языке оригинала. Русский интерфейс локализует название раздела, но не подменяет оригинальный текст лицензий неофициальным переводом.
+> UI localization note: the application displays a localized explanatory introduction for this document. License names, copyright notices, disclaimers and authoritative legal terms below remain in their original language so an unofficial translation cannot alter their meaning.
 
 ## Runtime components included in the application
 
@@ -91,14 +91,14 @@ All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the copyright notice, conditions and disclaimer in the source file are retained/reproduced as required by the BSD license. The complete original notice is preserved verbatim at the top of `ByteCircularBuffer.cs`.
 
-### Adblock Plus-derived PAC helper
+### Adblock Plus-derived network routing
 
-File: `Shadowsocks.Core/Data/abp.js`
-Origin: Adblock Plus / Eyeo GmbH
+File: `Shadowsocks.Core/Routing/FilterEngine.cs`
+Origin: Adblock Plus / Eyeo GmbH network-filter grammar and the historical Shadowsocks PAC adaptation
 License: GNU GPL version 3.
 Copyright (C) 2006-2014 Eyeo GmbH.
 
-The original GPL notice is preserved in the embedded source file. Shadowsocks Reborn is itself distributed under GPL-3.0-or-later.
+Shadowsocks Reborn reimplements the network-routing subset needed by Local PAC/GeoSite in managed C#. The historical bundled `abp.js` runtime, the compiled-PAC compatibility backend, and the executable custom `abp.txt` override are no longer distributed or supported. Local GeoSite/EasyList/ABP routing is authoritative in the C# `FilterEngine`; the Local PAC itself is only a minimal Windows proxy funnel. Online PAC is a separate user-selected external PAC feature.
 
 ## Optional runtime components downloaded on demand
 

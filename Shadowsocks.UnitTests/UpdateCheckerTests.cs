@@ -28,12 +28,79 @@ namespace Shadowsocks.UnitTests
             JToken selected = UpdateChecker.SelectLatestEligibleRelease(
                 releases,
                 configuration,
-                new Version(5, 2, 1, 0),
+                new Version(5, 2, 31, 0),
                 out Version version);
 
             Assert.IsNotNull(selected);
             Assert.AreEqual("v5.3.0", (string)selected["tag_name"]);
             Assert.AreEqual(new Version(5, 3, 0, 0), version);
+        }
+
+        [TestMethod]
+        public void OlderAndEqualReleasesAreNotEligibleForInstalledVersion()
+        {
+            JArray releases = JArray.Parse("""
+            [
+              { "tag_name": "v5.2.22", "prerelease": false, "draft": false },
+              { "tag_name": "v5.2.31", "prerelease": false, "draft": false }
+            ]
+            """);
+
+            JToken selected = UpdateChecker.SelectLatestEligibleRelease(
+                releases,
+                new Configuration(),
+                new Version(5, 2, 31, 0),
+                out Version version);
+
+            Assert.IsNull(selected);
+            Assert.IsNull(version);
+        }
+
+        [TestMethod]
+        public void OnlyStrictlyNewerReleaseCanUpdateInstalledVersion()
+        {
+            JArray releases = JArray.Parse("""
+            [
+              { "tag_name": "v5.2.22", "prerelease": false, "draft": false },
+              { "tag_name": "v5.2.31", "prerelease": false, "draft": false },
+              { "tag_name": "v5.2.32", "prerelease": false, "draft": false }
+            ]
+            """);
+
+            JToken selected = UpdateChecker.SelectLatestEligibleRelease(
+                releases,
+                new Configuration(),
+                new Version(5, 2, 31, 0),
+                out Version version);
+
+            Assert.IsNotNull(selected);
+            Assert.AreEqual("v5.2.32", (string)selected["tag_name"]);
+            Assert.AreEqual(new Version(5, 2, 32, 0), version);
+        }
+
+        [TestMethod]
+        public void NewerPrimaryExecutableWinsOverStaleStartupCopyVersion()
+        {
+            Version effective = UpdateChecker.SelectEffectiveInstalledVersion(
+                new Version(5, 2, 21, 0),
+                new Version(5, 2, 31, 0));
+
+            Assert.AreEqual(new Version(5, 2, 31, 0), effective);
+
+            JArray releases = JArray.Parse("""
+            [
+              { "tag_name": "v5.2.22", "prerelease": false, "draft": false }
+            ]
+            """);
+
+            JToken selected = UpdateChecker.SelectLatestEligibleRelease(
+                releases,
+                new Configuration(),
+                effective,
+                out Version version);
+
+            Assert.IsNull(selected);
+            Assert.IsNull(version);
         }
 
         [TestMethod]
@@ -50,7 +117,7 @@ namespace Shadowsocks.UnitTests
             JToken selected = UpdateChecker.SelectLatestEligibleRelease(
                 releases,
                 configuration,
-                new Version(5, 2, 1, 0),
+                new Version(5, 2, 31, 0),
                 out Version version);
 
             Assert.IsNotNull(selected);
@@ -78,11 +145,11 @@ namespace Shadowsocks.UnitTests
         public void ReleaseAssetOriginMustBeCanonicalRepository()
         {
             Assert.IsTrue(UpdateChecker.IsAllowedReleaseDownloadUrl(
-                "https://github.com/SlimRG/shadowsocks-reborn/releases/download/v5.2.2/Shadowsocks-win-x64.zip"));
+                "https://github.com/SlimRG/shadowsocks-reborn/releases/download/v5.2.32/Shadowsocks-win-x64.zip"));
             Assert.IsFalse(UpdateChecker.IsAllowedReleaseDownloadUrl(
-                "https://example.com/SlimRG/shadowsocks-reborn/releases/download/v5.2.2/Shadowsocks-win-x64.zip"));
+                "https://example.com/SlimRG/shadowsocks-reborn/releases/download/v5.2.32/Shadowsocks-win-x64.zip"));
             Assert.IsFalse(UpdateChecker.IsAllowedReleaseDownloadUrl(
-                "https://github.com/Other/repo/releases/download/v5.2.2/Shadowsocks-win-x64.zip"));
+                "https://github.com/Other/repo/releases/download/v5.2.32/Shadowsocks-win-x64.zip"));
         }
 
         [TestMethod]

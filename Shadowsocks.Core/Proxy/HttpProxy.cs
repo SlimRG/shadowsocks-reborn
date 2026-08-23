@@ -13,18 +13,10 @@ using Shadowsocks.Util.Sockets;
 
 namespace Shadowsocks.Proxy
 {
-    public class HttpProxy : IProxy
+    public sealed class HttpProxy : IProxy, IDisposable
     {
         private const int MaxProxyResponseHeaderBytes = 64 * 1024;
         private const string HttpCrlf = "\r\n";
-        private const string ProxyAuthTemplate = "Proxy-Authorization: Basic {0}" + HttpCrlf;
-        private const string HttpConnectTemplate =
-            "CONNECT {0} HTTP/1.1" + HttpCrlf +
-            "Host: {0}" + HttpCrlf +
-            "Proxy-Connection: keep-alive" + HttpCrlf +
-            "User-Agent: Shadowsocks-Reborn/{2}" + HttpCrlf +
-            "{1}" +
-            HttpCrlf;
 
         private static readonly Regex HttpStatusLineRegex = new(
             @"^HTTP/1\.[01] (?<status>\d{3})(?:\s|$)",
@@ -43,7 +35,8 @@ namespace Shadowsocks.Proxy
 
         public void BeginConnectProxy(EndPoint remoteEP, AsyncCallback callback, object state)
         {
-            ProxyEndPoint = remoteEP ?? throw new ArgumentNullException(nameof(remoteEP));
+            ArgumentNullException.ThrowIfNull(remoteEP);
+            ProxyEndPoint = remoteEP;
             _remote.BeginConnect(remoteEP, callback, state);
         }
 
@@ -55,7 +48,8 @@ namespace Shadowsocks.Proxy
 
         public void BeginConnectDest(EndPoint destEndPoint, AsyncCallback callback, object state, NetworkCredential auth = null)
         {
-            DestEndPoint = destEndPoint ?? throw new ArgumentNullException(nameof(destEndPoint));
+            ArgumentNullException.ThrowIfNull(destEndPoint);
+            DestEndPoint = destEndPoint;
             ClearPendingReceiveBuffer();
 
             var completion = new TaskCompletionSource<object>(state, TaskCreationOptions.RunContinuationsAsynchronously);
@@ -128,6 +122,12 @@ namespace Shadowsocks.Proxy
             _remote.Dispose();
         }
 
+        public void Dispose()
+        {
+            Close();
+            GC.SuppressFinalize(this);
+        }
+
         private async Task CompleteConnectDestAsync(
             EndPoint destination,
             NetworkCredential auth,
@@ -141,11 +141,16 @@ namespace Shadowsocks.Proxy
                 {
                     string authKey = Convert.ToBase64String(
                         Encoding.UTF8.GetBytes((auth.UserName ?? string.Empty) + ":" + (auth.Password ?? string.Empty)));
-                    authInfo = string.Format(ProxyAuthTemplate, authKey);
+                    authInfo = $"Proxy-Authorization: Basic {authKey}{HttpCrlf}";
                 }
 
-                byte[] request = Encoding.ASCII.GetBytes(
-                    string.Format(HttpConnectTemplate, authority, authInfo, ApplicationInfo.Version));
+                string requestText =
+                    $"CONNECT {authority} HTTP/1.1{HttpCrlf}" +
+                    $"Host: {authority}{HttpCrlf}" +
+                    $"Proxy-Connection: keep-alive{HttpCrlf}" +
+                    $"User-Agent: Shadowsocks-Reborn/{ApplicationInfo.Version}{HttpCrlf}" +
+                    authInfo + HttpCrlf;
+                byte[] request = Encoding.ASCII.GetBytes(requestText);
                 await SendAllAsync(request).ConfigureAwait(false);
                 await ReadProxyResponseAsync().ConfigureAwait(false);
                 completion.TrySetResult(null);
@@ -347,7 +352,7 @@ namespace Shadowsocks.Proxy
             return -1;
         }
 
-        private static Exception ProxyRequestFailed()
+        private static InvalidOperationException ProxyRequestFailed()
         {
             return new InvalidOperationException(I18N.GetString("Proxy request failed"));
         }

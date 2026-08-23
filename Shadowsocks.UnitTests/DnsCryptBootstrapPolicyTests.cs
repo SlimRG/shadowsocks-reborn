@@ -35,7 +35,7 @@ namespace Shadowsocks.UnitTests
         public void RoutedDnsCryptAcceptsIpv4AndIpv6ServerEndpoints()
         {
             Configuration configuration = CreateConfiguration("203.0.113.7");
-            configuration.configs.Add(new Server { server = "2001:db8::7", server_port = 8388 });
+            configuration.configs.Add(new Server { server = "2001:db8::7", ServerPort = 8388, password = "test" });
 
             DnsCryptBootstrapPolicy.Validate(configuration);
             Assert.AreEqual(0, DnsCryptBootstrapPolicy.GetUnsafeEndpoints(configuration).Count);
@@ -58,7 +58,7 @@ namespace Shadowsocks.UnitTests
         {
             Configuration configuration = new()
             {
-                configs = [new Server { server = serverHost, server_port = 8388 }],
+                configs = [new Server { server = serverHost, ServerPort = 8388, password = "test" }],
                 dnsPolicy = new DnsPolicyConfig
                 {
                     mode = DnsPolicyMode.DnsCrypt,

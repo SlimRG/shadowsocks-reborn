@@ -8,6 +8,7 @@ internal enum RouteAction
     Proxy = 1,
     Direct = 2,
     Block = 3,
+    Deferred = 4,
 }
 
 internal enum DnsPolicyMode
@@ -56,6 +57,15 @@ internal sealed class DnsPolicyDto
         && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 }
 
+
+internal sealed class ManagedRoutingDto
+{
+    public bool Enabled { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public List<string> DefaultRules { get; set; } = [];
+    public List<string> UserRules { get; set; } = [];
+}
+
 internal sealed class StartRequest
 {
     public string Command { get; set; } = "start";
@@ -66,6 +76,7 @@ internal sealed class StartRequest
     public RouteAction DefaultRoute { get; set; } = RouteAction.Direct;
     public List<ApplicationRuleDto> ApplicationRules { get; set; } = [];
     public List<int> ExcludedProcessIds { get; set; } = [];
+    public ManagedRoutingDto ManagedRouting { get; set; } = new();
     public DnsPolicyDto DnsPolicy { get; set; } = new();
 }
 
@@ -84,11 +95,14 @@ internal sealed class ServiceResponse
     public bool CaptureActive { get; set; }
     public bool DnsInterceptionActive { get; set; }
     public bool DnsFailClosedActive { get; set; }
+    public bool ManagedRoutingActive { get; set; }
+    public int ManagedRoutingRuleCount { get; set; }
     public bool DriverRemoved { get; set; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(StartRequest))]
+[JsonSerializable(typeof(ManagedRoutingDto))]
 [JsonSerializable(typeof(ControlRequest))]
 [JsonSerializable(typeof(ServiceResponse))]
 internal partial class NetworkServiceJsonContext : JsonSerializerContext

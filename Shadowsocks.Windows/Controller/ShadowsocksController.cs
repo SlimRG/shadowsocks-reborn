@@ -15,10 +15,11 @@ using Shadowsocks.Controller.Strategy;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Model;
 using Shadowsocks.Core;
+using Shadowsocks.Routing;
 
 namespace Shadowsocks.Controller
 {
-    public partial class ShadowsocksController
+    public sealed partial class ShadowsocksController : IDisposable
     {
         private readonly Logger logger;
         private readonly HttpClient httpClient;
@@ -27,7 +28,10 @@ namespace Shadowsocks.Controller
         // Application controller: coordinates configuration, proxy services and routing.
         // User-facing operations are delegated through IUserInteractionService.
         #region Members definition
-        private Thread _trafficThread;
+        private readonly object _trafficStatisticsSync = new();
+        private CancellationTokenSource _trafficStatisticsCancellation;
+        private Task _trafficStatisticsTask;
+        private Queue<TrafficPerSecond> _trafficPerSecondQueue;
 
         private Listener _listener;
         private PACDaemon _pacDaemon;
@@ -40,36 +44,38 @@ namespace Shadowsocks.Controller
         private readonly DnsCryptComponentManager _dnsCryptComponentManager;
         private readonly DnsCryptRuntimeManager _dnsCryptRuntimeManager;
         private readonly DnsCryptCoordinator _dnsCryptCoordinator;
-        private IReadOnlyList<DnsCryptResolverInfo> _dnsCryptResolverCatalog = Array.Empty<DnsCryptResolverInfo>();
-        private IReadOnlyList<string> _dnsCryptAutomaticServerNames = Array.Empty<string>();
+        private DnsCryptResolverInfo[] _dnsCryptResolverCatalog = Array.Empty<DnsCryptResolverInfo>();
+        private string[] _dnsCryptAutomaticServerNames = Array.Empty<string>();
         private DateTimeOffset _dnsCryptResolverCatalogLoadedUtc;
         private readonly SemaphoreSlim _dnsCaptureRefreshGate = new(1, 1);
+        private readonly SemaphoreSlim _managedRoutingCaptureRefreshGate = new(1, 1);
+        private int _managedRoutingCaptureRefreshPending;
+        private string _managedRoutingCaptureRefreshTrigger = string.Empty;
         private int _suppressDnsCaptureRefresh;
         private Version _latestDnsCryptVersion;
         private ManagedHttpProxyService _managedHttpProxy;
         private readonly ConcurrentDictionary<Server, Sip003Plugin> _pluginsByServer;
         private Exception _lastListenerError;
 
-        private long _inboundCounter = 0;
-        private long _outboundCounter = 0;
+        private long _inboundCounter;
+        private long _outboundCounter;
         public long InboundCounter => Interlocked.Read(ref _inboundCounter);
         public long OutboundCounter => Interlocked.Read(ref _outboundCounter);
-        public Queue<TrafficPerSecond> trafficPerSecondQueue;
-
-        private bool stopped = false;
+        private bool stopped;
+        private bool _disposed;
         private long _trafficConfigurationGeneration;
 
         public class PathEventArgs : EventArgs
         {
-            public string Path;
+            public string Path { get; set; }
         }
 
-        public class TrafficPerSecond
+        public sealed class TrafficPerSecond
         {
-            public long inboundCounter;
-            public long outboundCounter;
-            public long inboundIncreasement;
-            public long outboundIncreasement;
+            public long InboundCounter { get; init; }
+            public long OutboundCounter { get; init; }
+            public long InboundIncrement { get; init; }
+            public long OutboundIncrement { get; init; }
         }
 
         public event EventHandler ConfigChanged;
@@ -83,8 +89,6 @@ namespace Shadowsocks.Controller
         public event EventHandler TrafficModeChanged;
         public event EventHandler DnsCryptStatusChanged;
 
-        // when user clicked Edit PAC, and PAC file has already created
-        public event EventHandler<PathEventArgs> PACFileReadyToOpen;
         public event EventHandler<PathEventArgs> UserRuleFileReadyToOpen;
 
         public event EventHandler<GeositeResultEventArgs> UpdatePACFromGeositeCompleted;
@@ -95,9 +99,9 @@ namespace Shadowsocks.Controller
 
         #endregion
 
-        public ShadowsocksController(IUserInteractionService userInteraction = null)
+        public ShadowsocksController(IUserInteractionService userInterAction = null)
         {
-            this.userInteraction = userInteraction ?? NullUserInteractionService.Instance;
+            this.userInteraction = userInterAction ?? NullUserInteractionService.Instance;
             logger = LogManager.GetCurrentClassLogger();
             httpClient = new HttpClient();
             _config = Configuration.Load();
@@ -107,7 +111,9 @@ namespace Shadowsocks.Controller
             _adminCaptureManager = new AdminCaptureManager();
             _gameModeManager = new GameModeManager(_adminCaptureManager);
             _gameModeManager.StatusChanged += (_, _) => TrafficModeChanged?.Invoke(this, EventArgs.Empty);
-            _dnsCryptComponentManager = new DnsCryptComponentManager();
+            _dnsCryptComponentManager = new DnsCryptComponentManager(
+                () => _config.LocalHost,
+                () => _config.localPort);
             _dnsCryptRuntimeManager = new DnsCryptRuntimeManager(
                 _dnsCryptComponentManager,
                 () => _config?.showDnsLogs == true,
@@ -125,7 +131,7 @@ namespace Shadowsocks.Controller
                 RememberAutomaticDnsCryptRuntimeResolver();
                 DnsCryptStatusChanged?.Invoke(this, EventArgs.Empty);
             };
-            _pluginsByServer = new ConcurrentDictionary<Server, Sip003Plugin>();
+            _pluginsByServer = new ConcurrentDictionary<Server, Sip003Plugin>(ReferenceEqualityComparer.Instance);
             StartTrafficStatistics(61);
 
         }
@@ -147,7 +153,7 @@ namespace Shadowsocks.Controller
                 if (_config.regeneratePacOnUpdate)
                     try
                     {
-                        File.Delete(PACDaemon.PAC_FILE);
+                        File.Delete(PACDaemon.PacFile);
                         logger.Info("Deleted pac.txt from previous version.");
                     }
                     catch (Exception e)
@@ -161,6 +167,7 @@ namespace Shadowsocks.Controller
             }
             Reload();
             StartDnsCryptMaintenance();
+            StartPluginMaintenance();
         }
 
         public void Stop()
@@ -170,6 +177,9 @@ namespace Shadowsocks.Controller
                 return;
             }
             stopped = true;
+            // Stop background component maintenance before tearing down capture/runtime.
+            StopPluginMaintenance();
+
             // Cancel DNSCrypt downloads/update validation before tearing down capture/runtime.
             // This is also used by Windows suspend, so no maintenance task keeps Clean Mode
             // files or runtime processes alive across Stop()/Start().
@@ -182,14 +192,14 @@ namespace Shadowsocks.Controller
             {
                 _dnsCryptCoordinator.SuspendAndExecuteAsync(
                     "Stop DNSCrypt subsystem",
-                    async _ =>
+                    async cancellationToken =>
                     {
                         Interlocked.Increment(ref _suppressDnsCaptureRefresh);
                         try
                         {
                             try
                             {
-                                await _gameModeManager.StopAsync().ConfigureAwait(false);
+                                await _gameModeManager.StopAsync(cancellationToken).ConfigureAwait(false);
                             }
                             catch (Exception exception)
                             {
@@ -198,7 +208,7 @@ namespace Shadowsocks.Controller
 
                             try
                             {
-                                await _dnsCryptRuntimeManager.StopAsync().ConfigureAwait(false);
+                                await _dnsCryptRuntimeManager.StopAsync(cancellationToken).ConfigureAwait(false);
                             }
                             catch (Exception exception)
                             {
@@ -215,11 +225,9 @@ namespace Shadowsocks.Controller
             {
                 logger.LogUsefulException(exception);
             }
-            if (_listener != null)
-            {
-                _listener.Stop();
-            }
+            Listener listener = _listener;
             _listener = null;
+            listener?.Dispose();
 
             GeositeUpdater.UpdateCompleted -= PacServer_PACUpdateCompleted;
             GeositeUpdater.Error -= PacServer_PACUpdateError;
@@ -233,14 +241,41 @@ namespace Shadowsocks.Controller
             _pacServer = null;
 
             StopPlugins();
-            if (_config.enabled)
+            if (_config.Enabled)
             {
                 SystemProxy.Update(_config, true, null, userInteraction);
             }
             Encryption.RNG.Close();
         }
 
-        protected void Reload()
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            try
+            {
+                Stop();
+            }
+            finally
+            {
+                _disposed = true;
+                StopTrafficStatistics();
+                _gameModeManager.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                _adminCaptureManager.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                _dnsCryptRuntimeManager.Dispose();
+                _dnsCryptComponentManager.Dispose();
+                _dnsCryptCoordinator.Dispose();
+                _dnsCaptureRefreshGate.Dispose();
+                _managedRoutingCaptureRefreshGate.Dispose();
+                httpClient.Dispose();
+                GC.SuppressFinalize(this);
+            }
+        }
+
+        private void Reload()
         {
             Encryption.RNG.Reload();
             // some logic in configuration updated the config when saving, we need to read it again
@@ -279,7 +314,7 @@ namespace Shadowsocks.Controller
             }
             else
             {
-                _pacDaemon.UpdateConfiguration(_config);
+                PACDaemon.UpdateConfiguration(_config);
             }
 
             _pacServer = _pacServer ?? new PACServer(_pacDaemon);
@@ -304,6 +339,7 @@ namespace Shadowsocks.Controller
 
                 StartPlugin();
                 _trafficPolicyEngine.UpdateConfiguration(_config);
+                RefreshManagedRoutingSnapshot("configuration reload");
                 _managedHttpProxy = new ManagedHttpProxyService(_trafficPolicyEngine, _config);
 
                 List<Listener.IService> services = new List<Listener.IService>
@@ -317,7 +353,7 @@ namespace Shadowsocks.Controller
                     TCPRelay tcpRelay = new TCPRelay(this, _config);
                     tcpRelay.OnInbound += UpdateInboundCounter;
                     tcpRelay.OnOutbound += UpdateOutboundCounter;
-                    tcpRelay.OnFailed += (o, e) => GetCurrentStrategy()?.SetFailure(e.server);
+                    tcpRelay.OnFailed += (o, e) => GetCurrentStrategy()?.SetFailure(e.Server);
 
                     services.Insert(0, new UDPRelay(this));
                     services.Insert(0, tcpRelay);
@@ -334,11 +370,11 @@ namespace Shadowsocks.Controller
                 {
                     if (se.SocketErrorCode == SocketError.AddressAlreadyInUse)
                     {
-                        e = new Exception(I18N.GetString("Port {0} already in use", _config.localPort), e);
+                        e = new InvalidOperationException(I18N.GetString("Port {0} already in use", _config.localPort), e);
                     }
                     else if (se.SocketErrorCode == SocketError.AccessDenied)
                     {
-                        e = new Exception(I18N.GetString("Port {0} is reserved by system", _config.localPort), e);
+                        e = new InvalidOperationException(I18N.GetString("Port {0} is reserved by system", _config.localPort), e);
                     }
                 }
                 _lastListenerError = e;
@@ -354,13 +390,13 @@ namespace Shadowsocks.Controller
             _ = RefreshActivePacDataAsync(_config);
         }
 
-        protected void SaveConfig(Configuration newConfig)
+        private void SaveConfig(Configuration newConfig)
         {
             Configuration.Save(newConfig);
             Reload();
         }
 
-        protected void ReportError(Exception e)
+        private void ReportError(Exception e)
         {
             Errored?.Invoke(this, new ErrorEventArgs(e));
         }
@@ -372,14 +408,15 @@ namespace Shadowsocks.Controller
 
         public Server GetAServer(IStrategyCallerType type, IPEndPoint localIPEndPoint, EndPoint destEndPoint)
         {
+            if (!_config.HasConfiguredServer)
+            {
+                return Configuration.GetDefaultServer();
+            }
+
             IStrategy strategy = GetCurrentStrategy();
             if (strategy != null)
             {
                 return strategy.GetAServer(type, localIPEndPoint, destEndPoint);
-            }
-            if (_config.index < 0)
-            {
-                _config.index = 0;
             }
             return GetCurrentServer();
         }
@@ -406,6 +443,23 @@ namespace Shadowsocks.Controller
 
         public void SelectServerIndex(int index)
         {
+            if (index == -1 && (_config.configs?.Count ?? 0) == 0)
+            {
+                _config.index = -1;
+                _config.strategy = null;
+                SaveConfig(_config);
+                QueueDnsCryptAutomaticResolverRefresh();
+                return;
+            }
+
+            if (_config.configs is null
+                || index < 0
+                || index >= _config.configs.Count
+                || _config.configs[index]?.IsConfigured != true)
+            {
+                return;
+            }
+
             _config.index = index;
             _config.strategy = null;
             SaveConfig(_config);
@@ -422,8 +476,9 @@ namespace Shadowsocks.Controller
             _config.configs.RemoveAt(index);
             if (_config.configs.Count == 0)
             {
-                _config.configs.Add(new Server());
-                _config.index = 0;
+                _config.index = -1;
+                _config.strategy = string.Empty;
+                _config.Enabled = false;
             }
             else if (_config.index > index)
             {
@@ -512,7 +567,7 @@ namespace Shadowsocks.Controller
 
             try
             {
-                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await StopDnsCryptRuntimeWhenNotRequiredAsync(cancellationToken).ConfigureAwait(false);
                 Configuration.Save(_config);
                 TrafficModeChanged?.Invoke(this, EventArgs.Empty);
@@ -539,7 +594,7 @@ namespace Shadowsocks.Controller
             Configuration.Save(_config);
             try
             {
-                await ApplyTrafficCaptureConfigurationCoreAsync(_config, CancellationToken.None).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 await StopDnsCryptRuntimeWhenNotRequiredAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
@@ -570,12 +625,12 @@ namespace Shadowsocks.Controller
             CancellationToken cancellationToken)
         {
             _config.applicationRules = (applicationRules ?? [])
-                .Where(rule => rule is not null && !string.IsNullOrWhiteSpace(rule.application))
+                .Where(rule => rule is not null && !string.IsNullOrWhiteSpace(rule.Application))
                 .Select(rule => new ApplicationRouteRule
                 {
-                    enabled = rule.enabled,
-                    application = rule.application.Trim(),
-                    action = rule.action,
+                    Enabled = rule.Enabled,
+                    Application = rule.Application.Trim(),
+                    Action = rule.Action,
                 })
                 .ToList();
             _config.gameModeApplications = (gameModeApplications ?? [])
@@ -589,7 +644,7 @@ namespace Shadowsocks.Controller
             _config.trafficCaptureMode = captureMode;
             try
             {
-                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken: cancellationToken).ConfigureAwait(false);
                 await StopDnsCryptRuntimeWhenNotRequiredAsync(cancellationToken).ConfigureAwait(false);
                 Configuration.Save(_config);
                 TrafficModeChanged?.Invoke(this, EventArgs.Empty);
@@ -612,7 +667,7 @@ namespace Shadowsocks.Controller
             Configuration.Save(_config);
             try
             {
-                await ApplyTrafficCaptureConfigurationCoreAsync(_config, CancellationToken.None).ConfigureAwait(false);
+                await ApplyTrafficCaptureConfigurationCoreAsync(_config, cancellationToken: CancellationToken.None).ConfigureAwait(false);
                 await StopDnsCryptRuntimeWhenNotRequiredAsync(CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception exception)
@@ -670,7 +725,7 @@ namespace Shadowsocks.Controller
             {
                 await ApplyTrafficCaptureConfigurationCoreAsync(
                     configurationAtStart,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
             }
             catch (AdminElevationCanceledException exception)
             {
@@ -788,9 +843,30 @@ namespace Shadowsocks.Controller
 
         private async Task ApplyTrafficCaptureConfigurationCoreAsync(
             Configuration configuration,
-            CancellationToken cancellationToken = default,
-            bool ensureDnsRuntime = true)
+            bool ensureDnsRuntime = true,
+            CancellationToken cancellationToken = default)
         {
+            if (configuration is null || !configuration.HasConfiguredServer)
+            {
+                // Preserve saved DNS/capture preferences, but never run DNSCrypt or WinDivert
+                // against an inactive relay. Adding a configured server later reapplies them.
+                if (_dnsCryptRuntimeManager.GetStatus().IsServing)
+                {
+                    Interlocked.Increment(ref _suppressDnsCaptureRefresh);
+                    try
+                    {
+                        await _dnsCryptRuntimeManager.StopAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        Interlocked.Decrement(ref _suppressDnsCaptureRefresh);
+                    }
+                }
+
+                await _gameModeManager.StopAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             if (ensureDnsRuntime)
                 await EnsureDnsCryptRuntimeForCaptureAsync(configuration, cancellationToken).ConfigureAwait(false);
 
@@ -811,16 +887,18 @@ namespace Shadowsocks.Controller
         private async Task RefreshDnsCaptureAfterRuntimeChangeCoreAsync(CancellationToken cancellationToken)
         {
             if (stopped
+                || !_config.HasConfiguredServer
                 || Volatile.Read(ref _suppressDnsCaptureRefresh) != 0
                 || _config.trafficCaptureMode != TrafficCaptureMode.Admin)
             {
                 return;
             }
 
-            await _dnsCaptureRefreshGate.WaitAsync().ConfigureAwait(false);
+            await _dnsCaptureRefreshGate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
                 if (stopped
+                    || !_config.HasConfiguredServer
                     || Volatile.Read(ref _suppressDnsCaptureRefresh) != 0
                     || _config.trafficCaptureMode != TrafficCaptureMode.Admin)
                 {
@@ -833,7 +911,7 @@ namespace Shadowsocks.Controller
                     // A game may have prevented the first Admin elevation. Keep the cached
                     // DNS runtime current without creating an unexpected UAC prompt; the
                     // latest endpoint will be used when automatic Game Mode ends.
-                    await _gameModeManager.UpdateDnsRuntimeAsync(dnsRuntime).ConfigureAwait(false);
+                    await _gameModeManager.UpdateDnsRuntimeAsync(dnsRuntime, cancellationToken).ConfigureAwait(false);
                     return;
                 }
 
@@ -860,10 +938,19 @@ namespace Shadowsocks.Controller
 
         public void ToggleEnable(bool enabled)
         {
-            _config.enabled = enabled;
+            if (enabled && !_config.HasConfiguredServer)
+            {
+                logger.Warn("System proxy enable request ignored because no configured Shadowsocks server is selected.");
+                _config.Enabled = false;
+                SaveConfig(_config);
+                EnableStatusChanged?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            _config.Enabled = enabled;
             SaveConfig(_config);
 
-            EnableStatusChanged?.Invoke(this, new EventArgs());
+            EnableStatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         public void ToggleGlobal(bool global)
@@ -893,6 +980,7 @@ namespace Shadowsocks.Controller
         {
             if (!_config.useOnlinePac)
             {
+                RefreshManagedRoutingSnapshot("local PAC file changed");
                 _pacServer.UpdatePACURL(_config);
                 UpdateSystemProxy();
             }
@@ -902,6 +990,7 @@ namespace Shadowsocks.Controller
         {
             if (!_config.useOnlinePac)
             {
+                RefreshManagedRoutingSnapshot("GeoSite update completed");
                 _pacServer.UpdatePACURL(_config);
                 UpdateSystemProxy();
             }
@@ -913,15 +1002,136 @@ namespace Shadowsocks.Controller
             UpdatePACFromGeositeError?.Invoke(this, e);
         }
 
-        private static readonly IEnumerable<char> IgnoredLineBegins = new[] { '!', '[' };
         private void PacDaemon_UserRuleFileChanged(object sender, EventArgs e)
         {
-            if (_config.useOnlinePac || !GeositeUpdater.IsDatabaseAvailable)
+            if (_config.useOnlinePac)
+            {
+                RefreshManagedRoutingSnapshot("user-rule.txt changed while Online PAC is active");
                 return;
+            }
 
-            GeositeUpdater.MergeAndWritePACFile(_config.geositeDirectGroups, _config.geositeProxiedGroups, _config.geositePreferDirect);
-            _pacServer.UpdatePACURL(_config);
-            UpdateSystemProxy();
+            if (GeositeUpdater.IsDatabaseAvailable)
+            {
+                GeositeUpdater.MergeAndWritePACFile();
+                _pacServer.UpdatePACURL(_config);
+                UpdateSystemProxy();
+            }
+
+            RefreshManagedRoutingSnapshot("user-rule.txt changed");
+        }
+
+        private void RefreshManagedRoutingSnapshot(string trigger)
+        {
+            try
+            {
+                ManagedRoutingSnapshot snapshot = ManagedRoutingSnapshotBuilder.Build(_config);
+                _trafficPolicyEngine.UpdateManagedRouting(snapshot);
+
+                FilterCompilationReport report = snapshot.Report;
+                if (report is null)
+                {
+                    logger.Debug(
+                        "Managed routing snapshot {0} disabled ({1}); trigger={2}.",
+                        snapshot.Generation, snapshot.Source, trigger);
+                    QueueAdminManagedRoutingRefreshIfNeeded(trigger);
+                    return;
+                }
+
+                logger.Info(
+                    "Managed routing snapshot {0} published: mode={1}, defaultRules={2}, userRules={3}, optimizedDomains={4}, invalid={5}, source={6}; trigger={7}.",
+                    snapshot.Generation,
+                    snapshot.Mode,
+                    report.DefaultRuleCount,
+                    report.UserRuleCount,
+                    report.OptimizedDomainRuleCount,
+                    report.InvalidRuleCount,
+                    snapshot.Source,
+                    trigger);
+
+                foreach (InvalidFilterRule invalid in report.InvalidRules.Take(5))
+                {
+                    logger.Warn("Managed routing ignored invalid filter rule '{0}': {1}", invalid.Text, invalid.Reason);
+                }
+                if (report.InvalidRuleCount > 5)
+                {
+                    logger.Warn("Managed routing ignored {0} additional invalid filter rules.", report.InvalidRuleCount - 5);
+                }
+
+                QueueAdminManagedRoutingRefreshIfNeeded(trigger);
+            }
+            catch (Exception exception)
+            {
+                // Atomic publication means a failed rebuild never exposes a half-compiled
+                // rule set. Keep the previous snapshot and retry on the next file/config event.
+                logger.Warn(exception, "Managed routing snapshot rebuild failed; keeping the previous snapshot. Trigger: {0}", trigger);
+            }
+        }
+
+        private void QueueAdminManagedRoutingRefreshIfNeeded(string trigger)
+        {
+            if (_config.trafficCaptureMode != TrafficCaptureMode.Admin
+                || !_adminCaptureManager.IsBrokerRunning
+                || string.Equals(trigger, "configuration reload", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // FileSystemWatcher may emit several notifications for one save and a second
+            // rule update can arrive while the capture child is already restarting. Keep a
+            // coalesced pending bit so the last snapshot cannot be lost behind the gate.
+            Volatile.Write(ref _managedRoutingCaptureRefreshTrigger, trigger ?? string.Empty);
+            Interlocked.Exchange(ref _managedRoutingCaptureRefreshPending, 1);
+            _ = RefreshAdminManagedRoutingAfterSnapshotChangeAsync();
+        }
+
+        private async Task RefreshAdminManagedRoutingAfterSnapshotChangeAsync()
+        {
+            if (!await _managedRoutingCaptureRefreshGate.WaitAsync(0).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            try
+            {
+                while (Interlocked.Exchange(ref _managedRoutingCaptureRefreshPending, 0) != 0)
+                {
+                    string trigger = Volatile.Read(ref _managedRoutingCaptureRefreshTrigger);
+                    if (stopped
+                        || _config.trafficCaptureMode != TrafficCaptureMode.Admin
+                        || !_adminCaptureManager.IsBrokerRunning)
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        await _gameModeManager.ApplyConfigurationAsync(
+                            _config,
+                            GetCaptureExclusionProcessIds(),
+                            GetDnsCaptureRuntimeState(),
+                            CancellationToken.None).ConfigureAwait(false);
+                        logger.Info("Admin managed-routing rules refreshed after snapshot change: {0}.", trigger);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.Warn(exception, "Unable to refresh Admin managed routing after snapshot change: {0}.", trigger);
+                    }
+                }
+            }
+            finally
+            {
+                _managedRoutingCaptureRefreshGate.Release();
+
+                // Close the narrow race where a watcher marks a refresh pending after the
+                // loop observed zero but before this invocation released the gate.
+                if (Volatile.Read(ref _managedRoutingCaptureRefreshPending) != 0
+                    && !stopped
+                    && _config.trafficCaptureMode == TrafficCaptureMode.Admin
+                    && _adminCaptureManager.IsBrokerRunning)
+                {
+                    _ = RefreshAdminManagedRoutingAfterSnapshotChangeAsync();
+                }
+            }
         }
 
         private async Task RefreshActivePacDataAsync(Configuration configAtStart)
@@ -936,7 +1146,7 @@ namespace Shadowsocks.Controller
 
                 // PAC data is only fetched when PAC mode is actually active. Global and
                 // Disabled modes do not need either GeoSite or an online PAC refresh.
-                if (!configAtStart.enabled || configAtStart.global)
+                if (!configAtStart.Enabled || configAtStart.global)
                     return;
 
                 if (configAtStart.useOnlinePac)
@@ -947,7 +1157,7 @@ namespace Shadowsocks.Controller
                     await OnlinePacCache.RefreshAsync(configAtStart);
 
                     // A reload may have changed the mode or URL while the request was in flight.
-                    if (_config.enabled && !_config.global && _config.useOnlinePac &&
+                    if (_config.Enabled && !_config.global && _config.useOnlinePac &&
                         string.Equals(_config.pacUrl, configAtStart.pacUrl, StringComparison.Ordinal))
                     {
                         _pacServer.UpdatePACURL(_config);
@@ -959,7 +1169,7 @@ namespace Shadowsocks.Controller
                 if (!GeositeUpdater.IsDatabaseAvailable || GeositeUpdater.NeedsRefresh)
                 {
                     await GeositeUpdater.UpdatePACFromGeosite(_config, false);
-                    if (_config.enabled && !_config.global && !_config.useOnlinePac)
+                    if (_config.Enabled && !_config.global && !_config.useOnlinePac)
                     {
                         _pacServer.UpdatePACURL(_config);
                         UpdateSystemProxy();
@@ -975,6 +1185,30 @@ namespace Shadowsocks.Controller
         }
 
         public string GetPacUrl() => _pacServer.PacUrl;
+
+        public ManagedRoutingStatus GetManagedRoutingStatus()
+        {
+            ManagedRoutingSnapshot snapshot = _trafficPolicyEngine.CurrentManagedRoutingSnapshot;
+            FilterCompilationReport report = snapshot.Report;
+            string effectiveMode = _config.useOnlinePac
+                ? "Online PAC"
+                : "Managed routing";
+
+            return new ManagedRoutingStatus(
+                effectiveMode,
+                snapshot.Mode.ToString(),
+                snapshot.Generation,
+                snapshot.IsEnabled,
+                snapshot.Source,
+                snapshot.CreatedUtc,
+                report?.DefaultRuleCount ?? 0,
+                report?.UserRuleCount ?? 0,
+                report?.InvalidRuleCount ?? 0,
+                snapshot.DirectDecisionCount,
+                snapshot.ProxyDecisionCount,
+                _adminCaptureManager.ManagedRoutingActive,
+                _adminCaptureManager.ManagedRoutingRuleCount);
+        }
 
         public void CopyPacUrl()
         {
@@ -1000,7 +1234,7 @@ namespace Shadowsocks.Controller
             {
                 try
                 {
-                    File.Delete(PACDaemon.PAC_FILE);
+                    File.Delete(PACDaemon.PacFile);
                 }
                 catch (Exception ex)
                 {
@@ -1013,6 +1247,12 @@ namespace Shadowsocks.Controller
 
         public void UseOnlinePAC(bool useOnlinePac)
         {
+            if (useOnlinePac && !_config.HasConfiguredServer)
+            {
+                logger.Warn("Online PAC enable request ignored because no configured Shadowsocks server is selected.");
+                return;
+            }
+
             _config.useOnlinePac = useOnlinePac;
             SaveConfig(_config);
 
@@ -1024,16 +1264,9 @@ namespace Shadowsocks.Controller
             return GeositeUpdater.UpdatePACFromGeosite(_config);
         }
 
-        public void TouchPACFile()
-        {
-            string pacFilename = _pacDaemon.TouchPACFile();
-
-            PACFileReadyToOpen?.Invoke(this, new PathEventArgs() { Path = pacFilename });
-        }
-
         public void TouchUserRuleFile()
         {
-            string userRuleFilename = _pacDaemon.TouchUserRuleFile();
+            string userRuleFilename = PACDaemon.TouchUserRuleFile();
 
             UserRuleFileReadyToOpen?.Invoke(this, new PathEventArgs() { Path = userRuleFilename });
         }
@@ -1192,14 +1425,14 @@ namespace Shadowsocks.Controller
 
         public void UpdateInboundCounter(object sender, SSTransmitEventArgs args)
         {
-            GetCurrentStrategy()?.UpdateLastRead(args.server);
-            Interlocked.Add(ref _inboundCounter, args.length);
+            GetCurrentStrategy()?.UpdateLastRead(args.Server);
+            Interlocked.Add(ref _inboundCounter, args.Length);
         }
 
         public void UpdateOutboundCounter(object sender, SSTransmitEventArgs args)
         {
-            GetCurrentStrategy()?.UpdateLastWrite(args.server);
-            Interlocked.Add(ref _outboundCounter, args.length);
+            GetCurrentStrategy()?.UpdateLastWrite(args.Server);
+            Interlocked.Add(ref _outboundCounter, args.Length);
         }
 
         #endregion
@@ -1286,41 +1519,101 @@ namespace Shadowsocks.Controller
 
         #region Traffic Statistics
 
-        private void StartTrafficStatistics(int queueMaxSize)
+        public IReadOnlyList<TrafficPerSecond> GetTrafficSnapshot(int maxSamples)
         {
-            trafficPerSecondQueue = new Queue<TrafficPerSecond>();
-            for (int i = 0; i < queueMaxSize; i++)
+            if (maxSamples <= 0)
+                return Array.Empty<TrafficPerSecond>();
+
+            lock (_trafficStatisticsSync)
             {
-                trafficPerSecondQueue.Enqueue(new TrafficPerSecond());
+                if (_trafficPerSecondQueue is null || _trafficPerSecondQueue.Count == 0)
+                    return Array.Empty<TrafficPerSecond>();
+
+                return _trafficPerSecondQueue.TakeLast(maxSamples).ToArray();
             }
-            _trafficThread = new Thread(new ThreadStart(() => TrafficStatistics(queueMaxSize)))
-            {
-                IsBackground = true
-            };
-            _trafficThread.Start();
         }
 
-        private void TrafficStatistics(int queueMaxSize)
+        public TrafficPerSecond GetLatestTrafficSample()
         {
-            TrafficPerSecond previous, current;
-            while (true)
+            lock (_trafficStatisticsSync)
+                return _trafficPerSecondQueue?.LastOrDefault();
+        }
+
+        private void StartTrafficStatistics(int queueMaxSize)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(queueMaxSize);
+
+            lock (_trafficStatisticsSync)
             {
-                previous = trafficPerSecondQueue.Last();
-                current = new TrafficPerSecond
+                _trafficPerSecondQueue = new Queue<TrafficPerSecond>(queueMaxSize);
+                for (int i = 0; i < queueMaxSize; i++)
+                    _trafficPerSecondQueue.Enqueue(new TrafficPerSecond());
+            }
+
+            _trafficStatisticsCancellation = new CancellationTokenSource();
+            _trafficStatisticsTask = Task.Run(() => TrafficStatisticsAsync(queueMaxSize, _trafficStatisticsCancellation.Token));
+        }
+
+        private void StopTrafficStatistics()
+        {
+            CancellationTokenSource cancellation = _trafficStatisticsCancellation;
+            Task task = _trafficStatisticsTask;
+            _trafficStatisticsCancellation = null;
+            _trafficStatisticsTask = null;
+
+            if (cancellation is null)
+                return;
+
+            try
+            {
+                cancellation.Cancel();
+                task?.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal controller disposal.
+            }
+            catch (Exception exception)
+            {
+                logger.Warn(exception, "Traffic statistics task did not stop cleanly.");
+            }
+            finally
+            {
+                cancellation.Dispose();
+            }
+        }
+
+        private async Task TrafficStatisticsAsync(int queueMaxSize, CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    inboundCounter = InboundCounter,
-                    outboundCounter = OutboundCounter
-                };
-                current.inboundIncreasement = current.inboundCounter - previous.inboundCounter;
-                current.outboundIncreasement = current.outboundCounter - previous.outboundCounter;
+                    lock (_trafficStatisticsSync)
+                    {
+                        TrafficPerSecond previous = _trafficPerSecondQueue.Last();
+                        long inboundCounter = InboundCounter;
+                        long outboundCounter = OutboundCounter;
+                        var current = new TrafficPerSecond
+                        {
+                            InboundCounter = inboundCounter,
+                            OutboundCounter = outboundCounter,
+                            InboundIncrement = inboundCounter - previous.InboundCounter,
+                            OutboundIncrement = outboundCounter - previous.OutboundCounter,
+                        };
 
-                trafficPerSecondQueue.Enqueue(current);
-                if (trafficPerSecondQueue.Count > queueMaxSize)
-                    trafficPerSecondQueue.Dequeue();
+                        _trafficPerSecondQueue.Enqueue(current);
+                        if (_trafficPerSecondQueue.Count > queueMaxSize)
+                            _trafficPerSecondQueue.Dequeue();
+                    }
 
-                TrafficChanged?.Invoke(this, new EventArgs());
-
-                Thread.Sleep(1000);
+                    TrafficChanged?.Invoke(this, EventArgs.Empty);
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Normal controller disposal.
             }
         }
 
@@ -1353,7 +1646,7 @@ namespace Shadowsocks.Controller
                 logger.LogUsefulException(e);
                 return false;
             }
-            _config.index = _config.configs.IndexOf(selected);
+            _config.index = FindServerIndexAfterOnlineRefresh(_config.configs, selected);
             SaveConfig(_config);
             return true;
         }
@@ -1375,9 +1668,43 @@ namespace Shadowsocks.Controller
                 }
             }
 
-            _config.index = _config.configs.IndexOf(selected);
+            _config.index = FindServerIndexAfterOnlineRefresh(_config.configs, selected);
             SaveConfig(_config);
             return failedUrls;
+        }
+
+        private static int FindServerIndexAfterOnlineRefresh(List<Server> servers, Server selected)
+        {
+            if (servers is null || servers.Count == 0 || selected is null)
+            {
+                return -1;
+            }
+
+            for (int index = 0; index < servers.Count; index++)
+            {
+                if (ReferenceEquals(servers[index], selected))
+                {
+                    return index;
+                }
+            }
+
+            for (int index = 0; index < servers.Count; index++)
+            {
+                Server candidate = servers[index];
+                if (candidate is null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(candidate.group, selected.group, StringComparison.Ordinal)
+                    && string.Equals(candidate.server, selected.server, StringComparison.OrdinalIgnoreCase)
+                    && candidate.ServerPort == selected.ServerPort)
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
 
         public void SaveOnlineConfigSource(List<string> sources)

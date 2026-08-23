@@ -133,6 +133,15 @@ public class LocalizationServiceTests
             "Download the latest Windows x64 release archive and install the selected plugin.",
             "Import a local ZIP or TAR.GZ package containing a Windows plugin executable.",
             "Remove this installed plugin from Shadowsocks storage.",
+            "Install SIP003 plugins from the built-in list or import a plugin ZIP or TAR.GZ package. Built-in catalog plugins can update automatically.",
+            "Check updates",
+            "Check installed catalog plugins for newer GitHub releases now.",
+            "Built-in catalog plugins are checked automatically once per day when they are not in use.",
+            "Release: {0}", "Automatic updates",
+            "Automatically check this catalog plugin for a newer release once per day.",
+            "{0} plugin(s) updated.",
+            "Plugin updates were deferred because one or more plugins are in use.",
+            "Installed catalog plugins are up to date.",
             "{0} installed.",
         ];
 
@@ -151,8 +160,8 @@ public class LocalizationServiceTests
             "System Proxy", "Disable", "PAC", "Global", "Traffic Mode", "User Mode", "Admin Mode",
             "Traffic Routing", "Servers", "Share Server Config", "DNS", "System DNS", "DNSCrypt",
             "DNS Settings", "Check DNSCrypt Update", "DNSCrypt: Not installed", "DNSCrypt: Starting…", "DNSCrypt: Updating…",
-            "Local PAC", "Online PAC", "Edit Local PAC File",
-            "Update Local PAC from Geosite", "GeoSite Sources", "Edit User Rule for Geosite", "Require secret for local PAC URL",
+            "Local PAC", "Online PAC", "Edit Local User Rules",
+            "Update Local PAC from Geosite", "GeoSite Sources", "Require secret for local PAC URL",
             "Regenerate Local PAC after application updates", "Edit Online PAC URL",
             "Forward Proxy", "Online Config", "Start on Boot", "Associate ss:// Links",
             "Allow other devices to connect", "Hotkeys", "Help", "Logs", "Updates",
@@ -170,6 +179,48 @@ public class LocalizationServiceTests
             Assert.AreNotEqual(key, value, $"Missing Russian tray translation for '{key}'.");
         }
     }
+    [TestMethod]
+    public void EmbeddedRussianCatalogCoversWinUiUxAuditStrings()
+    {
+        var service = new CsvLocalizationService(Shadowsocks.Core.EmbeddedResources.I18nCsv, CultureInfo.GetCultureInfo("ru-RU"));
+        string[] keys =
+        [
+            "Open application appearance, startup and storage settings.",
+            "Edit Local User Rules",
+            "Select a GeoSite source before moving or removing it.",
+            "Enter an absolute HTTP or HTTPS PAC URL.",
+            "Select a server to edit, duplicate, share, move, or delete it.",
+            "Not tested",
+            "Registered",
+            "Registration failed",
+            "Select a server to share, copy, or delete it.",
+            "The selected server's ss:// URL. Use Copy to place it on the clipboard.",
+            "Shows the resolvers currently chosen by automatic DNSCrypt selection.",
+            "Release notes for the selected available update.",
+            "Timeout (Sec)",
+            "Toggle system proxy",
+            "Switch Global / PAC",
+            "Allow clients from LAN",
+            "Open logs window",
+            "Switch to previous server",
+            "Switch to next server",
+            "Address",
+            "Port",
+            "Timeout",
+            "Username",
+            "Save the online PAC URL used when Online PAC mode is enabled.",
+            "Download the latest Windows x64 release archive and replace the installed selected plugin.",
+            "Save GeoSite source changes before downloading or refreshing data.",
+        ];
+
+        foreach (string key in keys)
+        {
+            string value = service[key];
+            Assert.IsFalse(string.IsNullOrWhiteSpace(value), $"Missing Russian WinUI UX translation for '{key}'.");
+            Assert.AreNotEqual(key, value, $"Missing Russian WinUI UX translation for '{key}'.");
+        }
+    }
+
     [TestMethod]
     public void EmbeddedRussianCatalogCoversDnsCryptManagement()
     {

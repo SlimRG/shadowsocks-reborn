@@ -29,7 +29,13 @@ namespace Shadowsocks.Controller.Service
 
     public sealed record DnsCryptRuntimeStartOptions(
         DnsCryptConfig Config,
-        int? ShadowsocksSocks5Port = null);
+        int? ShadowsocksSocks5Port = null)
+    {
+        public string ShadowsocksSocks5Host { get; init; } = "127.0.0.1";
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> StaticResolverStamps { get; init; }
+            = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
 
     public sealed record DnsCryptResolverInfo(
         string Name,
@@ -46,13 +52,36 @@ namespace Shadowsocks.Controller.Service
         int? LatencyMs = null)
     {
         public System.Collections.Generic.IReadOnlyList<int> Ports { get; init; } = System.Array.Empty<int>();
+        public string Stamp { get; init; } = string.Empty;
+    }
+
+    public sealed class DnsCryptBootstrapException : InvalidOperationException
+    {
+        public DnsCryptBootstrapException() { }
+        public DnsCryptBootstrapException(string message) : base(message) { }
+        public DnsCryptBootstrapException(string message, Exception? innerException) : base(message, innerException) { }
+    }
+
+    public sealed class DnsCryptComponentNetworkException : InvalidOperationException
+    {
+        public DnsCryptComponentNetworkException() { }
+        public DnsCryptComponentNetworkException(string message) : base(message) { }
+        public DnsCryptComponentNetworkException(string message, Exception? innerException) : base(message, innerException) { }
+    }
+
+    public sealed class DnsCryptRuntimeStartupException : InvalidOperationException
+    {
+        public DnsCryptRuntimeStartupException() { }
+        public DnsCryptRuntimeStartupException(string message) : base(message) { }
+        public DnsCryptRuntimeStartupException(string message, Exception? innerException) : base(message, innerException) { }
     }
 
     public sealed class DnsCryptRuntimeStatusChangedEventArgs : EventArgs
     {
         public DnsCryptRuntimeStatusChangedEventArgs(DnsCryptRuntimeStatus status)
         {
-            Status = status ?? throw new ArgumentNullException(nameof(status));
+            ArgumentNullException.ThrowIfNull(status);
+            Status = status;
         }
 
         public DnsCryptRuntimeStatus Status { get; }

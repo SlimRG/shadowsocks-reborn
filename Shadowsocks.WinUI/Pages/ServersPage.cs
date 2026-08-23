@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Shadowsocks.Model;
+using Shadowsocks.Controller;
 using Shadowsocks.Controller.Service;
 using Shadowsocks.WinUI.UI;
 
@@ -36,6 +37,7 @@ public sealed class ServersPage : Page, IRefreshablePage
     private readonly ComboBox _method;
     private readonly ComboBox _plugin;
     private readonly TextBox _pluginOptions;
+    private readonly TextBlock _pluginOptionsLabel;
     private readonly CheckBox _pluginArgumentsEnabled;
     private readonly TextBox _pluginArguments;
     private readonly TextBlock _pluginArgumentsLabel;
@@ -44,9 +46,14 @@ public sealed class ServersPage : Page, IRefreshablePage
     private readonly TextBox _group;
     private readonly NumberBox _localPort;
     private readonly Button _deleteButton;
+    private readonly Button _duplicateButton;
+    private readonly Button _shareButton;
     private readonly Button _moveUpButton;
     private readonly Button _moveDownButton;
     private readonly Button _applyButton;
+    private readonly Button _discardButton;
+    private readonly Border _editorCard;
+    private readonly TextBlock _emptyServersText;
     private readonly List<Server> _servers = new();
     private readonly HashSet<string> _loadedServerIdentities = new(StringComparer.Ordinal);
     private int _selectedIndex = -1;
@@ -86,7 +93,14 @@ public sealed class ServersPage : Page, IRefreshablePage
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
         };
         _serverList.SelectionChanged += OnServerSelectionChanged;
+        _context.SetToolTip(_serverList, "Select a server to edit, duplicate, share, move, or delete it.");
         left.Children.Add(_serverList);
+        _emptyServersText = WinUIStyles.CreateText(
+            "No servers configured. Select Add to create one.",
+            "CaptionTextBlockStyle");
+        _emptyServersText.Opacity = 0.72;
+        _emptyServersText.Visibility = Visibility.Collapsed;
+        left.Children.Add(_emptyServersText);
 
         // Match the original Config form: two compact button columns beneath the server list.
         var listButtons = new Grid { ColumnSpacing = 6, RowSpacing = 6 };
@@ -105,15 +119,15 @@ public sealed class ServersPage : Page, IRefreshablePage
         Grid.SetColumn(_deleteButton, 1);
         listButtons.Children.Add(_deleteButton);
 
-        var duplicate = CreateListButton("Duplicate", OnDuplicateClicked);
-        _context.SetToolTip(duplicate, "Create a copy of the selected server.");
-        Grid.SetRow(duplicate, 1);
-        listButtons.Children.Add(duplicate);
-        var share = CreateListButton("Share Server Config", OnShareClicked);
-        _context.SetToolTip(share, "Open Share / QR for the selected server.");
-        Grid.SetRow(share, 3);
-        Grid.SetColumnSpan(share, 2);
-        listButtons.Children.Add(share);
+        _duplicateButton = CreateListButton("Duplicate", OnDuplicateClicked);
+        _context.SetToolTip(_duplicateButton, "Create a copy of the selected server.");
+        Grid.SetRow(_duplicateButton, 1);
+        listButtons.Children.Add(_duplicateButton);
+        _shareButton = CreateListButton("Share Server Config", OnShareClicked);
+        _context.SetToolTip(_shareButton, "Open Share / QR for the selected server.");
+        Grid.SetRow(_shareButton, 3);
+        Grid.SetColumnSpan(_shareButton, 2);
+        listButtons.Children.Add(_shareButton);
 
         _moveUpButton = CreateListButton("Move up", (_, _) => MoveSelected(-1));
         _context.SetToolTip(_moveUpButton, "Move the selected server one position up.");
@@ -167,17 +181,17 @@ public sealed class ServersPage : Page, IRefreshablePage
         AddFormRow(form, "Plugin", _plugin);
         _pluginOptions = new TextBox { MaxLength = 256 };
         _context.SetToolTip(_pluginOptions, "Options passed to the SIP003 plugin through SS_PLUGIN_OPTIONS.");
-        AddFormRow(form, "Plugin Options", _pluginOptions);
+        _pluginOptionsLabel = AddFormRow(form, "Plugin Options", _pluginOptions)!;
         _pluginArgumentsEnabled = new CheckBox { Content = "Need Plugin Argument" };
         _context.SetToolTip(_pluginArgumentsEnabled, "Enable an additional command-line argument string for the plugin.");
         _pluginArgumentsEnabled.Checked += (_, _) =>
         {
-            UpdatePluginArgumentsVisibility();
+            UpdatePluginFieldsVisibility();
             MarkDirty();
         };
         _pluginArgumentsEnabled.Unchecked += (_, _) =>
         {
-            UpdatePluginArgumentsVisibility();
+            UpdatePluginFieldsVisibility();
             MarkDirty();
         };
         AddFormRow(form, string.Empty, _pluginArgumentsEnabled);
@@ -191,9 +205,9 @@ public sealed class ServersPage : Page, IRefreshablePage
         _context.SetToolTip(_group, "Read-only group supplied by an imported or online configuration, when available.");
         AddFormRow(form, "Group", _group);
         editorStack.Children.Add(form);
-        Border editorCard = WinUIStyles.CreateCard(editorStack);
-        editorCard.Padding = new Thickness(16, 14, 16, 14);
-        right.Children.Add(editorCard);
+        _editorCard = WinUIStyles.CreateCard(editorStack);
+        _editorCard.Padding = new Thickness(16, 14, 16, 14);
+        right.Children.Add(_editorCard);
 
         var localStack = new StackPanel { Spacing = 10 };
         localStack.Children.Add(WinUIStyles.CreateSectionTitle("Local client"));
@@ -209,10 +223,10 @@ public sealed class ServersPage : Page, IRefreshablePage
             HorizontalAlignment = HorizontalAlignment.Right,
             Spacing = 8,
         };
-        var discard = new Button { Content = "Discard changes", MinWidth = 112 };
-        _context.SetToolTip(discard, "Restore the selected server fields to their last saved values.");
-        discard.Click += (_, _) => DiscardChanges();
-        actions.Children.Add(discard);
+        _discardButton = new Button { Content = "Discard changes", MinWidth = 112, IsEnabled = false };
+        _context.SetToolTip(_discardButton, "Restore the selected server fields to their last saved values.");
+        _discardButton.Click += (_, _) => DiscardChanges();
+        actions.Children.Add(_discardButton);
         _applyButton = new Button { Content = "Apply", MinWidth = 88, IsEnabled = false };
         _context.SetToolTip(_applyButton, "Validate and save the current server and local client settings.");
         _applyButton.Click += OnSaveClicked;
@@ -230,12 +244,17 @@ public sealed class ServersPage : Page, IRefreshablePage
         _serverPort.ValueChanged += (_, _) => MarkDirty();
         _password.PasswordChanged += (_, _) => MarkDirty();
         _method.SelectionChanged += (_, _) => MarkDirty();
-        _plugin.SelectionChanged += (_, _) => MarkDirty();
+        _plugin.SelectionChanged += (_, _) =>
+        {
+            UpdatePluginFieldsVisibility();
+            MarkDirty();
+        };
         _pluginOptions.TextChanged += (_, _) => MarkDirty();
         _pluginArguments.TextChanged += (_, _) => MarkDirty();
         _remarks.TextChanged += (_, _) => MarkDirty();
         _timeout.ValueChanged += (_, _) => MarkDirty();
         _localPort.ValueChanged += (_, _) => MarkDirty();
+        UpdatePluginFieldsVisibility();
 
         WinUILocalization.Apply(Content, _context.Localization);
     }
@@ -265,11 +284,6 @@ public sealed class ServersPage : Page, IRefreshablePage
             _servers.Add(CloneServer(server));
             _loadedServerIdentities.Add(BuildServerIdentity(server));
         }
-        if (_servers.Count == 0)
-        {
-            _servers.Add(new Server());
-        }
-
         _loading = true;
         try
         {
@@ -280,7 +294,9 @@ public sealed class ServersPage : Page, IRefreshablePage
             _loading = false;
         }
 
-        _selectedIndex = Math.Clamp(configuration.index, 0, _servers.Count - 1);
+        _selectedIndex = _servers.Count == 0
+            ? -1
+            : Math.Clamp(configuration.index, 0, _servers.Count - 1);
         RebuildServerList(_selectedIndex);
         LoadSelectedIntoEditor();
         _loadedOnce = true;
@@ -354,7 +370,10 @@ public sealed class ServersPage : Page, IRefreshablePage
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 });
             }
-            _serverList.SelectedIndex = Math.Clamp(selectedIndex, 0, _servers.Count - 1);
+            _serverList.SelectedIndex = _servers.Count == 0
+                ? -1
+                : Math.Clamp(selectedIndex, 0, _servers.Count - 1);
+            _emptyServersText.Visibility = _servers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally
         {
@@ -394,11 +413,11 @@ public sealed class ServersPage : Page, IRefreshablePage
     private static string BuildServerIdentity(Server server)
         => string.Join("\u001F",
             server.server ?? string.Empty,
-            server.server_port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            server.ServerPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
             server.method ?? string.Empty,
             server.password ?? string.Empty,
             server.plugin ?? string.Empty,
-            server.plugin_opts ?? string.Empty,
+            server.PluginOptions ?? string.Empty,
             server.remarks ?? string.Empty);
 
     private void UpdateServerListItem(int index)
@@ -415,7 +434,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
     }
 
-    private FrameworkElement CreateServerListContent(Server server, int index)
+    private Grid CreateServerListContent(Server server, int index)
     {
         string name = server.IsConfigured
             ? !string.IsNullOrWhiteSpace(server.remarks)
@@ -468,7 +487,7 @@ public sealed class ServersPage : Page, IRefreshablePage
                 continue;
             try
             {
-                IpCountryInfo? country = await _context.Controller.GetServerCountryAsync(server);
+                IpCountryInfo? country = await ShadowsocksController.GetServerCountryAsync(server);
                 if (generation != _countryLookupGeneration)
                     return;
                 if (country is not null && !string.IsNullOrWhiteSpace(country.FlagEmoji))
@@ -590,7 +609,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         UpdateListButtons();
     }
 
-    private bool ValidateCurrentServerForAction(string action)
+    private bool ValidateCurrentServerForAction()
     {
         if (_selectedIndex < 0 || _selectedIndex >= _servers.Count)
         {
@@ -606,7 +625,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
         catch (Exception exception)
         {
-            _context.ShowInfo(action, exception.Message, InfoBarSeverity.Error);
+            _context.ShowInfo("Server configuration", exception.Message, InfoBarSeverity.Error);
             return false;
         }
     }
@@ -657,6 +676,7 @@ public sealed class ServersPage : Page, IRefreshablePage
     {
         if (_selectedIndex < 0 || _selectedIndex >= _servers.Count)
         {
+            ClearEditor();
             return;
         }
 
@@ -665,7 +685,7 @@ public sealed class ServersPage : Page, IRefreshablePage
         {
             Server server = _servers[_selectedIndex];
             _host.Text = server.server ?? string.Empty;
-            _serverPort.Value = server.server_port > 0 ? server.server_port : Server.DefaultPort;
+            _serverPort.Value = server.ServerPort > 0 ? server.ServerPort : Server.DefaultPort;
             _password.Password = server.password ?? string.Empty;
             _showPassword.IsChecked = false;
             _password.PasswordRevealMode = PasswordRevealMode.Hidden;
@@ -674,13 +694,13 @@ public sealed class ServersPage : Page, IRefreshablePage
                 ? server.method
                 : Server.DefaultMethod;
             SelectPlugin(server.plugin);
-            _pluginOptions.Text = server.plugin_opts ?? string.Empty;
-            _pluginArguments.Text = server.plugin_args ?? string.Empty;
-            _pluginArgumentsEnabled.IsChecked = !string.IsNullOrWhiteSpace(server.plugin_args);
+            _pluginOptions.Text = server.PluginOptions ?? string.Empty;
+            _pluginArguments.Text = server.PluginArguments ?? string.Empty;
+            _pluginArgumentsEnabled.IsChecked = !string.IsNullOrWhiteSpace(server.PluginArguments);
             _remarks.Text = server.remarks ?? string.Empty;
             _group.Text = server.group ?? string.Empty;
             _timeout.Value = server.timeout > 0 ? server.timeout : 5;
-            UpdatePluginArgumentsVisibility();
+            UpdatePluginFieldsVisibility();
         }
         finally
         {
@@ -688,11 +708,50 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
     }
 
-    private void UpdatePluginArgumentsVisibility()
+
+    private void ClearEditor()
     {
-        Visibility visibility = _pluginArgumentsEnabled.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-        _pluginArguments.Visibility = visibility;
-        _pluginArgumentsLabel.Visibility = visibility;
+        _loading = true;
+        try
+        {
+            _host.Text = string.Empty;
+            _serverPort.Value = Server.DefaultPort;
+            _password.Password = string.Empty;
+            _showPassword.IsChecked = false;
+            _password.PasswordRevealMode = PasswordRevealMode.Hidden;
+            _showPassword.Visibility = Visibility.Visible;
+            _method.SelectedItem = Server.DefaultMethod;
+            SelectPlugin(string.Empty);
+            _pluginOptions.Text = string.Empty;
+            _pluginArguments.Text = string.Empty;
+            _pluginArgumentsEnabled.IsChecked = false;
+            _remarks.Text = string.Empty;
+            _group.Text = string.Empty;
+            _timeout.Value = 5;
+            UpdatePluginFieldsVisibility();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool HasSelectedPlugin()
+        => _plugin.SelectedItem is PluginChoice choice && !string.IsNullOrWhiteSpace(choice.Id);
+
+    private void UpdatePluginFieldsVisibility()
+    {
+        bool hasPlugin = HasSelectedPlugin();
+        Visibility pluginVisibility = hasPlugin ? Visibility.Visible : Visibility.Collapsed;
+        _pluginOptions.Visibility = pluginVisibility;
+        _pluginOptionsLabel.Visibility = pluginVisibility;
+        _pluginArgumentsEnabled.Visibility = pluginVisibility;
+
+        Visibility argumentsVisibility = hasPlugin && _pluginArgumentsEnabled.IsChecked == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _pluginArguments.Visibility = argumentsVisibility;
+        _pluginArgumentsLabel.Visibility = argumentsVisibility;
     }
 
     private void CaptureEditorIntoSelected()
@@ -704,12 +763,15 @@ public sealed class ServersPage : Page, IRefreshablePage
 
         Server server = _servers[_selectedIndex];
         server.server = _host.Text?.Trim() ?? string.Empty;
-        server.server_port = double.IsNaN(_serverPort.Value) ? Server.DefaultPort : checked((int)_serverPort.Value);
+        server.ServerPort = double.IsNaN(_serverPort.Value) ? Server.DefaultPort : checked((int)_serverPort.Value);
         server.password = _password.Password ?? string.Empty;
         server.method = _method.SelectedItem?.ToString() ?? Server.DefaultMethod;
         server.plugin = (_plugin.SelectedItem as PluginChoice)?.Id ?? string.Empty;
-        server.plugin_opts = _pluginOptions.Text?.Trim() ?? string.Empty;
-        server.plugin_args = _pluginArgumentsEnabled.IsChecked == true ? (_pluginArguments.Text?.Trim() ?? string.Empty) : string.Empty;
+        bool hasPlugin = !string.IsNullOrWhiteSpace(server.plugin);
+        server.PluginOptions = hasPlugin ? (_pluginOptions.Text?.Trim() ?? string.Empty) : string.Empty;
+        server.PluginArguments = hasPlugin && _pluginArgumentsEnabled.IsChecked == true
+            ? (_pluginArguments.Text?.Trim() ?? string.Empty)
+            : string.Empty;
         server.remarks = _remarks.Text?.Trim() ?? string.Empty;
         server.timeout = double.IsNaN(_timeout.Value) ? 5 : checked((int)_timeout.Value);
     }
@@ -726,11 +788,12 @@ public sealed class ServersPage : Page, IRefreshablePage
     {
         _dirty = dirty;
         _applyButton.IsEnabled = dirty;
+        _discardButton.IsEnabled = dirty;
     }
 
     private void OnAddClicked(object _, RoutedEventArgs _1)
     {
-        if (!ValidateCurrentServerForAction("Add server"))
+        if (!ValidateCurrentServerForAction())
         {
             return;
         }
@@ -743,7 +806,7 @@ public sealed class ServersPage : Page, IRefreshablePage
 
     private void OnDuplicateClicked(object _, RoutedEventArgs _1)
     {
-        if (!ValidateCurrentServerForAction("Duplicate server"))
+        if (!ValidateCurrentServerForAction())
         {
             return;
         }
@@ -783,12 +846,8 @@ public sealed class ServersPage : Page, IRefreshablePage
         }
 
         _servers.RemoveAt(_selectedIndex);
-        if (_servers.Count == 0)
-        {
-            _servers.Add(new Server());
-        }
         SetDirty(true);
-        _selectedIndex = Math.Min(_selectedIndex, _servers.Count - 1);
+        _selectedIndex = _servers.Count == 0 ? -1 : Math.Min(_selectedIndex, _servers.Count - 1);
         RebuildServerList(_selectedIndex);
         LoadSelectedIntoEditor();
     }
@@ -813,9 +872,30 @@ public sealed class ServersPage : Page, IRefreshablePage
 
     private void UpdateListButtons()
     {
-        _deleteButton.IsEnabled = _servers.Count > 0;
+        bool hasSelection = _selectedIndex >= 0 && _selectedIndex < _servers.Count;
+        SetEditorEnabled(hasSelection);
+        _editorCard.Opacity = hasSelection ? 1.0 : 0.62;
+        _deleteButton.IsEnabled = hasSelection;
+        _duplicateButton.IsEnabled = hasSelection;
+        _shareButton.IsEnabled = hasSelection;
         _moveUpButton.IsEnabled = _selectedIndex > 0;
         _moveDownButton.IsEnabled = _selectedIndex >= 0 && _selectedIndex < _servers.Count - 1;
+    }
+
+    private void SetEditorEnabled(bool enabled)
+    {
+        _remarks.IsEnabled = enabled;
+        _host.IsEnabled = enabled;
+        _serverPort.IsEnabled = enabled;
+        _password.IsEnabled = enabled;
+        _showPassword.IsEnabled = enabled;
+        _method.IsEnabled = enabled;
+        _plugin.IsEnabled = enabled;
+        _pluginOptions.IsEnabled = enabled;
+        _pluginArgumentsEnabled.IsEnabled = enabled;
+        _pluginArguments.IsEnabled = enabled;
+        _timeout.IsEnabled = enabled;
+        _group.IsEnabled = enabled;
     }
 
     private void DiscardChanges()
@@ -841,22 +921,24 @@ public sealed class ServersPage : Page, IRefreshablePage
             int localPort = double.IsNaN(_localPort.Value) ? 0 : checked((int)_localPort.Value);
             Configuration.CheckLocalPort(localPort);
 
-            List<Server> toSave = _servers
-                .Where(server => !IsCompletelyBlank(server))
-                .Select(CloneServer)
-                .ToList();
-            if (toSave.Count == 0)
+            var toSave = new List<Server>();
+            int savedSelection = -1;
+            for (int index = 0; index < _servers.Count; index++)
             {
-                toSave.Add(new Server());
-                _selectedIndex = 0;
+                Server server = _servers[index];
+                if (IsCompletelyBlank(server))
+                    continue;
+
+                if (index == _selectedIndex)
+                    savedSelection = toSave.Count;
+                Server copy = CloneServer(server);
+                Configuration.CheckServer(copy);
+                toSave.Add(copy);
             }
 
-            foreach (Server server in toSave.Where(server => !IsCompletelyBlank(server)))
-            {
-                Configuration.CheckServer(server);
-            }
-
-            _selectedIndex = Math.Clamp(_selectedIndex, 0, toSave.Count - 1);
+            _selectedIndex = toSave.Count == 0
+                ? -1
+                : savedSelection >= 0 ? savedSelection : 0;
             _context.Controller.SaveServers(toSave, localPort);
             _context.Controller.SelectServerIndex(_selectedIndex);
             _context.Controller.CompleteFirstRun();
@@ -901,12 +983,12 @@ public sealed class ServersPage : Page, IRefreshablePage
         => new()
         {
             server = source.server ?? string.Empty,
-            server_port = source.server_port,
+            ServerPort = source.ServerPort,
             password = source.password ?? string.Empty,
             method = source.method ?? Server.DefaultMethod,
             plugin = source.plugin ?? string.Empty,
-            plugin_opts = source.plugin_opts ?? string.Empty,
-            plugin_args = source.plugin_args ?? string.Empty,
+            PluginOptions = source.PluginOptions ?? string.Empty,
+            PluginArguments = source.PluginArguments ?? string.Empty,
             remarks = source.remarks ?? string.Empty,
             group = source.group ?? string.Empty,
             timeout = source.timeout,

@@ -12,7 +12,8 @@ namespace Shadowsocks.Controller
 
         public static void Configure(ILocalizationService service)
         {
-            _service = service ?? throw new ArgumentNullException(nameof(service));
+            ArgumentNullException.ThrowIfNull(service);
+            _service = service;
         }
 
         public static string GetString(string key, params object[] args)

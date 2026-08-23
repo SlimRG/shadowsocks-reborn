@@ -92,7 +92,7 @@ public sealed class CsvLocalizationService : ILocalizationService
             }
 
             string source = row[enIndex].Trim();
-            if (string.IsNullOrWhiteSpace(source) || source.StartsWith("#", StringComparison.Ordinal))
+            if (string.IsNullOrWhiteSpace(source) || source.StartsWith('#'))
             {
                 continue;
             }

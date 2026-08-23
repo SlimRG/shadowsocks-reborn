@@ -51,9 +51,16 @@ namespace Shadowsocks.UnitTests
             DnsCryptRuntimeStatus started = await runtime.StartAsync(
                 new DnsCryptRuntimeStartOptions(new DnsCryptConfig
                 {
+                    routeThroughShadowsocks = false,
                     automaticResolvers = false,
                     serverNames = new System.Collections.Generic.List<string> { "test-resolver" },
-                }));
+                })
+                {
+                    StaticResolverStamps = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["test-resolver"] = "sdns://test",
+                    },
+                });
             Assert.IsTrue(started.IsRunning);
             string configPath = started.ConfigPath
                 ?? throw new AssertFailedException("Running DNSCrypt status must expose its generated configuration path.");

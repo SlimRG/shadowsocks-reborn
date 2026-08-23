@@ -1,2 +1,5 @@
-﻿! Put user rules line by line in this file.
+﻿! Put user routing rules line by line in this file.
+! Rules use the supported ABP/EasyList network-filter syntax.
+! Normal matching rules route through the proxy; @@ exception rules go DIRECT.
+! User rules are evaluated before GeoSite defaults and changes are applied automatically.
 ! See https://adblockplus.org/en/filter-cheatsheet

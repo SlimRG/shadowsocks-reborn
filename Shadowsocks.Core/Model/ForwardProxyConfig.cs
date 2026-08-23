@@ -5,25 +5,25 @@ namespace Shadowsocks.Model
     [Serializable]
     public class ForwardProxyConfig
     {
-        public const int PROXY_SOCKS5 = 0;
-        public const int PROXY_HTTP = 1;
+        public const int ProxySocks5 = 0;
+        public const int ProxyHttp = 1;
 
         public const int MaxProxyTimeoutSec = 10;
         private const int DefaultProxyTimeoutSec = 3;
 
-        public bool useProxy;
-        public int proxyType;
-        public string proxyServer;
-        public int proxyPort;
-        public int proxyTimeout;
-        public bool useAuth;
-        public string authUser;
-        public string authPwd;
+        public bool useProxy { get; set; }
+        public int proxyType { get; set; }
+        public string proxyServer { get; set; }
+        public int proxyPort { get; set; }
+        public int proxyTimeout { get; set; }
+        public bool useAuth { get; set; }
+        public string authUser { get; set; }
+        public string authPwd { get; set; }
 
         public ForwardProxyConfig()
         {
             useProxy = false;
-            proxyType = PROXY_SOCKS5;
+            proxyType = ProxySocks5;
             proxyServer = "";
             proxyPort = 0;
             proxyTimeout = DefaultProxyTimeoutSec;
@@ -34,9 +34,9 @@ namespace Shadowsocks.Model
 
         public void CheckConfig()
         {
-            if (proxyType < PROXY_SOCKS5 || proxyType > PROXY_HTTP)
+            if (proxyType < ProxySocks5 || proxyType > ProxyHttp)
             {
-                proxyType = PROXY_SOCKS5;
+                proxyType = ProxySocks5;
             }
         }
     }

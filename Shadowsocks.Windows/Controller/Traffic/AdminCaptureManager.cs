@@ -13,6 +13,8 @@ using Newtonsoft.Json.Linq;
 using NLog;
 using Shadowsocks.Core;
 using Shadowsocks.Model;
+using Shadowsocks.Routing;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Core.Storage;
 
 namespace Shadowsocks.Controller.Traffic
@@ -48,6 +50,8 @@ namespace Shadowsocks.Controller.Traffic
         private int _udpRedirectPort;
         private bool _dnsInterceptionActive;
         private bool _dnsFailClosedActive;
+        private bool _managedRoutingActive;
+        private int _managedRoutingRuleCount;
         private bool _disposed;
 
         public AdminCaptureManager()
@@ -62,6 +66,8 @@ namespace Shadowsocks.Controller.Traffic
         public int UdpRedirectPort => IsCaptureActive ? _udpRedirectPort : 0;
         public bool DnsInterceptionActive => IsCaptureActive && _dnsInterceptionActive;
         public bool DnsFailClosedActive => IsCaptureActive && _dnsFailClosedActive;
+        public bool ManagedRoutingActive => IsCaptureActive && _managedRoutingActive;
+        public int ManagedRoutingRuleCount => IsCaptureActive ? _managedRoutingRuleCount : 0;
 
         public event EventHandler StatusChanged;
 
@@ -431,7 +437,7 @@ namespace Shadowsocks.Controller.Traffic
             }
 
             await _writer.WriteLineAsync(json).ConfigureAwait(false);
-            Task<string> readTask = _reader.ReadLineAsync();
+            Task<string> readTask = _reader.ReadLineAsync(cancellationToken).AsTask();
             Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(30), cancellationToken);
             Task completed = await Task.WhenAny(readTask, timeoutTask).ConfigureAwait(false);
             if (completed != readTask)
@@ -478,18 +484,20 @@ namespace Shadowsocks.Controller.Traffic
             IEnumerable<int> excludedProcessIds,
             DnsCaptureRuntimeState dnsRuntime)
         {
-            int fallback = configuration.enabled && configuration.global
+            int fallback = configuration.Enabled && configuration.global
                 ? (int)TrafficRouteAction.Proxy
                 : (int)TrafficRouteAction.Direct;
             var rules = (configuration.applicationRules ?? [])
                 .Where(rule => rule is not null)
                 .Select(rule => new
                 {
-                    enabled = rule.enabled,
-                    application = rule.application ?? string.Empty,
-                    action = (int)rule.action,
+                    enabled = rule.Enabled,
+                    application = rule.Application ?? string.Empty,
+                    action = (int)rule.Action,
                 })
                 .ToArray();
+
+            ManagedRoutingSnapshot managedRouting = ManagedRoutingSnapshotBuilder.Build(configuration);
 
             var request = new
             {
@@ -506,6 +514,13 @@ namespace Shadowsocks.Controller.Traffic
                     .Where(processId => processId > 0)
                     .Distinct()
                     .ToArray(),
+                managedRouting = new
+                {
+                    enabled = managedRouting.IsEnabled,
+                    source = managedRouting.Source,
+                    defaultRules = managedRouting.DefaultRules,
+                    userRules = managedRouting.UserRules,
+                },
                 dnsPolicy = new
                 {
                     mode = (int)(configuration.dnsPolicy?.mode ?? DnsPolicyMode.System),
@@ -668,6 +683,8 @@ namespace Shadowsocks.Controller.Traffic
             _udpRedirectPort = Math.Max(0, response.Value<int?>("udpRedirectPort") ?? 0);
             _dnsInterceptionActive = response.Value<bool?>("dnsInterceptionActive") == true;
             _dnsFailClosedActive = response.Value<bool?>("dnsFailClosedActive") == true;
+            _managedRoutingActive = response.Value<bool?>("managedRoutingActive") == true;
+            _managedRoutingRuleCount = Math.Max(0, response.Value<int?>("managedRoutingRuleCount") ?? 0);
         }
 
         private void ClearRedirectPorts()
@@ -676,6 +693,8 @@ namespace Shadowsocks.Controller.Traffic
             _udpRedirectPort = 0;
             _dnsInterceptionActive = false;
             _dnsFailClosedActive = false;
+            _managedRoutingActive = false;
+            _managedRoutingRuleCount = 0;
         }
 
         private static void LogCaptureConfirmed(JObject response, string operation)
@@ -684,16 +703,21 @@ namespace Shadowsocks.Controller.Traffic
             int udpPort = response.Value<int?>("udpRedirectPort") ?? 0;
             bool dnsIntercept = response.Value<bool?>("dnsInterceptionActive") == true;
             bool dnsFailClosed = response.Value<bool?>("dnsFailClosedActive") == true;
+            bool managedRouting = response.Value<bool?>("managedRoutingActive") == true;
+            int managedRuleCount = response.Value<int?>("managedRoutingRuleCount") ?? 0;
             string message = response.Value<string>("message") ?? "capture-ready";
             Logger.Info(
                 "WinDivert capture confirmed ({0}): {1}; TCP redirect port={2}, UDP redirect port={3}, " +
-                "DNS intercept={4}, DNS fail-closed={5}. The elevated capture child returned success only after WinDivertOpen completed.",
+                "DNS intercept={4}, DNS fail-closed={5}, managed routing={6} ({7} rules). " +
+                "The elevated capture child returned success only after WinDivertOpen completed.",
                 operation,
                 message,
                 tcpPort,
                 udpPort,
                 dnsIntercept,
-                dnsFailClosed);
+                dnsFailClosed,
+                managedRouting,
+                managedRuleCount);
         }
 
         private void RaiseStatusChanged()
@@ -724,6 +748,7 @@ namespace Shadowsocks.Controller.Traffic
             {
             }
             _healthShutdown.Dispose();
+            _installer.Dispose();
             _gate.Dispose();
         }
     }

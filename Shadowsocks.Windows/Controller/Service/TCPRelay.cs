@@ -65,7 +65,7 @@ namespace Shadowsocks.Controller
                 }
             };
 
-            IList<TCPHandler> handlersToClose = new List<TCPHandler>();
+            List<TCPHandler> handlersToClose = new();
             lock (Handlers)
             {
                 Handlers.Add(handler);
@@ -99,7 +99,7 @@ namespace Shadowsocks.Controller
             return true;
         }
 
-        public override void Stop()
+        public override void Shutdown()
         {
             List<TCPHandler> handlersToClose = new List<TCPHandler>();
             lock (Handlers)
@@ -112,34 +112,35 @@ namespace Shadowsocks.Controller
 
     public class SSRelayEventArgs : EventArgs
     {
-        public readonly Server server;
-
         public SSRelayEventArgs(Server server)
         {
-            this.server = server;
+            Server = server;
         }
+
+        public Server Server { get; }
     }
 
     public class SSTransmitEventArgs : SSRelayEventArgs
     {
-        public readonly long length;
         public SSTransmitEventArgs(Server server, long length) : base(server)
         {
-            this.length = length;
+            Length = length;
         }
+
+        public long Length { get; }
     }
 
     public class SSTCPConnectedEventArgs : SSRelayEventArgs
     {
-        public readonly TimeSpan latency;
-
         public SSTCPConnectedEventArgs(Server server, TimeSpan latency) : base(server)
         {
-            this.latency = latency;
+            Latency = latency;
         }
+
+        public TimeSpan Latency { get; }
     }
 
-    internal class TCPHandler
+    internal sealed class TCPHandler : IDisposable
     {
         public event EventHandler<SSTCPConnectedEventArgs> OnConnected;
         public event EventHandler<SSTransmitEventArgs> OnInbound;
@@ -174,7 +175,7 @@ namespace Shadowsocks.Controller
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        private readonly int _serverTimeout;
+        private int _serverTimeout;
         private readonly int _proxyTimeout;
 
         // each recv size.
@@ -213,8 +214,8 @@ namespace Shadowsocks.Controller
 
         private int _addrBufLength = -1;
 
-        private int _totalRead = 0;
-        private int _totalWrite = 0;
+        private int _totalRead;
+        private int _totalWrite;
 
         // remote -> local proxy (ciphertext, before decrypt)
         private readonly byte[] _remoteRecvBuffer = new byte[BufferSize];
@@ -228,9 +229,9 @@ namespace Shadowsocks.Controller
         // local proxy -> client (ciphertext, before decrypt)
         private readonly byte[] _connetionSendBuffer = new byte[BufferSize];
 
-        private bool _connectionShutdown = false;
-        private bool _remoteShutdown = false;
-        private bool _closed = false;
+        private bool _connectionShutdown;
+        private bool _remoteShutdown;
+        private bool _closed;
 
         // instance-based lock without static
         private readonly object _encryptionLock = new object();
@@ -242,7 +243,7 @@ namespace Shadowsocks.Controller
         private DateTime _startReceivingTime;
         private DateTime _startSendingTime;
 
-        private EndPoint _destEndPoint = null;
+        private EndPoint _destEndPoint;
 
         public TCPHandler(ShadowsocksController controller, Configuration config, Socket socket)
         {
@@ -250,7 +251,6 @@ namespace Shadowsocks.Controller
             _config = config.proxy;
             _connection = socket;
             _proxyTimeout = config.proxy.proxyTimeout * 1000;
-            _serverTimeout = config.GetCurrentServer().timeout * 1000;
 
             lastActivity = DateTime.Now;
         }
@@ -267,6 +267,7 @@ namespace Shadowsocks.Controller
             _encryptor = EncryptorFactory.GetEncryptor(server.method, server.password);
 
             _server = server;
+            _serverTimeout = Math.Max(1, server.timeout) * 1000;
 
             /* prepare address buffer length for AEAD */
             Logger.Trace($"_addrBufLength={_addrBufLength}");
@@ -341,6 +342,12 @@ namespace Shadowsocks.Controller
             }
         }
 
+        public void Dispose()
+        {
+            Close();
+            GC.SuppressFinalize(this);
+        }
+
         private void HandshakeReceive()
         {
             if (_closed)
@@ -393,7 +400,7 @@ namespace Shadowsocks.Controller
                 // Skip first 3 bytes, and read 2 more bytes to analysis the address.
                 // 2 more bytes is designed if address is domain then we don't need to read once more to get the addr length.
                 // validate is unnecessary, we did it in first packet, but we can do it in future version
-                _connection.BeginReceive(_connetionRecvBuffer, 0, 3 + ADDR_ATYP_LEN + 1, SocketFlags.None,
+                _connection.BeginReceive(_connetionRecvBuffer, 0, 3 + AddressTypeLength + 1, SocketFlags.None,
                     AddressReceiveCallback, null);
             }
             catch (Exception e)
@@ -471,15 +478,15 @@ namespace Shadowsocks.Controller
 
             switch (atyp)
             {
-                case ATYP_IPv4: // IPv4 address, 4 bytes
-                    ReadAddress(4 + ADDR_PORT_LEN - 1, onSuccess);
+                case AddressTypeIPv4: // IPv4 address, 4 bytes
+                    ReadAddress(4 + AddressPortLength - 1, onSuccess);
                     break;
-                case ATYP_DOMAIN: // domain name, length + str
+                case AddressTypeDomain: // domain name, length + str
                     int len = _connetionRecvBuffer[4];
-                    ReadAddress(len + ADDR_PORT_LEN, onSuccess);
+                    ReadAddress(len + AddressPortLength, onSuccess);
                     break;
-                case ATYP_IPv6: // IPv6 address, 16 bytes
-                    ReadAddress(16 + ADDR_PORT_LEN - 1, onSuccess);
+                case AddressTypeIPv6: // IPv6 address, 16 bytes
+                    ReadAddress(16 + AddressPortLength - 1, onSuccess);
                     break;
                 default:
                     Logger.Debug("Unsupported ATYP=" + atyp);
@@ -491,7 +498,7 @@ namespace Shadowsocks.Controller
         private void ReadAddress(int bytesRemain, Action onSuccess)
         {
             // drop [ VER | CMD |  RSV  ]
-            Array.Copy(_connetionRecvBuffer, 3, _connetionRecvBuffer, 0, ADDR_ATYP_LEN + 1);
+            Array.Copy(_connetionRecvBuffer, 3, _connetionRecvBuffer, 0, AddressTypeLength + 1);
 
             // Read the remain address bytes
             _connection.BeginReceive(_connetionRecvBuffer, 2, RecvSize - 2, SocketFlags.None, OnAddressFullyRead,
@@ -524,24 +531,24 @@ namespace Shadowsocks.Controller
                     int dstPort = -1;
                     switch (atyp)
                     {
-                        case ATYP_IPv4: // IPv4 address, 4 bytes
+                        case AddressTypeIPv4: // IPv4 address, 4 bytes
                             dstAddr = new IPAddress(_connetionRecvBuffer.Skip(1).Take(4).ToArray()).ToString();
                             dstPort = (_connetionRecvBuffer[5] << 8) + _connetionRecvBuffer[6];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 4 + ADDR_PORT_LEN;
+                            _addrBufLength = AddressTypeLength + 4 + AddressPortLength;
                             break;
-                        case ATYP_DOMAIN: // domain name, length + str
+                        case AddressTypeDomain: // domain name, length + str
                             int len = _connetionRecvBuffer[1];
                             dstAddr = System.Text.Encoding.UTF8.GetString(_connetionRecvBuffer, 2, len);
                             dstPort = (_connetionRecvBuffer[len + 2] << 8) + _connetionRecvBuffer[len + 3];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 1 + len + ADDR_PORT_LEN;
+                            _addrBufLength = AddressTypeLength + 1 + len + AddressPortLength;
                             break;
-                        case ATYP_IPv6: // IPv6 address, 16 bytes
+                        case AddressTypeIPv6: // IPv6 address, 16 bytes
                             dstAddr = $"[{new IPAddress(_connetionRecvBuffer.Skip(1).Take(16).ToArray())}]";
                             dstPort = (_connetionRecvBuffer[17] << 8) + _connetionRecvBuffer[18];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
+                            _addrBufLength = AddressTypeLength + 16 + AddressPortLength;
                             break;
                     }
 
@@ -568,15 +575,15 @@ namespace Shadowsocks.Controller
             IPEndPoint endPoint = (IPEndPoint)_connection.LocalEndPoint;
             byte[] address = endPoint.Address.GetAddressBytes();
             int port = endPoint.Port;
-            byte[] response = new byte[4 + address.Length + ADDR_PORT_LEN];
+            byte[] response = new byte[4 + address.Length + AddressPortLength];
             response[0] = 5;
             switch (endPoint.AddressFamily)
             {
                 case AddressFamily.InterNetwork:
-                    response[3] = ATYP_IPv4;
+                    response[3] = AddressTypeIPv4;
                     break;
                 case AddressFamily.InterNetworkV6:
-                    response[3] = ATYP_IPv6;
+                    response[3] = AddressTypeIPv6;
                     break;
             }
             address.CopyTo(response, 4);
@@ -653,7 +660,7 @@ namespace Shadowsocks.Controller
                 // Setting up proxy
                 IProxy remote;
                 EndPoint proxyEP = null;
-                EndPoint serverEP = _controller.ResolveOutboundEndpoint(_server.server, _server.server_port);
+                EndPoint serverEP = _controller.ResolveOutboundEndpoint(_server.server, _server.ServerPort);
                 EndPoint pluginEP = _controller.GetPluginLocalEndPointIfConfigured(_server);
 
                 if (pluginEP != null)
@@ -665,10 +672,10 @@ namespace Shadowsocks.Controller
                 {
                     switch (_config.proxyType)
                     {
-                        case ForwardProxyConfig.PROXY_SOCKS5:
+                        case ForwardProxyConfig.ProxySocks5:
                             remote = new Socks5Proxy();
                             break;
-                        case ForwardProxyConfig.PROXY_HTTP:
+                        case ForwardProxyConfig.ProxyHttp:
                             remote = new HttpProxy();
                             break;
                         default:

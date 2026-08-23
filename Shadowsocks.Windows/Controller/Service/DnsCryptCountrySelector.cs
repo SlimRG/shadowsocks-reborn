@@ -99,8 +99,7 @@ namespace Shadowsocks.Controller.Service
         {
             ArgumentNullException.ThrowIfNull(resolvers);
             ArgumentNullException.ThrowIfNull(config);
-            if (maxCount < 1)
-                throw new ArgumentOutOfRangeException(nameof(maxCount));
+            ArgumentOutOfRangeException.ThrowIfLessThan(maxCount, 1);
 
             return OrderCompatibleResolvers(resolvers, config)
                 .Select(item => item.Name)

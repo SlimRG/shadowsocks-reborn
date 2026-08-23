@@ -19,7 +19,9 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
     private readonly Button _copy;
     private readonly Button _remove;
     private readonly Button _add;
+    private readonly ProgressRing _progress;
     private readonly List<string> _items = new();
+    private bool _busy;
 
     internal OnlineConfigPage(WinUIPageContext context)
     {
@@ -64,6 +66,15 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
         _context.SetToolTip(_remove, "Remove the selected online configuration source.");
         _remove.Click += OnRemoveClicked;
         sourceActions.Children.Add(_remove);
+        _progress = new ProgressRing
+        {
+            Width = 20,
+            Height = 20,
+            IsActive = false,
+            Visibility = Visibility.Collapsed,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        };
+        sourceActions.Children.Add(_progress);
         Grid.SetColumn(sourceActions, 1);
         card.Children.Add(sourceActions);
 
@@ -119,12 +130,26 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
 
     private void UpdateButtons()
     {
+        bool idle = !_busy;
         bool hasSelection = _sources.SelectedIndex >= 0;
-        _update.IsEnabled = hasSelection;
-        _copy.IsEnabled = hasSelection;
-        _remove.IsEnabled = hasSelection;
-        _updateAll.IsEnabled = _items.Count > 0;
-        _add.IsEnabled = IsValidUrl(_url.Text);
+        _sources.IsEnabled = idle;
+        _url.IsEnabled = idle;
+        _update.IsEnabled = idle && hasSelection;
+        _copy.IsEnabled = idle && hasSelection;
+        _remove.IsEnabled = idle && hasSelection;
+        _updateAll.IsEnabled = idle && _items.Count > 0;
+        string candidate = _url.Text?.Trim() ?? string.Empty;
+        _add.IsEnabled = idle
+            && IsValidUrl(candidate)
+            && !_items.Contains(candidate, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _busy = busy;
+        _progress.IsActive = busy;
+        _progress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        UpdateButtons();
     }
 
     private async void OnUpdateClicked(object _, RoutedEventArgs _1)
@@ -134,7 +159,7 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
             return;
         }
 
-        _update.IsEnabled = false;
+        SetBusy(true);
         try
         {
             bool success = await _context.Controller.UpdateOnlineConfig(url);
@@ -147,7 +172,7 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
         }
         finally
         {
-            UpdateButtons();
+            SetBusy(false);
         }
     }
 
@@ -158,7 +183,7 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
             return;
         }
 
-        _updateAll.IsEnabled = false;
+        SetBusy(true);
         try
         {
             List<string> failed = await _context.Controller.UpdateAllOnlineConfig();
@@ -173,7 +198,7 @@ public sealed class OnlineConfigPage : Page, IRefreshablePage
         }
         finally
         {
-            UpdateButtons();
+            SetBusy(false);
         }
     }
 

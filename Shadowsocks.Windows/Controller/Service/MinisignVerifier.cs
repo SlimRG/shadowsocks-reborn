@@ -18,6 +18,16 @@ namespace Shadowsocks.Controller.Service
         private const int Blake2bHashLength = 64;
 
         public static bool VerifyFile(string filePath, string signatureText, string publicKeyBase64)
+            => VerifyFileCore(filePath, signatureText, publicKeyBase64, allowLegacy: false);
+
+        internal static bool VerifyFileAllowLegacy(string filePath, string signatureText, string publicKeyBase64)
+            => VerifyFileCore(filePath, signatureText, publicKeyBase64, allowLegacy: true);
+
+        private static bool VerifyFileCore(
+            string filePath,
+            string signatureText,
+            string publicKeyBase64,
+            bool allowLegacy)
         {
             if (string.IsNullOrWhiteSpace(filePath))
                 throw new ArgumentException("A signed file path is required.", nameof(filePath));
@@ -26,11 +36,20 @@ namespace Shadowsocks.Controller.Service
 
             ParsedPublicKey publicKey = ParsePublicKey(publicKeyBase64);
             ParsedSignature signature = ParseSignature(signatureText);
+            if (signature.Mode == MinisignSignatureMode.Legacy && !allowLegacy)
+                throw new InvalidDataException("Legacy Minisign signatures are not allowed for this artifact.");
             if (!publicKey.KeyId.SequenceEqual(signature.KeyId))
                 return false;
 
-            byte[] messageHash = ComputeBlake2b512(filePath);
-            if (!VerifyEd25519(publicKey.PublicKey, messageHash, signature.Signature))
+            bool payloadSignatureValid = signature.Mode switch
+            {
+                MinisignSignatureMode.Prehashed =>
+                    VerifyEd25519(publicKey.PublicKey, ComputeBlake2b512(filePath), signature.Signature),
+                MinisignSignatureMode.Legacy =>
+                    VerifyEd25519File(publicKey.PublicKey, filePath, signature.Signature),
+                _ => false,
+            };
+            if (!payloadSignatureValid)
                 return false;
 
             byte[] trustedComment = Encoding.UTF8.GetBytes(signature.TrustedComment);
@@ -81,9 +100,9 @@ namespace Shadowsocks.Controller.Service
             byte[] signatureRecord = DecodeBase64(lines[1], "signature");
             if (signatureRecord.Length != SignatureRecordLength
                 || signatureRecord[0] != (byte)'E'
-                || signatureRecord[1] != (byte)'D')
+                || (signatureRecord[1] != (byte)'D' && signatureRecord[1] != (byte)'d'))
             {
-                throw new InvalidDataException("Only modern pre-hashed Minisign signatures are supported.");
+                throw new InvalidDataException("The Minisign signature uses an unsupported algorithm.");
             }
 
             byte[] globalSignature = DecodeBase64(lines[3], "global signature");
@@ -91,11 +110,15 @@ namespace Shadowsocks.Controller.Service
                 throw new InvalidDataException("The Minisign global signature has an invalid length.");
 
             string trustedComment = lines[2].Substring(TrustedCommentPrefix.Length);
+            MinisignSignatureMode mode = signatureRecord[1] == (byte)'D'
+                ? MinisignSignatureMode.Prehashed
+                : MinisignSignatureMode.Legacy;
             return new ParsedSignature(
                 signatureRecord[2..10],
                 signatureRecord[10..74],
                 trustedComment,
-                globalSignature);
+                globalSignature,
+                mode);
         }
 
         private static byte[] DecodeBase64(string value, string description)
@@ -134,7 +157,34 @@ namespace Shadowsocks.Controller.Service
             return verifier.VerifySignature(signature);
         }
 
+        private static bool VerifyEd25519File(byte[] publicKey, string filePath, byte[] signature)
+        {
+            var verifier = new Ed25519Signer();
+            verifier.Init(false, new Ed25519PublicKeyParameters(publicKey, 0));
+
+            byte[] buffer = new byte[64 * 1024];
+            using FileStream input = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                verifier.BlockUpdate(buffer, 0, read);
+            }
+
+            return verifier.VerifySignature(signature);
+        }
+
+        private enum MinisignSignatureMode
+        {
+            Legacy,
+            Prehashed,
+        }
+
         private sealed record ParsedPublicKey(byte[] KeyId, byte[] PublicKey);
-        private sealed record ParsedSignature(byte[] KeyId, byte[] Signature, string TrustedComment, byte[] GlobalSignature);
+        private sealed record ParsedSignature(
+            byte[] KeyId,
+            byte[] Signature,
+            string TrustedComment,
+            byte[] GlobalSignature,
+            MinisignSignatureMode Mode);
     }
 }

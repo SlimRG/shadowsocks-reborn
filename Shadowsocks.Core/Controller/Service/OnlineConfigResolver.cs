@@ -12,7 +12,7 @@ namespace Shadowsocks.Controller.Service
     {
         public static async Task<List<Server>> GetOnline(HttpClient httpClient, string url)
         {
-            if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
+            ArgumentNullException.ThrowIfNull(httpClient);
             string server_json = await httpClient.GetStringAsync(url);
             var servers = server_json.GetServers();
             foreach (var server in servers)

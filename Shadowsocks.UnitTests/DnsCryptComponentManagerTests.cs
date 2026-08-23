@@ -21,6 +21,25 @@ namespace Shadowsocks.UnitTests
     [DoNotParallelize]
     public class DnsCryptComponentManagerTests
     {
+        [TestMethod]
+        public void SecurityPinsMatchOfficialDnsCryptProject()
+        {
+            Assert.AreEqual("DNSCrypt/dnscrypt-proxy", ReadDnsCryptConstant(nameof(DnsCryptComponentManager.Repository)));
+            Assert.AreEqual("dnscrypt-proxy.exe", ReadDnsCryptConstant(nameof(DnsCryptComponentManager.ExpectedExecutableName)));
+
+            byte[] minisignKey = Convert.FromBase64String(DnsCryptComponentManager.ReleaseSigningPublicKey);
+            Assert.AreEqual(42, minisignKey.Length);
+        }
+
+        private static string ReadDnsCryptConstant(string fieldName)
+        {
+            System.Reflection.FieldInfo field = typeof(DnsCryptComponentManager).GetField(
+                fieldName,
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            Assert.IsNotNull(field);
+            return (string)field.GetRawConstantValue();
+        }
+
         private string root;
         private string componentRoot;
         private string updateRoot;
@@ -178,6 +197,67 @@ namespace Shadowsocks.UnitTests
 
             File.AppendAllText(signedFile, "tampered", Encoding.UTF8);
             Assert.IsFalse(MinisignVerifier.VerifyFile(signedFile, fixture.SignatureText, fixture.PublicKey));
+        }
+
+        [TestMethod]
+        public void MinisignVerifierAcceptsLegacyResolverCatalogSignatureAndRejectsTampering()
+        {
+            byte[] payload = Encoding.UTF8.GetBytes("dnscrypt resolver catalog fixture");
+            string signedFile = Path.Combine(root, "public-resolvers.md");
+            File.WriteAllBytes(signedFile, payload);
+            MinisignFixture fixture = CreateMinisignFixture(payload, prehashed: false);
+
+            Assert.IsTrue(MinisignVerifier.VerifyFileAllowLegacy(signedFile, fixture.SignatureText, fixture.PublicKey));
+
+            File.AppendAllText(signedFile, "tampered", Encoding.UTF8);
+            Assert.IsFalse(MinisignVerifier.VerifyFileAllowLegacy(signedFile, fixture.SignatureText, fixture.PublicKey));
+        }
+
+        [TestMethod]
+        public void MinisignVerifierRecognizesOfficialResolverLegacySignatureFormat()
+        {
+            string signedFile = Path.Combine(root, "official-resolver-format.md");
+            File.WriteAllText(signedFile, "intentionally not the signed upstream catalog", Encoding.UTF8);
+            string signatureText = string.Join("\n", new[]
+            {
+                "untrusted comment: signature from minisign secret key",
+                "RWQf6LRCGA9i59dR/JthmdbOIHVSepvwImbIu8RNVy4drRsi1YPHp5bLTqvDVu3BgNy7/eYDZWDnKzxl+aovrP1VNU6qBzD9CQs=",
+                "trusted comment: timestamp:1786712947\tfile:public-resolvers.md",
+                "zyX1ZY3vlnMtEY4vditqPW3+XnMcqvgVWXa7FPvWv0VDcVXs1d2rIXtBpj2bZO8xHQUIqlotHNlmvdi9F2GMBA==",
+                string.Empty,
+            });
+
+            Assert.IsFalse(MinisignVerifier.VerifyFileAllowLegacy(
+                signedFile,
+                signatureText,
+                DnsCryptTomlGenerator.PublicResolversMinisignKey));
+        }
+
+        [TestMethod]
+        public void MinisignVerifierDefaultPathRejectsLegacySignature()
+        {
+            byte[] payload = Encoding.UTF8.GetBytes("legacy release fixture");
+            string signedFile = Path.Combine(root, "legacy-release.zip");
+            File.WriteAllBytes(signedFile, payload);
+            MinisignFixture fixture = CreateMinisignFixture(payload, prehashed: false);
+
+            Assert.ThrowsExactly<InvalidDataException>(() =>
+                MinisignVerifier.VerifyFile(signedFile, fixture.SignatureText, fixture.PublicKey));
+        }
+
+        [TestMethod]
+        public void MinisignVerifierRejectsTamperedTrustedCommentForLegacySignature()
+        {
+            byte[] payload = Encoding.UTF8.GetBytes("dnscrypt resolver catalog fixture");
+            string signedFile = Path.Combine(root, "public-resolvers-comment.md");
+            File.WriteAllBytes(signedFile, payload);
+            MinisignFixture fixture = CreateMinisignFixture(payload, prehashed: false);
+            string tamperedSignature = fixture.SignatureText.Replace(
+                "file:public-resolvers.md",
+                "file:tampered-resolvers.md",
+                StringComparison.Ordinal);
+
+            Assert.IsFalse(MinisignVerifier.VerifyFileAllowLegacy(signedFile, tamperedSignature, fixture.PublicKey));
         }
 
         [TestMethod]
@@ -549,20 +629,36 @@ namespace Shadowsocks.UnitTests
             return stream.ToArray();
         }
 
-        private static MinisignFixture CreateMinisignFixture(byte[] payload, int seedOffset = 0)
+        private static MinisignFixture CreateMinisignFixture(
+            byte[] payload,
+            int seedOffset = 0,
+            bool prehashed = true)
         {
             byte[] seed = Enumerable.Range(0, 32).Select(value => (byte)(value + seedOffset)).ToArray();
             byte[] keyId = Enumerable.Range(1, 8).Select(value => (byte)(value + seedOffset)).ToArray();
             var privateKey = new Ed25519PrivateKeyParameters(seed);
             byte[] publicKeyBytes = privateKey.GeneratePublicKey().GetEncoded();
 
-            var digest = new Blake2bDigest(512);
-            digest.BlockUpdate(payload, 0, payload.Length);
-            byte[] hash = new byte[64];
-            digest.DoFinal(hash, 0);
+            byte[] signedPayload;
+            string algorithm;
+            string trustedComment;
+            if (prehashed)
+            {
+                var digest = new Blake2bDigest(512);
+                digest.BlockUpdate(payload, 0, payload.Length);
+                signedPayload = new byte[64];
+                digest.DoFinal(signedPayload, 0);
+                algorithm = "ED";
+                trustedComment = "timestamp:1700000000\tfile:dnscrypt-proxy.zip\thashed";
+            }
+            else
+            {
+                signedPayload = payload;
+                algorithm = "Ed";
+                trustedComment = "timestamp:1700000000\tfile:public-resolvers.md";
+            }
 
-            byte[] signature = Sign(privateKey, hash);
-            string trustedComment = "timestamp:1700000000\tfile:dnscrypt-proxy.zip\thashed";
+            byte[] signature = Sign(privateKey, signedPayload);
             byte[] trustedCommentBytes = Encoding.UTF8.GetBytes(trustedComment);
             byte[] globalMessage = new byte[signature.Length + trustedCommentBytes.Length];
             Buffer.BlockCopy(signature, 0, globalMessage, 0, signature.Length);
@@ -570,7 +666,7 @@ namespace Shadowsocks.UnitTests
             byte[] globalSignature = Sign(privateKey, globalMessage);
 
             byte[] publicKeyRecord = Concat(Encoding.ASCII.GetBytes("Ed"), keyId, publicKeyBytes);
-            byte[] signatureRecord = Concat(Encoding.ASCII.GetBytes("ED"), keyId, signature);
+            byte[] signatureRecord = Concat(Encoding.ASCII.GetBytes(algorithm), keyId, signature);
             string signatureText = string.Join("\n", new[]
             {
                 "untrusted comment: signature from test key",

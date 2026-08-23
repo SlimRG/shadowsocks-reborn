@@ -13,6 +13,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using NLog;
 using Shadowsocks.Core.Storage;
 
 namespace Shadowsocks.Controller.Service
@@ -74,11 +75,12 @@ namespace Shadowsocks.Controller.Service
             WriteIndented = true,
         };
 
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly HttpClient httpClient;
         private readonly bool ownsHttpClient;
         private readonly string componentDirectory;
         private readonly string updateDirectory;
-        private readonly IReadOnlyList<string> trustedReleasePublicKeys;
+        private readonly string[] trustedReleasePublicKeys;
         private readonly SemaphoreSlim operationLock = new(1, 1);
         private bool disposed;
 
@@ -87,7 +89,23 @@ namespace Shadowsocks.Controller.Service
                 httpClient,
                 AppStoragePaths.DnsCryptComponentDirectory,
                 AppStoragePaths.DnsCryptUpdateDirectory,
-                [ReleaseSigningPublicKey])
+                [ReleaseSigningPublicKey],
+                ownsHttpClient: httpClient is null)
+        {
+        }
+
+        internal DnsCryptComponentManager(
+            Func<string> proxyHostProvider,
+            Func<int> proxyPortProvider)
+            : this(
+                ShadowsocksDohHttpClient.CreateTunneledClient(
+                    proxyHostProvider,
+                    proxyPortProvider,
+                    TimeSpan.FromMinutes(5)),
+                AppStoragePaths.DnsCryptComponentDirectory,
+                AppStoragePaths.DnsCryptUpdateDirectory,
+                [ReleaseSigningPublicKey],
+                ownsHttpClient: true)
         {
         }
 
@@ -96,6 +114,16 @@ namespace Shadowsocks.Controller.Service
             string componentDirectory,
             string updateDirectory,
             IReadOnlyList<string> trustedReleasePublicKeys)
+            : this(httpClient, componentDirectory, updateDirectory, trustedReleasePublicKeys, ownsHttpClient: false)
+        {
+        }
+
+        private DnsCryptComponentManager(
+            HttpClient httpClient,
+            string componentDirectory,
+            string updateDirectory,
+            IReadOnlyList<string> trustedReleasePublicKeys,
+            bool ownsHttpClient)
         {
             if (string.IsNullOrWhiteSpace(componentDirectory))
                 throw new ArgumentException("A DNSCrypt component directory is required.", nameof(componentDirectory));
@@ -105,7 +133,7 @@ namespace Shadowsocks.Controller.Service
                 throw new ArgumentException("At least one trusted DNSCrypt release signing key is required.", nameof(trustedReleasePublicKeys));
 
             this.httpClient = httpClient ?? CreateHttpClient();
-            ownsHttpClient = httpClient is null;
+            this.ownsHttpClient = ownsHttpClient || httpClient is null;
             this.componentDirectory = Path.GetFullPath(componentDirectory);
             this.updateDirectory = Path.GetFullPath(updateDirectory);
             this.trustedReleasePublicKeys = trustedReleasePublicKeys
@@ -114,7 +142,7 @@ namespace Shadowsocks.Controller.Service
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
 
-            if (this.trustedReleasePublicKeys.Count == 0)
+            if (this.trustedReleasePublicKeys.Length == 0)
                 throw new ArgumentException("At least one non-empty DNSCrypt release signing key is required.", nameof(trustedReleasePublicKeys));
 
             CleanupTransientState();
@@ -123,27 +151,41 @@ namespace Shadowsocks.Controller.Service
         public async Task<DnsCryptReleaseInfo> GetLatestReleaseAsync(CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
-            using HttpRequestMessage request = CreateGitHubApiRequest(HttpMethod.Get, new Uri(LatestReleaseApiUrl));
-            using HttpResponseMessage response = await httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            try
+            {
+                using HttpRequestMessage request = CreateGitHubApiRequest(HttpMethod.Get, new Uri(LatestReleaseApiUrl));
+                using HttpResponseMessage response = await httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
 
-            byte[] content = await ReadContentBytesWithLimitAsync(
-                response.Content,
-                MaxReleaseMetadataBytes,
-                cancellationToken).ConfigureAwait(false);
-            GitHubRelease release = JsonSerializer.Deserialize<GitHubRelease>(content)
-                ?? throw new InvalidDataException("GitHub returned an empty DNSCrypt release document.");
+                byte[] content = await ReadContentBytesWithLimitAsync(
+                    response.Content,
+                    MaxReleaseMetadataBytes,
+                    cancellationToken).ConfigureAwait(false);
+                GitHubRelease release = JsonSerializer.Deserialize<GitHubRelease>(content)
+                    ?? throw new InvalidDataException("GitHub returned an empty DNSCrypt release document.");
 
-            return SelectRelease(release);
+                return SelectRelease(release);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or DnsCryptBootstrapException)
+            {
+                Logger.Error(exception, "DNSCrypt GitHub release lookup failed through DoH-over-Shadowsocks: {0}", LatestReleaseApiUrl);
+                throw new DnsCryptComponentNetworkException(
+                    "DNSCrypt component release metadata could not be fetched through DoH-over-Shadowsocks.",
+                    exception);
+            }
         }
 
         public async Task<DnsCryptPreparedComponent> PrepareLatestAsync(
             IProgress<DnsCryptComponentProgress> progress = null,
-            CancellationToken cancellationToken = default,
-            bool forceDownload = false)
+            bool forceDownload = false,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             await operationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -151,7 +193,7 @@ namespace Shadowsocks.Controller.Service
             {
                 progress?.Report(new DnsCryptComponentProgress(DnsCryptComponentStage.CheckingRelease));
                 DnsCryptReleaseInfo release = await GetLatestReleaseAsync(cancellationToken).ConfigureAwait(false);
-                return await PrepareReleaseCoreAsync(release, progress, cancellationToken, forceDownload).ConfigureAwait(false);
+                return await PrepareReleaseCoreAsync(release, progress, forceDownload, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -162,15 +204,15 @@ namespace Shadowsocks.Controller.Service
         internal async Task<DnsCryptPreparedComponent> PrepareReleaseAsync(
             DnsCryptReleaseInfo release,
             IProgress<DnsCryptComponentProgress> progress = null,
-            CancellationToken cancellationToken = default,
-            bool forceDownload = false)
+            bool forceDownload = false,
+            CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(release);
             await operationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await PrepareReleaseCoreAsync(release, progress, cancellationToken, forceDownload).ConfigureAwait(false);
+                return await PrepareReleaseCoreAsync(release, progress, forceDownload, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -583,7 +625,7 @@ namespace Shadowsocks.Controller.Service
             }
         }
 
-        private ComponentMetadata CreateDefaultMetadata() => new()
+        private static ComponentMetadata CreateDefaultMetadata() => new()
         {
             ComponentId = ComponentId,
             Repository = Repository,
@@ -680,7 +722,7 @@ namespace Shadowsocks.Controller.Service
                 throw new InvalidDataException($"DNSCrypt archive contains a reparse-point entry '{entry.FullName}'.");
         }
 
-        private static void CopyWithLimit(Stream input, Stream output, long declaredLength, long maxBytes)
+        private static void CopyWithLimit(Stream input, FileStream output, long declaredLength, long maxBytes)
         {
             byte[] buffer = new byte[64 * 1024];
             long copied = 0;
@@ -759,8 +801,7 @@ namespace Shadowsocks.Controller.Service
 
         private void ThrowIfDisposed()
         {
-            if (disposed)
-                throw new ObjectDisposedException(nameof(DnsCryptComponentManager));
+            ObjectDisposedException.ThrowIf(disposed, this);
         }
 
         public void Dispose()

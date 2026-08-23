@@ -126,7 +126,7 @@ namespace Shadowsocks.Controller.Hotkeys
 
         public bool Register(string name, string gestureText, Action callback)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(GlobalHotkeyService));
+            ObjectDisposedException.ThrowIf(_disposed, this);
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
             ArgumentNullException.ThrowIfNull(callback);
             if (!HotkeyGesture.TryParse(gestureText, out HotkeyGesture gesture)) return false;

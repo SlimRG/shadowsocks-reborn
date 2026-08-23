@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -10,13 +11,14 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
+using Shadowsocks.Controller;
 using Shadowsocks.Core.Logging;
 using Shadowsocks.Model;
 using Shadowsocks.WinUI.UI;
 
 namespace Shadowsocks.WinUI.Pages;
 
-public sealed class LogsPage : Page, IRefreshablePage
+public sealed class LogsPage : Page, IRefreshablePage, IDisposable
 {
     private const int MaxTailBytes = 256 * 1024;
     private const int MaxVisibleLogLines = 750;
@@ -44,7 +46,7 @@ public sealed class LogsPage : Page, IRefreshablePage
     private readonly CheckBox _topMost;
     private readonly DispatcherQueueTimer _timer;
     private readonly DispatcherQueueTimer _viewerConfigSaveTimer;
-    private readonly SemaphoreSlim _loggingSettingsGate = new(1, 1);
+    private readonly Lock _loggingSettingsGate = new();
 
     private long[] _inboundSamples = [];
     private long[] _outboundSamples = [];
@@ -54,7 +56,8 @@ public sealed class LogsPage : Page, IRefreshablePage
     private DateTime _lastRenderedLogWriteUtc = DateTime.MinValue;
     private string _lastViewerText = string.Empty;
     private bool _lastViewerIsStandaloneMessage;
-    private CancellationTokenSource? _logRefreshCts;
+    private Action? _cancelLogRefresh;
+    private bool _disposed;
     private int _logRefreshGeneration;
     private int _loggingPreferenceWrites;
     private LogViewerConfig? _pendingViewerConfig;
@@ -179,8 +182,8 @@ public sealed class LogsPage : Page, IRefreshablePage
         chart.Children.Add(_chartCurrent);
         _chartScale = WinUIStyles.CreateText("Scale 1 KiB/s", "CaptionTextBlockStyle");
         chart.Children.Add(_chartScale);
-        _inboundGraph = CreateTrafficGraphText("Inbound  ");
-        _outboundGraph = CreateTrafficGraphText("Outbound ");
+        _inboundGraph = CreateTrafficGraphText(_context.L("Inbound") + "  ");
+        _outboundGraph = CreateTrafficGraphText(_context.L("Outbound") + " ");
         chart.Children.Add(_inboundGraph);
         chart.Children.Add(_outboundGraph);
         panel.Children.Add(WinUIStyles.CreateCard(chart));
@@ -284,11 +287,19 @@ public sealed class LogsPage : Page, IRefreshablePage
 
     private async Task PersistLoggingPreferenceAsync(Action update, string settingName)
     {
+        if (_disposed)
+            return;
+
         Interlocked.Increment(ref _loggingPreferenceWrites);
-        await _loggingSettingsGate.WaitAsync().ConfigureAwait(true);
         try
         {
-            await Task.Run(update).ConfigureAwait(true);
+            await Task.Run(() =>
+            {
+                lock (_loggingSettingsGate)
+                {
+                    update();
+                }
+            }).ConfigureAwait(true);
             RenderCurrentViewerText();
             QueueLogRefresh(force: true);
         }
@@ -299,7 +310,6 @@ public sealed class LogsPage : Page, IRefreshablePage
         }
         finally
         {
-            _loggingSettingsGate.Release();
             Interlocked.Decrement(ref _loggingPreferenceWrites);
         }
     }
@@ -383,11 +393,9 @@ public sealed class LogsPage : Page, IRefreshablePage
             return;
         }
 
-        // TrafficChanged is raised by the statistics thread immediately after the queue is rotated,
-        // so this snapshot is taken on the same thread before the next mutation.
-        var snapshot = controller.trafficPerSecondQueue.TakeLast(TrafficWindowSeconds).ToArray();
-        long[] inbound = snapshot.Select(item => Math.Max(0, item.inboundIncreasement)).ToArray();
-        long[] outbound = snapshot.Select(item => Math.Max(0, item.outboundIncreasement)).ToArray();
+        IReadOnlyList<ShadowsocksController.TrafficPerSecond> snapshot = controller.GetTrafficSnapshot(TrafficWindowSeconds);
+        long[] inbound = snapshot.Select(item => Math.Max(0, item.InboundIncrement)).ToArray();
+        long[] outbound = snapshot.Select(item => Math.Max(0, item.OutboundIncrement)).ToArray();
         _ = DispatcherQueue.TryEnqueue(() => UpdateTrafficSamples(inbound, outbound));
     }
 
@@ -400,18 +408,10 @@ public sealed class LogsPage : Page, IRefreshablePage
             return;
         }
 
-        try
-        {
-            var snapshot = controller.trafficPerSecondQueue.TakeLast(TrafficWindowSeconds).ToArray();
-            UpdateTrafficSamples(
-                snapshot.Select(item => Math.Max(0, item.inboundIncreasement)).ToArray(),
-                snapshot.Select(item => Math.Max(0, item.outboundIncreasement)).ToArray());
-        }
-        catch (InvalidOperationException)
-        {
-            // A manual refresh can race the statistics thread. The next TrafficChanged event
-            // provides a stable snapshot from the statistics thread itself.
-        }
+        IReadOnlyList<ShadowsocksController.TrafficPerSecond> snapshot = controller.GetTrafficSnapshot(TrafficWindowSeconds);
+        UpdateTrafficSamples(
+            snapshot.Select(item => Math.Max(0, item.InboundIncrement)).ToArray(),
+            snapshot.Select(item => Math.Max(0, item.OutboundIncrement)).ToArray());
     }
 
     private void UpdateTrafficSamples(long[] inbound, long[] outbound)
@@ -525,18 +525,22 @@ public sealed class LogsPage : Page, IRefreshablePage
 
     private async Task PersistViewerConfigAsync(LogViewerConfig config)
     {
-        await _loggingSettingsGate.WaitAsync().ConfigureAwait(true);
+        if (_disposed)
+            return;
+
         try
         {
-            await Task.Run(() => _context.Controller?.SaveLogViewerConfig(config)).ConfigureAwait(true);
+            await Task.Run(() =>
+            {
+                lock (_loggingSettingsGate)
+                {
+                    _context.Controller?.SaveLogViewerConfig(config);
+                }
+            }).ConfigureAwait(true);
         }
         catch (Exception exception)
         {
             _context.ShowInfo("Logs", _context.LF("Unable to save log viewer settings: {0}", exception.Message), InfoBarSeverity.Error);
-        }
-        finally
-        {
-            _loggingSettingsGate.Release();
         }
     }
 
@@ -561,24 +565,37 @@ public sealed class LogsPage : Page, IRefreshablePage
             return;
 
         int generation = Interlocked.Increment(ref _logRefreshGeneration);
-        CancellationTokenSource? previous = _logRefreshCts;
-        _logRefreshCts = new CancellationTokenSource();
-        previous?.Cancel();
-        previous?.Dispose();
-        _ = RefreshLogTextAsync(force, generation, _logRefreshCts.Token);
+        _cancelLogRefresh?.Invoke();
+        _ = RefreshLogTextAsync(force, generation);
     }
 
     private void CancelLogRefresh()
     {
         Interlocked.Increment(ref _logRefreshGeneration);
-        CancellationTokenSource? current = _logRefreshCts;
-        _logRefreshCts = null;
-        current?.Cancel();
-        current?.Dispose();
+        _cancelLogRefresh?.Invoke();
+        _cancelLogRefresh = null;
     }
 
-    private async Task RefreshLogTextAsync(bool force, int generation, CancellationToken cancellationToken)
+    public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _timer.Stop();
+        _viewerConfigSaveTimer.Stop();
+        _pendingViewerConfig = null;
+        CancelLogRefresh();
+        UnsubscribeTraffic();
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task RefreshLogTextAsync(bool force, int generation)
+    {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        _cancelLogRefresh = cancel;
+        CancellationToken cancellationToken = cancellation.Token;
         UpdateTrafficText();
         string path = LoggingConfigurator.LogFilePath;
         _logPath.Text = path;
@@ -618,6 +635,11 @@ public sealed class LogsPage : Page, IRefreshablePage
         {
             if (!cancellationToken.IsCancellationRequested && generation == _logRefreshGeneration)
                 SetViewerMessage(_context.LF("Unable to read log: {0}", exception.Message), LogLineSeverity.Error);
+        }
+        finally
+        {
+            if (ReferenceEquals(_cancelLogRefresh, cancel))
+                _cancelLogRefresh = null;
         }
     }
 

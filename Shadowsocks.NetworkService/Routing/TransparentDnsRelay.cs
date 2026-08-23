@@ -71,7 +71,8 @@ internal sealed class TransparentDnsRelay : IAsyncDisposable
         if (normalizedEndpoints.Any(endpoint => endpoint.Port is < 1 or > 65535))
             throw new ArgumentOutOfRangeException(nameof(upstreamEndpoints));
 
-        _flows = flows ?? throw new ArgumentNullException(nameof(flows));
+        ArgumentNullException.ThrowIfNull(flows);
+        _flows = flows;
         _upstreamEndpoints = normalizedEndpoints;
         if (!string.IsNullOrWhiteSpace(proxyHost))
         {
@@ -160,8 +161,8 @@ internal sealed class TransparentDnsRelay : IAsyncDisposable
                         _udpListener,
                         _upstreamEndpoints,
                         _localSocksEndpoint,
-                        _shutdown.Token,
-                        RemoveFaultedUdpFlow));
+                        RemoveFaultedUdpFlow,
+                        _shutdown.Token));
                 try
                 {
                     await flow.SendAsync(buffer.AsMemory(0, result.ReceivedBytes)).ConfigureAwait(false);
@@ -526,7 +527,7 @@ internal sealed class TransparentDnsRelay : IAsyncDisposable
         private readonly Socket _transparentListener;
         private readonly CancellationToken _token;
         private readonly Action<FlowKey, UdpDnsFlow> _onFault;
-        private readonly IReadOnlyList<Socket> _dnsSockets;
+        private readonly List<Socket> _dnsSockets;
         private readonly IReadOnlyList<IPEndPoint> _upstreamEndpoints;
         private readonly IPEndPoint? _localSocksEndpoint;
         private readonly SemaphoreSlim _sendLock = new(1, 1);
@@ -542,8 +543,8 @@ internal sealed class TransparentDnsRelay : IAsyncDisposable
             Socket transparentListener,
             IReadOnlyList<IPEndPoint> upstreamEndpoints,
             IPEndPoint? localSocksEndpoint,
-            CancellationToken token,
-            Action<FlowKey, UdpDnsFlow> onFault)
+            Action<FlowKey, UdpDnsFlow> onFault,
+            CancellationToken token)
         {
             _flow = flow;
             _transparentListener = transparentListener;

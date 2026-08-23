@@ -114,7 +114,8 @@ namespace Shadowsocks.Controller.Service
 
         public SystemDnsCryptRunningProcess(Process process)
         {
-            this.process = process ?? throw new ArgumentNullException(nameof(process));
+            ArgumentNullException.ThrowIfNull(process);
+            this.process = process;
             killOnCloseJob = new Job();
             try
             {

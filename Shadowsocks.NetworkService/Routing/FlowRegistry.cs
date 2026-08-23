@@ -30,12 +30,17 @@ internal sealed class FlowRegistry
                     ProcessId = process.ProcessId,
                     ProcessPath = process.ProcessPath,
                     ProcessName = process.ProcessName,
-                    Route = _policy.Evaluate(process.ProcessId, process.ProcessPath, process.ProcessName),
+                    Route = _policy.Evaluate(
+                        key.Protocol,
+                        key.RemotePort,
+                        process.ProcessId,
+                        process.ProcessPath,
+                        process.ProcessName),
                 };
                 if (_flows.TryUpdate(key, resolved, state))
                 {
                     state = resolved;
-                    if (resolved.Route == RouteAction.Proxy)
+                    if (resolved.Route is RouteAction.Proxy or RouteAction.Deferred)
                     {
                         IndexReflected(resolved);
                     }
@@ -58,7 +63,7 @@ internal sealed class FlowRegistry
             if (_flows.TryUpdate(key, updated, state))
             {
                 state = updated;
-                if (state.Route == RouteAction.Proxy)
+                if (state.Route is RouteAction.Proxy or RouteAction.Deferred)
                 {
                     IndexReflected(state);
                 }
@@ -126,9 +131,21 @@ internal sealed class FlowRegistry
     private FlowState CreateState(FlowKey key)
     {
         ProcessIdentity process = ProcessResolver.Resolve(key);
-        RouteAction route = _policy.Evaluate(process.ProcessId, process.ProcessPath, process.ProcessName);
-        FlowState state = new(key, process.ProcessId, process.ProcessPath, process.ProcessName, route, DateTime.UtcNow);
-        if (route == RouteAction.Proxy)
+        RouteAction route = _policy.Evaluate(
+            key.Protocol,
+            key.RemotePort,
+            process.ProcessId,
+            process.ProcessPath,
+            process.ProcessName);
+        FlowState state = new(
+            key,
+            process.ProcessId,
+            process.ProcessPath,
+            process.ProcessName,
+            route,
+            _policy.DefaultRoute,
+            DateTime.UtcNow);
+        if (route is RouteAction.Proxy or RouteAction.Deferred)
         {
             IndexReflected(state);
         }

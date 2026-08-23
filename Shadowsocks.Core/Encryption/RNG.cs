@@ -5,7 +5,7 @@ namespace Shadowsocks.Encryption
 {
     public static class RNG
     {
-        private static RandomNumberGenerator _rng = null;
+        private static RandomNumberGenerator _rng;
 
         public static void Init()
         {
@@ -26,13 +26,14 @@ namespace Shadowsocks.Encryption
 
         public static void GetBytes(byte[] buf)
         {
+            ArgumentNullException.ThrowIfNull(buf);
             GetBytes(buf, buf.Length);
         }
 
         public static void GetBytes(byte[] buf, int len)
         {
             if (_rng == null) Init();
-            if (buf == null) throw new ArgumentNullException(nameof(buf));
+            ArgumentNullException.ThrowIfNull(buf);
             if ((uint)len > (uint)buf.Length) throw new ArgumentOutOfRangeException(nameof(len));
             _rng.GetBytes(buf.AsSpan(0, len));
         }

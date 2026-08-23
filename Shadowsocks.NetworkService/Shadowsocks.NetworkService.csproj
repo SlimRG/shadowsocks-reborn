@@ -2,7 +2,6 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <Version>2.2.31</Version>
     <Authors>Shadowsocks community</Authors>
     <RepositoryUrl>https://github.com/SlimRG/shadowsocks-reborn</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -14,6 +13,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);SHADOWSOCKS_NETWORKSERVICE_FILTER_ENGINE</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <NetworkServiceProductPublish Condition="'$(NetworkServiceProductPublish)' == ''">false</NetworkServiceProductPublish>
@@ -38,6 +38,12 @@
     <SelfContained>false</SelfContained>
     <PublishSingleFile>false</PublishSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Share the dependency-free managed ABP matcher source without pulling the full Core
+         assembly and its packages into the elevated single-file helper. -->
+    <Compile Include="..\Shadowsocks.Core\Routing\FilterEngine.cs" Link="Routing\Shared\FilterEngine.cs" />
+  </ItemGroup>
 
   <Target Name="ValidateNetworkServicePublishMode" BeforeTargets="PrepareForPublish" Condition="'$(NetworkServiceProductPublish)' == 'true'">
     <Message Importance="High"

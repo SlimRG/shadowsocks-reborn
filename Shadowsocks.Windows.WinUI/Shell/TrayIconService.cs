@@ -2,10 +2,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -15,7 +15,7 @@ using Microsoft.UI.Xaml.Media;
 using NLog;
 using WinUIEx;
 
-namespace Shadowsocks.Windows.Shell;
+namespace Shadowsocks.Windows.WinUI.Shell;
 
 public enum TraySystemProxyMode
 {
@@ -67,7 +67,6 @@ public enum TrayCommandKind
     SelectStrategy,
     UseLocalPac,
     UseOnlinePac,
-    EditLocalPacFile,
     UpdateLocalPacFromGeosite,
     EditUserRuleFile,
     ToggleSecureLocalPac,
@@ -95,6 +94,7 @@ public sealed record TrayMenuState(
     bool DnsCryptUpdateAvailable,
     IReadOnlyList<TrayStrategyMenuItem> Strategies,
     IReadOnlyList<TrayServerMenuItem> Servers,
+    bool HasConfiguredServer,
     bool UseOnlinePac,
     bool SecureLocalPac,
     bool RegeneratePacOnUpdate,
@@ -249,8 +249,12 @@ public sealed class TrayIconService : IDisposable
     {
         var menu = new MenuFlyoutSubItem { Text = L("System Proxy") };
         menu.Items.Add(CreateToggleItem("Disable", state.SystemProxyMode == TraySystemProxyMode.Disabled, TrayCommandKind.SetSystemProxyDisabled));
-        menu.Items.Add(CreateToggleItem("PAC", state.SystemProxyMode == TraySystemProxyMode.Pac, TrayCommandKind.SetSystemProxyPac));
-        menu.Items.Add(CreateToggleItem("Global", state.SystemProxyMode == TraySystemProxyMode.Global, TrayCommandKind.SetSystemProxyGlobal));
+        ToggleMenuFlyoutItem pac = CreateToggleItem("PAC", state.SystemProxyMode == TraySystemProxyMode.Pac, TrayCommandKind.SetSystemProxyPac);
+        ToggleMenuFlyoutItem global = CreateToggleItem("Global", state.SystemProxyMode == TraySystemProxyMode.Global, TrayCommandKind.SetSystemProxyGlobal);
+        pac.IsEnabled = state.HasConfiguredServer;
+        global.IsEnabled = state.HasConfiguredServer;
+        menu.Items.Add(pac);
+        menu.Items.Add(global);
         return menu;
     }
 
@@ -265,7 +269,7 @@ public sealed class TrayIconService : IDisposable
             TrayCommandKind.SetTrafficAdmin);
         adminModeItem.Icon = new FontIcon
         {
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
             Glyph = "\uEA18", // Shield: marks the UAC/elevation path.
         };
         menu.Items.Add(adminModeItem);
@@ -303,13 +307,15 @@ public sealed class TrayIconService : IDisposable
         {
             menu.Items.Add(CreateItem(LF("More than 20 servers (total: {0})", state.TotalServerCount), TrayCommandKind.OpenServers, localize: false));
         }
-        menu.Items.Add(CreateItem("Share Server Config", TrayCommandKind.OpenSharing));
+        MenuFlyoutItem share = CreateItem("Share Server Config", TrayCommandKind.OpenSharing);
+        share.IsEnabled = state.HasConfiguredServer;
+        menu.Items.Add(share);
         return menu;
     }
 
     private MenuFlyoutSubItem BuildDnsMenu(TrayMenuState state)
     {
-        var menu = new MenuFlyoutSubItem { Text = L("DNS") };
+        var menu = new MenuFlyoutSubItem { Text = L("DNS"), IsEnabled = state.HasConfiguredServer };
         menu.Items.Add(CreateToggleItem("System DNS", state.DnsMode == TrayDnsMode.System, TrayCommandKind.SetDnsSystem));
         menu.Items.Add(CreateToggleItem("Direct DNS", state.DnsMode == TrayDnsMode.Direct, TrayCommandKind.SetDnsDirect));
         menu.Items.Add(CreateToggleItem("DNS through Shadowsocks", state.DnsMode == TrayDnsMode.Proxy, TrayCommandKind.SetDnsProxy));
@@ -324,7 +330,7 @@ public sealed class TrayIconService : IDisposable
             {
                 updateItem.Icon = new FontIcon
                 {
-                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+                    FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
                     Glyph = "\uE896",
                 };
             }
@@ -339,23 +345,21 @@ public sealed class TrayIconService : IDisposable
         // Keep PAC menu actions consistent with the current Local/Online PAC state.
         bool localPac = !state.UseOnlinePac;
 
-        var menu = new MenuFlyoutSubItem { Text = L("PAC") };
+        var menu = new MenuFlyoutSubItem { Text = L("PAC"), IsEnabled = state.HasConfiguredServer };
         menu.Items.Add(CreateToggleItem("Local PAC", localPac, TrayCommandKind.UseLocalPac));
         menu.Items.Add(CreateToggleItem("Online PAC", state.UseOnlinePac, TrayCommandKind.UseOnlinePac));
         menu.Items.Add(new MenuFlyoutSeparator());
 
         if (localPac)
         {
-            menu.Items.Add(CreateItem("Edit Local PAC File", TrayCommandKind.EditLocalPacFile));
-            menu.Items.Add(CreateItem("Update Local PAC from Geosite", TrayCommandKind.UpdateLocalPacFromGeosite));
+            menu.Items.Add(CreateItem("Edit Local User Rules", TrayCommandKind.EditUserRuleFile));
             menu.Items.Add(CreateItem("GeoSite Sources", TrayCommandKind.OpenPac));
-            menu.Items.Add(CreateItem("Edit User Rule for Geosite", TrayCommandKind.EditUserRuleFile));
+            menu.Items.Add(CreateItem("Update Local PAC from Geosite", TrayCommandKind.UpdateLocalPacFromGeosite));
+            menu.Items.Add(new MenuFlyoutSeparator());
+            menu.Items.Add(CreateToggleItem("Require secret for local PAC URL", state.SecureLocalPac, TrayCommandKind.ToggleSecureLocalPac));
+            menu.Items.Add(CreateToggleItem("Regenerate Local PAC after application updates", state.RegeneratePacOnUpdate, TrayCommandKind.ToggleRegeneratePacOnUpdate));
         }
-
-        menu.Items.Add(CreateToggleItem("Require secret for local PAC URL", state.SecureLocalPac, TrayCommandKind.ToggleSecureLocalPac));
-        menu.Items.Add(CreateToggleItem("Regenerate Local PAC after application updates", state.RegeneratePacOnUpdate, TrayCommandKind.ToggleRegeneratePacOnUpdate));
-
-        if (state.UseOnlinePac)
+        else
         {
             menu.Items.Add(CreateItem("Edit Online PAC URL", TrayCommandKind.EditOnlinePacUrl));
         }

@@ -18,45 +18,52 @@ namespace Shadowsocks.Model
         private const int DefaultServerTimeoutSec = 5;
         public const int MaxServerTimeoutSec = 20;
 
-        public string server;
-        public int server_port;
-        public string password;
-        public string method;
+        public string server { get; set; }
+        [JsonProperty("server_port")]
+        public int ServerPort { get; set; }
+        public string password { get; set; }
+        public string method { get; set; }
         // optional fields
         [DefaultValue("")]
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public string plugin;
+        public string plugin { get; set; }
+        [DefaultValue("")]
+        [JsonProperty("plugin_opts", NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
+        public string PluginOptions { get; set; }
+        [DefaultValue("")]
+        [JsonProperty("plugin_args", NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
+        public string PluginArguments { get; set; }
         [DefaultValue("")]
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public string plugin_opts;
-        [DefaultValue("")]
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public string plugin_args;
-        [DefaultValue("")]
-        [JsonProperty(NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public string remarks;
+        public string remarks { get; set; }
 
         [DefaultValue("")]
         [JsonProperty(NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public string group;
+        public string group { get; set; }
 
-        public int timeout;
+        public int timeout { get; set; }
 
         // Credentials originating from a link/subscription stay reveal-protected in the UI.
         // The flag is persisted so a direct SIP002 import remains protected after restart.
         [DefaultValue(false)]
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        public bool importedFromUrl;
+        public bool importedFromUrl { get; set; }
 
         [JsonIgnore]
-        public bool IsConfigured => !string.IsNullOrWhiteSpace(server) && server_port > 0 && server_port <= 65535;
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(server)
+            && ServerPort > 0
+            && ServerPort <= 65535
+            && !string.IsNullOrEmpty(password)
+            && !string.IsNullOrWhiteSpace(method)
+            && timeout > 0
+            && timeout <= MaxServerTimeoutSec;
 
         public override int GetHashCode()
         {
-            return StringComparer.Ordinal.GetHashCode(server ?? string.Empty) ^ server_port;
+            return StringComparer.Ordinal.GetHashCode(server ?? string.Empty) ^ ServerPort;
         }
 
-        public override bool Equals(object obj) => obj is Server o2 && server == o2.server && server_port == o2.server_port;
+        public override bool Equals(object obj) => obj is Server o2 && server == o2.server && ServerPort == o2.ServerPort;
 
         public override string ToString()
         {
@@ -65,7 +72,7 @@ namespace Shadowsocks.Model
                 return I18N.GetString("New server");
             }
 
-            string serverStr = $"{FormalHostName}:{server_port}";
+            string serverStr = $"{FormalHostName}:{ServerPort}";
             return string.IsNullOrEmpty(remarks)
                 ? serverStr
                 : $"{remarks} ({serverStr})";
@@ -77,18 +84,14 @@ namespace Shadowsocks.Model
             string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(parts));
             string websafeBase64 = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
 
-            string url = string.Format(
-                "{0}@{1}:{2}/",
-                websafeBase64,
-                FormalHostName,
-                server_port);
+            string url = $"{websafeBase64}@{FormalHostName}:{ServerPort}/";
 
             if (!string.IsNullOrWhiteSpace(plugin))
             {
                 string pluginPart = plugin;
-                if (!string.IsNullOrWhiteSpace(plugin_opts))
+                if (!string.IsNullOrWhiteSpace(PluginOptions))
                 {
-                    pluginPart += ";" + plugin_opts;
+                    pluginPart += ";" + PluginOptions;
                 }
                 url += "?plugin=" + UrlEncodeShareComponent(pluginPart);
             }
@@ -146,11 +149,11 @@ namespace Shadowsocks.Model
         public Server()
         {
             server = "";
-            server_port = DefaultPort;
+            ServerPort = DefaultPort;
             method = DefaultMethod;
             plugin = "";
-            plugin_opts = "";
-            plugin_args = "";
+            PluginOptions = "";
+            PluginArguments = "";
             password = "";
             remarks = "";
             timeout = DefaultServerTimeoutSec;
@@ -197,7 +200,7 @@ namespace Shadowsocks.Model
                 return null;
             }
 
-            string[] userInfoParts = userInfo.Split(new[] { ':' }, 2);
+            string[] userInfoParts = userInfo.Split(':', 2);
             if (userInfoParts.Length != 2)
             {
                 return null;
@@ -207,16 +210,16 @@ namespace Shadowsocks.Model
             {
                 remarks = WebUtility.UrlDecode(parsedUrl.GetComponents(UriComponents.Fragment, UriFormat.Unescaped)),
                 server = parsedUrl.IdnHost,
-                server_port = parsedUrl.Port,
+                ServerPort = parsedUrl.Port,
                 method = userInfoParts[0],
                 password = userInfoParts[1],
                 importedFromUrl = true,
             };
 
             string pluginValue = GetQueryParameter(parsedUrl, "plugin") ?? string.Empty;
-            string[] pluginParts = pluginValue.Split(new[] { ';' }, 2);
+            string[] pluginParts = pluginValue.Split(';', 2);
             server.plugin = pluginParts.Length > 0 ? pluginParts[0] ?? string.Empty : string.Empty;
-            server.plugin_opts = pluginParts.Length > 1 ? pluginParts[1] ?? string.Empty : string.Empty;
+            server.PluginOptions = pluginParts.Length > 1 ? pluginParts[1] ?? string.Empty : string.Empty;
             return server;
         }
 
@@ -247,7 +250,7 @@ namespace Shadowsocks.Model
 
         public string Identifier()
         {
-            return server + ':' + server_port;
+            return server + ':' + ServerPort;
         }
     }
 }

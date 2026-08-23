@@ -28,6 +28,7 @@ namespace Shadowsocks.Controller.Service
         private static readonly HttpClient DirectClient = CreateClient(useProxy: false);
         private static readonly HttpClient ProxyFallbackClient = CreateClient(useProxy: true);
         private static readonly TimeSpan NegativeCacheLifetime = TimeSpan.FromMinutes(10);
+        private static readonly HttpClient[] LookupClients = [DirectClient, ProxyFallbackClient];
 
         public static async Task<IpCountryInfo?> ResolveHostAsync(string host, CancellationToken cancellationToken = default)
         {
@@ -42,7 +43,7 @@ namespace Shadowsocks.Controller.Service
 
             try
             {
-                IPAddress[] addresses = await Dns.GetHostAddressesAsync(normalized).WaitAsync(cancellationToken).ConfigureAwait(false);
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(normalized, cancellationToken).ConfigureAwait(false);
                 IPAddress? address = addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork)
                     ?? addresses.FirstOrDefault();
                 return address is null ? null : await LookupAddressAsync(address, cancellationToken).ConfigureAwait(false);
@@ -192,10 +193,10 @@ namespace Shadowsocks.Controller.Service
         }
 
         private static async Task<IReadOnlyDictionary<string, IpCountryInfo>> LookupCountryIsBatchAsync(
-            IReadOnlyList<string> addresses,
+            string[] addresses,
             CancellationToken cancellationToken)
         {
-            if (addresses.Count == 0)
+            if (addresses.Length == 0)
                 return new Dictionary<string, IpCountryInfo>(StringComparer.OrdinalIgnoreCase);
 
             try
@@ -256,7 +257,7 @@ namespace Shadowsocks.Controller.Service
                 return string.Empty;
 
             string value = host.Trim();
-            if (value.StartsWith("[", StringComparison.Ordinal))
+            if (value.StartsWith('['))
             {
                 int closingBracket = value.IndexOf(']');
                 if (closingBracket > 1)
@@ -312,7 +313,7 @@ namespace Shadowsocks.Controller.Service
 
         private static async Task<string?> GetStringWithFallbackAsync(string uri, CancellationToken cancellationToken)
         {
-            foreach (HttpClient client in new[] { DirectClient, ProxyFallbackClient })
+            foreach (HttpClient client in LookupClients)
             {
                 try
                 {
@@ -333,7 +334,7 @@ namespace Shadowsocks.Controller.Service
             string payload,
             CancellationToken cancellationToken)
         {
-            foreach (HttpClient client in new[] { DirectClient, ProxyFallbackClient })
+            foreach (HttpClient client in LookupClients)
             {
                 try
                 {

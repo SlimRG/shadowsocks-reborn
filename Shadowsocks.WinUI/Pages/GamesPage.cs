@@ -24,6 +24,9 @@ public sealed class GamesPage : Page, IRefreshablePage
     private readonly TextBlock _scanStatus;
     private readonly Button _scanButton;
     private readonly ProgressRing _scanProgress;
+    private readonly Button _addButton;
+    private readonly Button _saveButton;
+    private readonly Button _discardButton;
     private readonly List<string> _applicationItems = new();
     private IReadOnlyList<DiscoveredGame> _discoveredGames = Array.Empty<DiscoveredGame>();
     private bool _dirty;
@@ -88,25 +91,26 @@ public sealed class GamesPage : Page, IRefreshablePage
             PlaceholderText = "game.exe or C:\\Games\\Game\\game.exe",
         };
         _context.SetToolTip(_newApplication, "Enter an executable name, full path, or wildcard pattern to trigger automatic Game Mode.");
+        _newApplication.TextChanged += (_, _) => UpdateActionState();
         appCard.Children.Add(_newApplication);
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var add = new Button { Content = "Add" };
-        _context.SetToolTip(add, "Add the manually entered application pattern to the Game Mode list.");
-        add.Click += OnAddClicked;
-        actions.Children.Add(add);
-        var save = new Button { Content = "Save" };
-        _context.SetToolTip(save, "Save the configured Game Mode application list.");
-        save.Click += OnSaveClicked;
-        actions.Children.Add(save);
-        var discard = new Button { Content = "Discard changes" };
-        _context.SetToolTip(discard, "Discard unsaved Game Mode application changes.");
-        discard.Click += (_, _) =>
+        _addButton = new Button { Content = "Add", IsEnabled = false };
+        _context.SetToolTip(_addButton, "Add the manually entered application pattern to the Game Mode list.");
+        _addButton.Click += OnAddClicked;
+        actions.Children.Add(_addButton);
+        _saveButton = new Button { Content = "Save", IsEnabled = false };
+        _context.SetToolTip(_saveButton, "Save the configured Game Mode application list.");
+        _saveButton.Click += OnSaveClicked;
+        actions.Children.Add(_saveButton);
+        _discardButton = new Button { Content = "Discard changes", IsEnabled = false };
+        _context.SetToolTip(_discardButton, "Discard unsaved Game Mode application changes.");
+        _discardButton.Click += (_, _) =>
         {
-            _dirty = false;
+            SetDirty(false);
             Refresh();
         };
-        actions.Children.Add(discard);
+        actions.Children.Add(_discardButton);
         appCard.Children.Add(actions);
         panel.Children.Add(WinUIStyles.CreateCard(appCard));
 
@@ -149,6 +153,7 @@ public sealed class GamesPage : Page, IRefreshablePage
         }
         RebuildApplications(status.RunningGameApplications);
         RebuildDetectedGames();
+        UpdateActionState();
     }
 
     private async Task ScanInstalledGamesAsync()
@@ -280,7 +285,7 @@ public sealed class GamesPage : Page, IRefreshablePage
         if (!_applicationItems.Any(existing => string.Equals(existing, executablePath, StringComparison.OrdinalIgnoreCase)))
         {
             _applicationItems.Add(executablePath);
-            _dirty = true;
+            SetDirty(true);
         }
         Refresh();
     }
@@ -296,7 +301,7 @@ public sealed class GamesPage : Page, IRefreshablePage
         if (!_applicationItems.Any(existing => string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
         {
             _applicationItems.Add(value);
-            _dirty = true;
+            SetDirty(true);
         }
         _newApplication.Text = string.Empty;
         Refresh();
@@ -310,8 +315,23 @@ public sealed class GamesPage : Page, IRefreshablePage
         }
 
         _applicationItems.RemoveAt(index);
-        _dirty = true;
+        SetDirty(true);
         Refresh();
+    }
+
+    private void SetDirty(bool dirty)
+    {
+        _dirty = dirty;
+        UpdateActionState();
+    }
+
+    private void UpdateActionState()
+    {
+        string candidate = _newApplication.Text?.Trim() ?? string.Empty;
+        _addButton.IsEnabled = !string.IsNullOrWhiteSpace(candidate)
+            && !_applicationItems.Any(existing => string.Equals(existing, candidate, StringComparison.OrdinalIgnoreCase));
+        _saveButton.IsEnabled = _dirty;
+        _discardButton.IsEnabled = _dirty;
     }
 
     private async void OnSaveClicked(object _, RoutedEventArgs _1)
@@ -328,7 +348,7 @@ public sealed class GamesPage : Page, IRefreshablePage
             _applicationItems);
         if (saved)
         {
-            _dirty = false;
+            SetDirty(false);
             _context.ShowInfo("Game compatibility", "Automatic Game Mode application list saved.", InfoBarSeverity.Success);
         }
         else

@@ -9,10 +9,12 @@ namespace Shadowsocks.Controller.Strategy
         private readonly List<IStrategy> _strategies;
         public StrategyManager(Func<Configuration> configurationProvider)
         {
-            if (configurationProvider == null) throw new ArgumentNullException(nameof(configurationProvider));
-            _strategies = new List<IStrategy>();
-            _strategies.Add(new BalancingStrategy(configurationProvider));
-            _strategies.Add(new HighAvailabilityStrategy(configurationProvider));
+            ArgumentNullException.ThrowIfNull(configurationProvider);
+            _strategies =
+            [
+                new BalancingStrategy(configurationProvider),
+                new HighAvailabilityStrategy(configurationProvider),
+            ];
         }
         public IList<IStrategy> GetStrategies()
         {

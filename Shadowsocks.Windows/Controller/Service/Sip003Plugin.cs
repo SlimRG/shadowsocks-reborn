@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -31,10 +32,7 @@ namespace Shadowsocks.Controller.Service
 
         public static Sip003Plugin CreateIfConfigured(Server server, Func<bool> showPluginOutputProvider)
         {
-            if (server == null)
-            {
-                throw new ArgumentNullException(nameof(server));
-            }
+            ArgumentNullException.ThrowIfNull(server);
 
             if (string.IsNullOrWhiteSpace(server.plugin))
             {
@@ -43,16 +41,16 @@ namespace Shadowsocks.Controller.Service
 
             return new Sip003Plugin(
                 server.plugin,
-                server.plugin_opts,
-                server.plugin_args,
+                server.PluginOptions,
+                server.PluginArguments,
                 server.server,
-                server.server_port,
+                server.ServerPort,
                 showPluginOutputProvider);
         }
 
         private Sip003Plugin(string plugin, string pluginOpts, string pluginArgs, string serverAddress, int serverPort, Func<bool> showPluginOutputProvider)
         {
-            if (plugin == null) throw new ArgumentNullException(nameof(plugin));
+            ArgumentNullException.ThrowIfNull(plugin);
             _showPluginOutputProvider = showPluginOutputProvider ?? (() => false);
             if (string.IsNullOrWhiteSpace(serverAddress))
             {
@@ -60,7 +58,7 @@ namespace Shadowsocks.Controller.Service
             }
             if (serverPort <= 0 || serverPort > 65535)
             {
-                throw new ArgumentOutOfRangeException("serverPort");
+                throw new ArgumentOutOfRangeException(nameof(serverPort));
             }
 
             string resolvedPlugin = PluginManager.ResolveExecutable(plugin);
@@ -87,7 +85,7 @@ namespace Shadowsocks.Controller.Service
                     Environment =
                     {
                         ["SS_REMOTE_HOST"] = serverAddress,
-                        ["SS_REMOTE_PORT"] = serverPort.ToString(),
+                        ["SS_REMOTE_PORT"] = serverPort.ToString(CultureInfo.InvariantCulture),
                         ["SS_PLUGIN_OPTIONS"] = pluginOpts
                     }
                 }
@@ -100,10 +98,7 @@ namespace Shadowsocks.Controller.Service
 
         public bool StartIfNeeded()
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             lock (_startProcessLock)
             {
@@ -116,7 +111,7 @@ namespace Shadowsocks.Controller.Service
                 LocalEndPoint = new IPEndPoint(IPAddress.Loopback, localPort);
 
                 _pluginProcess.StartInfo.Environment["SS_LOCAL_HOST"] = LocalEndPoint.Address.ToString();
-                _pluginProcess.StartInfo.Environment["SS_LOCAL_PORT"] = LocalEndPoint.Port.ToString();
+                _pluginProcess.StartInfo.Environment["SS_LOCAL_PORT"] = LocalEndPoint.Port.ToString(CultureInfo.InvariantCulture);
                 _pluginProcess.StartInfo.Arguments = ExpandEnvironmentVariables(_pluginProcess.StartInfo.Arguments, _pluginProcess.StartInfo.EnvironmentVariables);
                 try
                 {
@@ -128,7 +123,7 @@ namespace Shadowsocks.Controller.Service
                     {
                         throw new FileNotFoundException(I18N.GetString("Cannot find the plugin program file"), _pluginProcess.StartInfo.FileName, ex);
                     }
-                    throw new ApplicationException(I18N.GetString("Plugin Program"), ex);
+                    throw new InvalidOperationException(I18N.GetString("Plugin Program"), ex);
                 }
                 _pluginProcess.BeginOutputReadLine();
                 _pluginProcess.BeginErrorReadLine();
@@ -157,7 +152,7 @@ namespace Shadowsocks.Controller.Service
             catch { return false; }
         }
 
-        public string ExpandEnvironmentVariables(string name, StringDictionary environmentVariables = null)
+        public static string ExpandEnvironmentVariables(string name, StringDictionary environmentVariables = null)
         {
             // Expand the environment variables from the new process itself
             if (environmentVariables != null)

@@ -33,6 +33,21 @@ namespace Shadowsocks.Controller.Traffic
         DnsCrypt = 4,
     }
 
+    public sealed record ManagedRoutingStatus(
+        string EffectiveMode,
+        string SnapshotMode,
+        long Generation,
+        bool Enabled,
+        string Source,
+        System.DateTime CreatedUtc,
+        int DefaultRuleCount,
+        int UserRuleCount,
+        int InvalidRuleCount,
+        long DirectDecisionCount,
+        long ProxyDecisionCount,
+        bool AdminManagedRoutingActive,
+        int AdminManagedRoutingRuleCount);
+
     public sealed record TrafficCaptureStatus(
         TrafficCaptureMode ConfiguredMode,
         TrafficRuntimeMode RuntimeMode,
@@ -65,6 +80,7 @@ namespace Shadowsocks.Controller.Traffic
         public string ProcessName { get; init; }
         public string Protocol { get; init; }
         public string DestinationHost { get; init; }
+        public string DestinationUrl { get; init; }
         public IPAddress DestinationAddress { get; init; }
         public int DestinationPort { get; init; }
         public bool IsInternal { get; init; }

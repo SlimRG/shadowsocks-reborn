@@ -10,7 +10,7 @@ using Shadowsocks.Util.Sockets;
 
 namespace Shadowsocks.Proxy
 {
-    public class Socks5Proxy : IProxy
+    public sealed class Socks5Proxy : IProxy, IDisposable
     {
         private const byte SocksVersion = 0x05;
         private const byte AuthVersion = 0x01;
@@ -30,7 +30,8 @@ namespace Shadowsocks.Proxy
 
         public void BeginConnectProxy(EndPoint remoteEP, AsyncCallback callback, object state)
         {
-            ProxyEndPoint = remoteEP ?? throw new ArgumentNullException(nameof(remoteEP));
+            ArgumentNullException.ThrowIfNull(remoteEP);
+            ProxyEndPoint = remoteEP;
             _remote.BeginConnect(remoteEP, callback, state);
         }
 
@@ -42,7 +43,8 @@ namespace Shadowsocks.Proxy
 
         public void BeginConnectDest(EndPoint destEndPoint, AsyncCallback callback, object state, NetworkCredential auth = null)
         {
-            DestEndPoint = destEndPoint ?? throw new ArgumentNullException(nameof(destEndPoint));
+            ArgumentNullException.ThrowIfNull(destEndPoint);
+            DestEndPoint = destEndPoint;
 
             var completion = new TaskCompletionSource<object>(state, TaskCreationOptions.RunContinuationsAsynchronously);
             if (callback != null)
@@ -97,6 +99,12 @@ namespace Shadowsocks.Proxy
         public void Close()
         {
             _remote.Dispose();
+        }
+
+        public void Dispose()
+        {
+            Close();
+            GC.SuppressFinalize(this);
         }
 
         private async Task CompleteConnectDestAsync(
@@ -339,12 +347,12 @@ namespace Shadowsocks.Proxy
             return completion.Task;
         }
 
-        private static Exception ProxyHandshakeFailed()
+        private static InvalidOperationException ProxyHandshakeFailed()
         {
             return new InvalidOperationException(I18N.GetString("Proxy handshake failed"));
         }
 
-        private static Exception ProxyRequestFailed()
+        private static InvalidOperationException ProxyRequestFailed()
         {
             return new InvalidOperationException(I18N.GetString("Proxy request failed"));
         }

@@ -9,7 +9,7 @@ namespace Shadowsocks.Encryption
 {
     public static class EncryptorFactory
     {
-        private static Dictionary<string, Type> _registeredEncryptors = new Dictionary<string, Type>();
+        private static readonly Dictionary<string, Type> _registeredEncryptors = new();
 
         private static readonly Type[] ConstructorTypes = { typeof(string), typeof(string) };
 
@@ -40,7 +40,7 @@ namespace Shadowsocks.Encryption
             }
 
             ConstructorInfo c = t.GetConstructor(ConstructorTypes);
-            if (c == null) throw new System.Exception("Invalid ctor");
+            if (c is null) throw new InvalidOperationException($"Encryptor type '{t.FullName}' does not expose the expected constructor.");
             IEncryptor result = (IEncryptor)c.Invoke(new object[] { method, password });
             return result;
         }
@@ -53,7 +53,7 @@ namespace Shadowsocks.Encryption
             sb.AppendLine("Registered Encryptor Info");
             foreach (var encryptor in _registeredEncryptors)
             {
-                sb.AppendLine($"{encryptor.Key}=>{encryptor.Value.Name}");
+                sb.AppendLine(System.Globalization.CultureInfo.InvariantCulture, $"{encryptor.Key}=>{encryptor.Value.Name}");
             }
 
             sb.AppendLine("=========================");

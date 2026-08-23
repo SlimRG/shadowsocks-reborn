@@ -1,116 +1,48 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter()]
-    [ValidateNotNullOrEmpty()]
-    [string]$Version = '2.2.31'
+    [ValidatePattern('^[vV]?\d+\.\d+\.\d+$')]
+    [string]$Version
 )
 
-$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $artifactsRoot = Join-Path $repoRoot 'artifacts'
 $publishDir = Join-Path $artifactsRoot 'publish'
 $releaseDir = Join-Path $artifactsRoot 'release'
-$solution = Join-Path $repoRoot 'shadowsocks-reborn.sln'
-$project = Join-Path $repoRoot 'Shadowsocks.WinUI\Shadowsocks.WinUI.csproj'
-$coreProject = Join-Path $repoRoot 'Shadowsocks.Core\Shadowsocks.Core.csproj'
-$testProject = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
-
-$normalizedVersion = $Version.Trim() -replace '^[vV]', ''
-if ($normalizedVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
-    throw "Invalid release version '$Version'. Use a stable tag such as 2.2.31."
-}
-$baseVersion = $normalizedVersion
-$expectedFourPartVersion = [Version]("$normalizedVersion.0")
+$solutionPath = Join-Path $repoRoot 'shadowsocks-reborn.sln'
+$mainProjectPath = Join-Path $repoRoot 'Shadowsocks.WinUI\Shadowsocks.WinUI.csproj'
+$coreProjectPath = Join-Path $repoRoot 'Shadowsocks.Core\Shadowsocks.Core.csproj'
+$testProjectPath = Join-Path $repoRoot 'Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj'
 $minimumReleaseSdk = [Version]'10.0.303'
-try {
-    $requestedVersion = [Version]$baseVersion
-}
-catch {
-    throw "Invalid release version '$Version'. Expected a stable tag such as 2.2.31."
-}
 
-$projectXml = [xml](Get-Content -LiteralPath $project -Raw)
-$declaredProjectVersion = @($projectXml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
-if ([string]::IsNullOrWhiteSpace($declaredProjectVersion)) {
-    throw "The main project does not declare <Version>."
-}
+function Get-CanonicalVersion {
+    [CmdletBinding()]
+    param()
 
-$declaredVersion = [Version]$declaredProjectVersion
-if ($declaredProjectVersion.Trim() -ne $normalizedVersion -or
-    $requestedVersion.Major -ne $declaredVersion.Major -or
-    $requestedVersion.Minor -ne $declaredVersion.Minor -or
-    $requestedVersion.Build -ne $declaredVersion.Build) {
-    throw "Release label '$Version' does not exactly match project version '$declaredProjectVersion'. Update version metadata before tagging."
-}
-
-$applicationInfoPath = Join-Path $repoRoot 'Shadowsocks.Core\ApplicationInfo.cs'
-$applicationInfoSource = Get-Content -LiteralPath $applicationInfoPath -Raw
-if ($applicationInfoSource -notmatch 'public const string Version = "(?<version>[0-9]+(?:\.[0-9]+){1,3})";') {
-    throw 'Unable to read ApplicationInfo.Version.'
-}
-$applicationVersion = [Version]$Matches['version']
-if ($applicationVersion -ne $expectedFourPartVersion) {
-    throw "ApplicationInfo.Version '$applicationVersion' must exactly match release version '$expectedFourPartVersion'."
-}
-
-$versionedProjects = @(
-    'Shadowsocks.Core\Shadowsocks.Core.csproj',
-    'Shadowsocks.Windows\Shadowsocks.Windows.csproj',
-    'Shadowsocks.Windows.WinUI\Shadowsocks.Windows.WinUI.csproj',
-    'Shadowsocks.NetworkService\Shadowsocks.NetworkService.csproj'
-)
-foreach ($relativeProjectPath in $versionedProjects) {
-    $versionedProjectPath = Join-Path $repoRoot $relativeProjectPath
-    $versionedProjectXml = [xml](Get-Content -LiteralPath $versionedProjectPath -Raw)
-    $versionedProjectVersionText = @($versionedProjectXml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
-    if ([string]::IsNullOrWhiteSpace($versionedProjectVersionText)) {
-        throw "Release project '$relativeProjectPath' does not declare <Version>."
+    $propsPath = Join-Path $repoRoot 'Directory.Build.props'
+    [xml]$props = Get-Content -LiteralPath $propsPath -Raw
+    $value = [string](@($props.Project.PropertyGroup.Version | Where-Object { $_ })[0])
+    if ([string]::IsNullOrWhiteSpace($value) -or $value -notmatch '^\d+\.\d+\.\d+$') {
+        throw 'Directory.Build.props must contain one stable three-part <Version> value.'
     }
 
-    $versionedProjectVersion = [Version]$versionedProjectVersionText
-    if ($versionedProjectVersionText.Trim() -ne $normalizedVersion -or
-        $versionedProjectVersion.Major -ne $declaredVersion.Major -or
-        $versionedProjectVersion.Minor -ne $declaredVersion.Minor -or
-        $versionedProjectVersion.Build -ne $declaredVersion.Build) {
-        throw "Release project '$relativeProjectPath' version '$versionedProjectVersionText' does not exactly match '$normalizedVersion'."
-    }
+    return $value.Trim()
 }
 
-$versionedManifests = @(
-    'Shadowsocks.WinUI\app.manifest',
-    'Shadowsocks.NetworkService\app.manifest'
-)
-foreach ($relativeManifestPath in $versionedManifests) {
-    $manifestPath = Join-Path $repoRoot $relativeManifestPath
-    $manifestXml = [xml](Get-Content -LiteralPath $manifestPath -Raw)
-    $manifestIdentity = $manifestXml.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
-    if ($null -eq $manifestIdentity) {
-        throw "Release manifest '$relativeManifestPath' does not contain assemblyIdentity."
-    }
+function Test-RequiredFile {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
 
-    $manifestVersionText = [string]$manifestIdentity.GetAttribute('version')
-    if ([string]::IsNullOrWhiteSpace($manifestVersionText)) {
-        throw "Release manifest '$relativeManifestPath' does not declare assemblyIdentity version."
-    }
-
-    $manifestVersion = [Version]$manifestVersionText
-    if ($manifestVersion -ne $expectedFourPartVersion) {
-        throw "Release manifest '$relativeManifestPath' version '$manifestVersionText' must exactly match '$expectedFourPartVersion'."
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Required release file is missing: $Path"
     }
 }
-
-$changesPath = Join-Path $repoRoot 'CHANGES'
-$changesText = Get-Content -LiteralPath $changesPath -Raw
-$releaseFourPartVersion = $expectedFourPartVersion.ToString(4)
-$escapedReleaseFourPartVersion = [regex]::Escape($releaseFourPartVersion)
-if ($changesText -notmatch "(?m)^$escapedReleaseFourPartVersion \d{4}-\d{2}-\d{2}\s*$") {
-    throw "CHANGES does not contain a dated release heading for $releaseFourPartVersion."
-}
-
 
 function Invoke-DotNet {
+    [CmdletBinding()]
     param([Parameter(Mandatory)][string[]]$Arguments)
 
     & dotnet @Arguments
@@ -119,39 +51,88 @@ function Invoke-DotNet {
     }
 }
 
-function Assert-Exists {
-    param([Parameter(Mandatory)][string]$Path)
+function Test-VersionMetadata {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ReleaseVersion,
+        [Parameter(Mandatory)][Version]$ExpectedFourPartVersion
+    )
 
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-        throw "Required release artifact is missing: $Path"
+    $applicationInfoPath = Join-Path $repoRoot 'Shadowsocks.Core\ApplicationInfo.cs'
+    $applicationInfoSource = Get-Content -LiteralPath $applicationInfoPath -Raw
+    if ($applicationInfoSource -notmatch 'public const string Version = "(?<version>\d+(?:\.\d+){3})";') {
+        throw 'Unable to read ApplicationInfo.Version.'
+    }
+    if ([Version]$Matches.version -ne $ExpectedFourPartVersion) {
+        throw "ApplicationInfo.Version '$($Matches.version)' must match '$ExpectedFourPartVersion'."
+    }
+
+    foreach ($relativePath in @('Shadowsocks.WinUI\app.manifest', 'Shadowsocks.NetworkService\app.manifest')) {
+        $manifestPath = Join-Path $repoRoot $relativePath
+        [xml]$manifest = Get-Content -LiteralPath $manifestPath -Raw
+        $identity = $manifest.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
+        if ($null -eq $identity) {
+            throw "Manifest '$relativePath' does not contain assemblyIdentity."
+        }
+
+        $manifestVersion = [Version]$identity.GetAttribute('version')
+        if ($manifestVersion -ne $ExpectedFourPartVersion) {
+            throw "Manifest '$relativePath' version '$manifestVersion' must match '$ExpectedFourPartVersion'."
+        }
+    }
+
+    $changesText = Get-Content -LiteralPath (Join-Path $repoRoot 'CHANGES') -Raw
+    $escapedVersion = [regex]::Escape($ExpectedFourPartVersion.ToString(4))
+    if ($changesText -notmatch "(?m)^$escapedVersion \d{4}-\d{2}-\d{2}\s*$") {
+        throw "CHANGES must contain a dated heading for $ExpectedFourPartVersion."
+    }
+
+    if ($ReleaseVersion -ne $ExpectedFourPartVersion.ToString(3)) {
+        throw "Release version '$ReleaseVersion' is inconsistent with '$ExpectedFourPartVersion'."
     }
 }
 
+$canonicalVersion = Get-CanonicalVersion
+$requestedVersion = if ([string]::IsNullOrWhiteSpace($Version)) {
+    $canonicalVersion
+}
+else {
+    $Version.Trim() -replace '^[vV]', ''
+}
+
+if ($requestedVersion -ne $canonicalVersion) {
+    throw "Requested release '$requestedVersion' does not match Directory.Build.props version '$canonicalVersion'."
+}
+
+$expectedFourPartVersion = [Version]"$canonicalVersion.0"
+Test-VersionMetadata -ReleaseVersion $canonicalVersion -ExpectedFourPartVersion $expectedFourPartVersion
+
 $dotnetSdkText = (& dotnet --version).Trim()
 if ($LASTEXITCODE -ne 0 -or $dotnetSdkText -notmatch '^\d+\.\d+\.\d+$') {
-    throw "Unable to resolve a stable .NET SDK version for the release build. Found '$dotnetSdkText'."
+    throw "Unable to resolve a stable .NET SDK version. Found '$dotnetSdkText'."
 }
+
 $dotnetSdkVersion = [Version]$dotnetSdkText
-if ($dotnetSdkVersion -lt $minimumReleaseSdk) {
-    throw "Release build requires .NET SDK $minimumReleaseSdk or newer (includes .NET 10.0.11 security fixes). Found $dotnetSdkVersion."
+if ($dotnetSdkVersion.Major -ne 10 -or $dotnetSdkVersion -lt $minimumReleaseSdk) {
+    throw "Release build requires .NET 10 SDK $minimumReleaseSdk or newer. Found $dotnetSdkVersion."
 }
 
 Push-Location $repoRoot
 try {
-    Remove-Item $publishDir -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item $releaseDir -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item $publishDir -ItemType Directory -Force | Out-Null
-    New-Item $releaseDir -ItemType Directory -Force | Out-Null
+    Remove-Item -LiteralPath $publishDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $releaseDir -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -Path $publishDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $releaseDir -ItemType Directory -Force | Out-Null
 
     & (Join-Path $PSScriptRoot 'Validate-Repository.ps1')
 
-    Invoke-DotNet -Arguments @('restore', $coreProject, '-p:NuGetAudit=true', '-p:NuGetAuditMode=all')
-    Invoke-DotNet -Arguments @('build', $coreProject, '-c', 'Release', '--no-restore')
-    Invoke-DotNet -Arguments @('restore', $solution, '-p:Platform=x64', '-r', 'win-x64', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all')
-    Invoke-DotNet -Arguments @('build', $solution, '-c', 'Release', '-p:Platform=x64', '-m:1', '--no-restore')
-    Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '-p:Platform=x64', '--no-build')
+    Invoke-DotNet -Arguments @('restore', $coreProjectPath, '-p:NuGetAudit=true', '-p:NuGetAuditMode=all')
+    Invoke-DotNet -Arguments @('build', $coreProjectPath, '-c', 'Release', '--no-restore', '-p:TreatWarningsAsErrors=true')
+    Invoke-DotNet -Arguments @('restore', $solutionPath, '-p:Platform=x64', '-r', 'win-x64', '-p:NuGetAudit=true', '-p:NuGetAuditMode=all')
+    Invoke-DotNet -Arguments @('build', $solutionPath, '-c', 'Release', '-p:Platform=x64', '-m:1', '--no-restore', '-p:TreatWarningsAsErrors=true')
+    Invoke-DotNet -Arguments @('test', $testProjectPath, '-c', 'Release', '-p:Platform=x64', '--no-build')
     Invoke-DotNet -Arguments @(
-        'restore', $project,
+        'restore', $mainProjectPath,
         '-p:Platform=x64',
         '-p:PublishProfile=FolderProfile',
         '-r', 'win-x64',
@@ -159,84 +140,56 @@ try {
         '-p:NuGetAuditMode=all'
     )
     Invoke-DotNet -Arguments @(
-        'publish', $project,
+        'publish', $mainProjectPath,
         '-c', 'Release',
         '-p:Platform=x64',
         '-p:PublishProfile=FolderProfile',
         '-r', 'win-x64',
         '--self-contained', 'true',
         '-o', $publishDir,
-        '--no-restore'
+        '--no-restore',
+        '-p:TreatWarningsAsErrors=true'
     )
 
     $publishedExecutable = Join-Path $publishDir 'Shadowsocks.exe'
-    Assert-Exists $publishedExecutable
-
-    $publishedVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExecutable)
-    $publishedFileVersion = [Version]::new(
-        [Math]::Max(0, $publishedVersionInfo.FileMajorPart),
-        [Math]::Max(0, $publishedVersionInfo.FileMinorPart),
-        [Math]::Max(0, $publishedVersionInfo.FileBuildPart),
-        [Math]::Max(0, $publishedVersionInfo.FilePrivatePart))
-    if ($publishedFileVersion -ne $expectedFourPartVersion) {
-        throw "Published Shadowsocks.exe FileVersion '$publishedFileVersion' does not match release '$expectedFourPartVersion'."
-    }
+    Test-RequiredFile $publishedExecutable
 
     $publishEntries = @(Get-ChildItem -LiteralPath $publishDir -Force)
     if ($publishEntries.Count -ne 1 -or $publishEntries[0].PSIsContainer -or $publishEntries[0].Name -ne 'Shadowsocks.exe') {
-        throw "Product publish must contain exactly Shadowsocks.exe. Found: $($publishEntries.Name -join ', ')"
+        throw "Final publish must contain exactly Shadowsocks.exe. Found: $($publishEntries.Name -join ', ')"
     }
 
-    $forbiddenNames = @(
-        'Shadowsocks.NetworkService.dll',
-        'Shadowsocks.NetworkService.deps.json',
-        'Shadowsocks.NetworkService.runtimeconfig.json',
-        'Shadowsocks.pdb',
-        'Shadowsocks.NetworkService.exe',
-        'privoxy.exe',
-        'privoxy.exe.gz',
-        'sysproxy.exe',
-        'sysproxy64.exe',
-        'libsscrypto.dll',
-        'dnscrypt-proxy.exe',
-        'minisign.exe',
-        'libsodium.dll',
-        'libsodium-23.dll'
-    )
-
-    foreach ($name in $forbiddenNames) {
-        $unexpected = Get-ChildItem -Path $publishDir -Recurse -File -Filter $name -ErrorAction SilentlyContinue
-        if ($unexpected) {
-            throw "Retired or invalid artifact found in publish output: $($unexpected.FullName -join ', ')"
-        }
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExecutable)
+    $publishedFileVersion = [Version]::new(
+        [Math]::Max(0, $versionInfo.FileMajorPart),
+        [Math]::Max(0, $versionInfo.FileMinorPart),
+        [Math]::Max(0, $versionInfo.FileBuildPart),
+        [Math]::Max(0, $versionInfo.FilePrivatePart))
+    if ($publishedFileVersion -ne $expectedFourPartVersion) {
+        throw "Published Shadowsocks.exe FileVersion '$publishedFileVersion' does not match '$expectedFourPartVersion'."
     }
 
-
-    $zipName = "Shadowsocks-win-x64.zip"
+    $zipName = 'Shadowsocks-win-x64.zip'
     $zipPath = Join-Path $releaseDir $zipName
     $hashPath = "$zipPath.sha256"
-
-    Compress-Archive -Path (Join-Path $publishDir 'Shadowsocks.exe') -DestinationPath $zipPath -CompressionLevel Optimal -Force
+    Compress-Archive -LiteralPath $publishedExecutable -DestinationPath $zipPath -CompressionLevel Optimal -Force
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
     try {
-        $entries = @($zip.Entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) })
-        if ($entries.Count -ne 1 -or $entries[0].Name -ne 'Shadowsocks.exe') {
+        $entries = @($archive.Entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) })
+        if ($entries.Count -ne 1 -or $entries[0].FullName -ne 'Shadowsocks.exe') {
             throw "Release ZIP must contain exactly Shadowsocks.exe. Found: $($entries.FullName -join ', ')"
         }
     }
     finally {
-        $zip.Dispose()
+        $archive.Dispose()
     }
 
     $hash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath $hashPath -Value "$hash  $zipName" -Encoding ascii -NoNewline
 
-    Write-Host ''
-    Write-Host 'Release package created:'
-    Write-Host "  $zipPath"
-    Write-Host "  $hashPath"
+    Write-Information "Release package created:`n  $zipPath`n  $hashPath" -InformationAction Continue
 }
 finally {
     Pop-Location

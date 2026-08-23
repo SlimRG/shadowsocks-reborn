@@ -44,7 +44,7 @@ namespace Shadowsocks.UnitTests
                 new Server
                 {
                     server = "192.168.100.1",
-                    server_port = 8888,
+                    ServerPort = 8888,
                     password = "test",
                     method = Server.DefaultMethod,
                 },
@@ -59,7 +59,7 @@ namespace Shadowsocks.UnitTests
             var server = new Server
             {
                 server = "192.168.100.1",
-                server_port = 8888,
+                ServerPort = 8888,
                 password = "test",
                 method = Server.DefaultMethod,
                 plugin = "missing-plugin.exe",

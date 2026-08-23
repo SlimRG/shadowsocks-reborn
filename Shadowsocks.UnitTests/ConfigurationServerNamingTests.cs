@@ -12,10 +12,10 @@ public sealed class ConfigurationServerNamingTests
     {
         var servers = new List<Server>
         {
-            new() { server = "one.example", server_port = 8388, remarks = "Primary" },
-            new() { server = "two.example", server_port = 8388 },
-            new() { server = "three.example", server_port = 8388, remarks = "Server 1" },
-            new() { server = "four.example", server_port = 8388 },
+            new() { server = "one.example", ServerPort = 8388, password = "test", remarks = "Primary" },
+            new() { server = "two.example", ServerPort = 8388, password = "test" },
+            new() { server = "three.example", ServerPort = 8388, password = "test", remarks = "Server 1" },
+            new() { server = "four.example", ServerPort = 8388, password = "test" },
         };
 
         Configuration.EnsureServerNames(servers);

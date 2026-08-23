@@ -34,6 +34,8 @@ internal static class NetworkServiceResponses
             UdpRedirectPort = active ? child.UdpRedirectPort : 0,
             DnsInterceptionActive = active && child.DnsInterceptionActive,
             DnsFailClosedActive = active && child.DnsFailClosedActive,
+            ManagedRoutingActive = active && child.ManagedRoutingActive,
+            ManagedRoutingRuleCount = active ? child.ManagedRoutingRuleCount : 0,
         };
     }
 

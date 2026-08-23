@@ -101,8 +101,8 @@ namespace Shadowsocks.Controller.Service
                 if (string.IsNullOrWhiteSpace(name))
                     continue;
                 if (Path.IsPathRooted(name)
-                    || name.StartsWith("/", StringComparison.Ordinal)
-                    || name.StartsWith("\\", StringComparison.Ordinal)
+                    || name.StartsWith('/')
+                    || name.StartsWith('\\')
                     || name.Contains(':'))
                 {
                     throw new InvalidDataException($"Unsafe DNSCrypt archive entry '{name}'.");
@@ -115,8 +115,8 @@ namespace Shadowsocks.Controller.Service
                 if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException($"DNSCrypt archive entry escapes the extraction directory: '{name}'.");
 
-                bool directoryEntry = name.EndsWith("/", StringComparison.Ordinal)
-                    || name.EndsWith("\\", StringComparison.Ordinal);
+                bool directoryEntry = name.EndsWith('/')
+                    || name.EndsWith('\\');
                 if (directoryEntry)
                 {
                     Directory.CreateDirectory(target);
@@ -142,8 +142,8 @@ namespace Shadowsocks.Controller.Service
         private async Task<DnsCryptPreparedComponent> PrepareReleaseCoreAsync(
             DnsCryptReleaseInfo release,
             IProgress<DnsCryptComponentProgress> progress,
-            CancellationToken cancellationToken,
-            bool forceDownload)
+            bool forceDownload,
+            CancellationToken cancellationToken)
         {
             string existingExecutable = GetExecutablePath(release.Version);
             if (!forceDownload && File.Exists(existingExecutable))
@@ -276,33 +276,47 @@ namespace Shadowsocks.Controller.Service
             IProgress<DnsCryptComponentProgress> progress,
             CancellationToken cancellationToken)
         {
-            using HttpRequestMessage request = CreateDownloadRequest(HttpMethod.Get, uri);
-            using HttpResponseMessage response = await httpClient.SendAsync(
-                request,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            long? contentLength = response.Content.Headers.ContentLength;
-            if (contentLength.HasValue && contentLength.Value > maxBytes)
-                throw new InvalidDataException($"DNSCrypt download exceeds the {maxBytes}-byte safety limit.");
-
-            await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            await using FileStream output = new(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            byte[] buffer = new byte[64 * 1024];
-            long transferred = 0;
-            while (true)
+            try
             {
-                int read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
-                if (read == 0)
-                    break;
+                using HttpRequestMessage request = CreateDownloadRequest(HttpMethod.Get, uri);
+                using HttpResponseMessage response = await httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
 
-                transferred = checked(transferred + read);
-                if (transferred > maxBytes)
+                long? contentLength = response.Content.Headers.ContentLength;
+                if (contentLength.HasValue && contentLength.Value > maxBytes)
                     throw new InvalidDataException($"DNSCrypt download exceeds the {maxBytes}-byte safety limit.");
 
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                progress?.Report(new DnsCryptComponentProgress(stage, transferred, contentLength));
+                await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+                await using FileStream output = new(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                byte[] buffer = new byte[64 * 1024];
+                long transferred = 0;
+                while (true)
+                {
+                    int read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+                    if (read == 0)
+                        break;
+
+                    transferred = checked(transferred + read);
+                    if (transferred > maxBytes)
+                        throw new InvalidDataException($"DNSCrypt download exceeds the {maxBytes}-byte safety limit.");
+
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    progress?.Report(new DnsCryptComponentProgress(stage, transferred, contentLength));
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or DnsCryptBootstrapException)
+            {
+                Logger.Error(exception, "DNSCrypt release asset download failed through DoH-over-Shadowsocks: {0}", uri);
+                throw new DnsCryptComponentNetworkException(
+                    $"DNSCrypt component asset '{uri.Host}' could not be downloaded through DoH-over-Shadowsocks.",
+                    exception);
             }
         }
 

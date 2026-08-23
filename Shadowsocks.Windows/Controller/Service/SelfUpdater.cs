@@ -30,6 +30,7 @@ namespace Shadowsocks.Controller.Service
         internal const string UpdaterPidOption = "--update-updater-pid";
         internal const string PayloadSha256Option = "--update-sha256";
         internal const string ResumeHiddenSwitch = "--update-resume-hidden";
+        internal const string ResumeVisibleSwitch = "--update-resume-visible";
         internal const string TemporaryUpdaterFileName = "Shadowsocks.Update.exe";
 
         private const int ProcessExitTimeoutMilliseconds = 60000;
@@ -59,7 +60,8 @@ namespace Shadowsocks.Controller.Service
                 int waitPid = ParseRequiredPid(arguments, WaitPidOption);
                 string expectedPayloadSha256 = GetRequiredOption(arguments, PayloadSha256Option);
                 bool resumeHidden = ContainsSwitch(arguments, ResumeHiddenSwitch);
-                exitCode = RunUpdater(targetPath, transactionDirectory, waitPid, expectedPayloadSha256, resumeHidden);
+                bool resumeVisible = !resumeHidden && ContainsSwitch(arguments, ResumeVisibleSwitch);
+                exitCode = RunUpdater(targetPath, transactionDirectory, waitPid, expectedPayloadSha256, resumeHidden, resumeVisible);
             }
             catch (Exception exception)
             {
@@ -129,7 +131,8 @@ namespace Shadowsocks.Controller.Service
                 string argument = arguments[index] ?? string.Empty;
                 if (argument.Equals(UpdateSwitch, StringComparison.OrdinalIgnoreCase)
                     || argument.Equals(CleanupSwitch, StringComparison.OrdinalIgnoreCase)
-                    || argument.Equals(ResumeHiddenSwitch, StringComparison.OrdinalIgnoreCase))
+                    || argument.Equals(ResumeHiddenSwitch, StringComparison.OrdinalIgnoreCase)
+                    || argument.Equals(ResumeVisibleSwitch, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -227,10 +230,28 @@ namespace Shadowsocks.Controller.Service
                 startInfo.ArgumentList.Add(transactionPath);
                 startInfo.ArgumentList.Add(PayloadSha256Option);
                 startInfo.ArgumentList.Add(normalizedPayloadSha256);
-                if (RuntimeEnvironment.Arguments.Any(argument =>
-                    string.Equals(argument, "--start-hidden", StringComparison.OrdinalIgnoreCase)))
+                bool resumeHidden;
+                bool resumeVisible;
+                if (AutoStartup.TryGetTrackedWindowVisibility(out bool windowVisible))
+                {
+                    resumeVisible = windowVisible;
+                    resumeHidden = !windowVisible;
+                }
+                else
+                {
+                    resumeHidden = RuntimeEnvironment.Arguments.Any(argument =>
+                        string.Equals(argument, AutoStartup.StartupHiddenOption, StringComparison.OrdinalIgnoreCase));
+                    resumeVisible = !resumeHidden && RuntimeEnvironment.Arguments.Any(argument =>
+                        string.Equals(argument, AutoStartup.StartupVisibleOption, StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (resumeHidden)
                 {
                     startInfo.ArgumentList.Add(ResumeHiddenSwitch);
+                }
+                else if (resumeVisible)
+                {
+                    startInfo.ArgumentList.Add(ResumeVisibleSwitch);
                 }
 
                 Process process = Process.Start(startInfo)
@@ -299,7 +320,8 @@ namespace Shadowsocks.Controller.Service
             string transactionDirectory,
             int waitPid,
             string expectedPayloadSha256,
-            bool resumeHidden)
+            bool resumeHidden,
+            bool resumeVisible)
         {
             string updaterPath = Environment.ProcessPath
                 ?? Process.GetCurrentProcess().MainModule?.FileName
@@ -341,11 +363,20 @@ namespace Shadowsocks.Controller.Service
             bool hadOriginal = File.Exists(targetPath);
             try
             {
+                if (hadOriginal)
+                {
+                    EnsureStrictlyNewerReplacement(updaterPath, targetPath);
+                }
+
                 File.Copy(updaterPath, incomingPath, overwrite: true);
                 EnsureFilesMatch(updaterPath, incomingPath);
 
                 if (hadOriginal)
                 {
+                    // Re-read the target immediately before replacement as a second downgrade
+                    // barrier in case another process changed the installed executable after
+                    // the first validation.
+                    EnsureStrictlyNewerReplacement(updaterPath, targetPath);
                     try
                     {
                         File.Replace(incomingPath, targetPath, backupPath, ignoreMetadataErrors: true);
@@ -379,9 +410,10 @@ namespace Shadowsocks.Controller.Service
                 startInfo.ArgumentList.Add(backupPath);
                 startInfo.ArgumentList.Add(UpdaterPidOption);
                 startInfo.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                if (resumeHidden)
+                string resumeStartupOption = ResolveResumeStartupOption(resumeHidden, resumeVisible);
+                if (!string.IsNullOrEmpty(resumeStartupOption))
                 {
-                    startInfo.ArgumentList.Add("--start-hidden");
+                    startInfo.ArgumentList.Add(resumeStartupOption);
                 }
 
                 if (Process.Start(startInfo) is null)
@@ -408,7 +440,7 @@ namespace Shadowsocks.Controller.Service
 
                         if (File.Exists(targetPath))
                         {
-                            TryStartRollback(targetPath, targetDirectory, resumeHidden);
+                            TryStartRollback(targetPath, targetDirectory, resumeHidden, resumeVisible);
                         }
                     }
                     catch (Exception rollbackException)
@@ -427,6 +459,34 @@ namespace Shadowsocks.Controller.Service
             }
         }
 
+        internal static bool IsStrictlyNewerReplacement(Version payloadVersion, Version installedVersion)
+        {
+            ArgumentNullException.ThrowIfNull(payloadVersion);
+            ArgumentNullException.ThrowIfNull(installedVersion);
+            return payloadVersion.CompareTo(installedVersion) > 0;
+        }
+
+        private static void EnsureStrictlyNewerReplacement(string payloadPath, string installedPath)
+        {
+            Version payloadVersion = GetExecutableVersion(payloadPath);
+            Version installedVersion = GetExecutableVersion(installedPath);
+            if (!IsStrictlyNewerReplacement(payloadVersion, installedVersion))
+            {
+                throw new InvalidDataException(
+                    $"Refusing to replace installed version {installedVersion} with non-newer update payload {payloadVersion}.");
+            }
+        }
+
+        private static Version GetExecutableVersion(string executablePath)
+        {
+            FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(executablePath);
+            return new Version(
+                Math.Max(0, versionInfo.FileMajorPart),
+                Math.Max(0, versionInfo.FileMinorPart),
+                Math.Max(0, versionInfo.FileBuildPart),
+                Math.Max(0, versionInfo.FilePrivatePart));
+        }
+
         private static void ReplaceWithMoveFallback(string incomingPath, string targetPath, string backupPath)
         {
             if (File.Exists(targetPath))
@@ -436,7 +496,12 @@ namespace Shadowsocks.Controller.Service
             File.Move(incomingPath, targetPath, overwrite: true);
         }
 
-        private static void TryStartRollback(string targetPath, string workingDirectory, bool resumeHidden)
+        internal static string ResolveResumeStartupOption(bool resumeHidden, bool resumeVisible)
+            => resumeHidden
+                ? AutoStartup.StartupHiddenOption
+                : resumeVisible ? AutoStartup.StartupVisibleOption : string.Empty;
+
+        private static void TryStartRollback(string targetPath, string workingDirectory, bool resumeHidden, bool resumeVisible)
         {
             try
             {
@@ -446,9 +511,10 @@ namespace Shadowsocks.Controller.Service
                     WorkingDirectory = workingDirectory,
                     UseShellExecute = false,
                 };
-                if (resumeHidden)
+                string resumeStartupOption = ResolveResumeStartupOption(resumeHidden, resumeVisible);
+                if (!string.IsNullOrEmpty(resumeStartupOption))
                 {
-                    startInfo.ArgumentList.Add("--start-hidden");
+                    startInfo.ArgumentList.Add(resumeStartupOption);
                 }
 
                 Process.Start(startInfo);
@@ -588,10 +654,7 @@ namespace Shadowsocks.Controller.Service
 
         internal static void VerifySha256(Stream stream, string expectedSha256)
         {
-            if (stream == null)
-            {
-                throw new ArgumentNullException(nameof(stream));
-            }
+            ArgumentNullException.ThrowIfNull(stream);
 
             string normalized = NormalizeSha256(expectedSha256);
             if (stream.CanSeek)

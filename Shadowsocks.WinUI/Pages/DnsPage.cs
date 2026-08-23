@@ -13,7 +13,7 @@ using Shadowsocks.WinUI.UI;
 
 namespace Shadowsocks.WinUI.Pages;
 
-public sealed class DnsPage : Page, IRefreshablePage
+public sealed class DnsPage : Page, IRefreshablePage, IDisposable
 {
     private sealed record ResolverChoice(DnsCryptResolverInfo Resolver)
     {
@@ -120,15 +120,17 @@ public sealed class DnsPage : Page, IRefreshablePage
     private readonly ListView _resolverList;
     private readonly Button _loadResolversButton;
     private readonly TextBlock _resolverListStatus;
+    private readonly ProgressRing _progressRing;
     private readonly ProgressBar _progressBar;
     private readonly TextBlock _progressText;
     private readonly Button _cancelButton;
 
-    private CancellationTokenSource? _operationCancellation;
-    private CancellationTokenSource? _settingsApplyCancellation;
-    private CancellationTokenSource? _resolverLatencyCancellation;
+    private Action? _cancelOperation;
+    private Action? _cancelSettingsApply;
+    private Action? _cancelResolverLatency;
     private bool _refreshing;
     private bool _busy;
+    private bool _dnsCryptOperationActive;
     private bool _resolverCatalogLoaded;
     private bool _resolverCatalogLoading;
     private bool _updatingResolverList;
@@ -137,10 +139,11 @@ public sealed class DnsPage : Page, IRefreshablePage
     private bool _directDnsDirty;
     private bool _updatingDohPreset;
     private bool _updatingDirectDnsPreset;
-    private IReadOnlyList<DnsCryptResolverInfo> _resolverCatalog = Array.Empty<DnsCryptResolverInfo>();
+    private DnsCryptResolverInfo[] _resolverCatalog = Array.Empty<DnsCryptResolverInfo>();
     private readonly HashSet<string> _manualResolverNames = new(StringComparer.OrdinalIgnoreCase);
     private long _settingsApplyGeneration;
     private string? _privacySelfTestMessage;
+    private bool _disposed;
 
     internal DnsPage(WinUIPageContext context)
     {
@@ -315,7 +318,16 @@ public sealed class DnsPage : Page, IRefreshablePage
 
         var progressStack = new StackPanel { Spacing = 8 };
         progressStack.Children.Add(WinUIStyles.CreateSectionTitle("DNSCrypt operation"));
+        var progressHeader = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        _progressRing = new ProgressRing
+        {
+            Width = 24,
+            Height = 24,
+            IsActive = false,
+        };
         _progressText = WinUIStyles.CreateText("Ready");
+        progressHeader.Children.Add(_progressRing);
+        progressHeader.Children.Add(_progressText);
         _progressBar = new ProgressBar
         {
             Minimum = 0,
@@ -324,8 +336,8 @@ public sealed class DnsPage : Page, IRefreshablePage
             Value = 0,
         };
         _cancelButton = new Button { Content = "Cancel", IsEnabled = false };
-        _cancelButton.Click += (_, _) => _operationCancellation?.Cancel();
-        progressStack.Children.Add(_progressText);
+        _cancelButton.Click += (_, _) => _cancelOperation?.Invoke();
+        progressStack.Children.Add(progressHeader);
         progressStack.Children.Add(_progressBar);
         progressStack.Children.Add(_cancelButton);
         _context.SetToolTip(_cancelButton, "Cancel the current DNSCrypt install, update, validation, or runtime operation.");
@@ -346,7 +358,7 @@ public sealed class DnsPage : Page, IRefreshablePage
         statusStack.Children.Add(WinUIStyles.CreateKeyValueRow("Secure transport", out _privacyTransport));
         statusStack.Children.Add(WinUIStyles.CreateKeyValueRow("Plaintext DNS fallback", out _privacyFallback));
         statusStack.Children.Add(WinUIStyles.CreateKeyValueRow("Plaintext bootstrap", out _privacyBootstrap));
-        _context.SetToolTip(_privacyBootstrap, "Active DNS runtime never uses plaintext bootstrap DNS. Explicit resolver-catalog refresh may use one-shot bootstrap DNS only before a signed catalog cache exists.");
+        _context.SetToolTip(_privacyBootstrap, "The active DNSCrypt runtime never uses plaintext or system DNS. Resolver-catalog refresh uses Cloudflare DoH through Shadowsocks, with Google DoH as fallback, and publishes the catalog only after Minisign verification.");
         statusStack.Children.Add(WinUIStyles.CreateKeyValueRow("Shadowsocks route", out _privacyRoute));
         statusStack.Children.Add(WinUIStyles.CreateKeyValueRow("Privacy self-test", out _privacySelfTest));
         _privacyTestButton = CreateButton("Run privacy self-test", TestDnsPrivacyAsync);
@@ -450,6 +462,7 @@ public sealed class DnsPage : Page, IRefreshablePage
             MaxHeight = 150,
             IsItemClickEnabled = false,
         };
+        _context.SetToolTip(_automaticResolverList, "Shows the resolvers currently chosen by automatic DNSCrypt selection.");
         _automaticResolverPanel.Children.Add(_automaticResolverList);
         settingsStack.Children.Add(_automaticResolverPanel);
 
@@ -669,26 +682,26 @@ public sealed class DnsPage : Page, IRefreshablePage
 
     private void ApplyModeSpecificVisibility(DnsPolicyMode mode)
     {
-        _systemSettingsCard.Visibility = mode == DnsPolicyMode.System ? Visibility.Visible : Visibility.Collapsed;
-        _directSettingsCard.Visibility = mode == DnsPolicyMode.Direct ? Visibility.Visible : Visibility.Collapsed;
-        _proxySettingsCard.Visibility = mode == DnsPolicyMode.Proxy ? Visibility.Visible : Visibility.Collapsed;
-        _customDohSettingsCard.Visibility = mode == DnsPolicyMode.CustomDoh ? Visibility.Visible : Visibility.Collapsed;
+        bool pendingDnsCryptActivation = _dnsCryptOperationActive && mode != DnsPolicyMode.DnsCrypt;
+        _systemSettingsCard.Visibility = mode == DnsPolicyMode.System && !pendingDnsCryptActivation ? Visibility.Visible : Visibility.Collapsed;
+        _directSettingsCard.Visibility = mode == DnsPolicyMode.Direct && !pendingDnsCryptActivation ? Visibility.Visible : Visibility.Collapsed;
+        _proxySettingsCard.Visibility = mode == DnsPolicyMode.Proxy && !pendingDnsCryptActivation ? Visibility.Visible : Visibility.Collapsed;
+        _customDohSettingsCard.Visibility = mode == DnsPolicyMode.CustomDoh && !pendingDnsCryptActivation ? Visibility.Visible : Visibility.Collapsed;
 
-        Visibility dnsCryptVisibility = mode == DnsPolicyMode.DnsCrypt
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        _dnsCryptOperationCard.Visibility = dnsCryptVisibility;
-        _dnsCryptStatusCard.Visibility = dnsCryptVisibility;
-        _dnsCryptSettingsCard.Visibility = dnsCryptVisibility;
+        bool dnsCryptMode = mode == DnsPolicyMode.DnsCrypt;
+        _dnsCryptOperationCard.Visibility = dnsCryptMode || _dnsCryptOperationActive ? Visibility.Visible : Visibility.Collapsed;
+        _dnsCryptStatusCard.Visibility = dnsCryptMode ? Visibility.Visible : Visibility.Collapsed;
+        _dnsCryptSettingsCard.Visibility = dnsCryptMode ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ApplyModeState(DnsPolicyMode mode)
     {
-        _systemMode.IsChecked = mode == DnsPolicyMode.System;
-        _directMode.IsChecked = mode == DnsPolicyMode.Direct;
-        _proxyMode.IsChecked = mode == DnsPolicyMode.Proxy;
-        _customDohMode.IsChecked = mode == DnsPolicyMode.CustomDoh;
-        _dnsCryptMode.IsChecked = mode == DnsPolicyMode.DnsCrypt;
+        bool pendingDnsCryptActivation = _dnsCryptOperationActive && mode != DnsPolicyMode.DnsCrypt;
+        _systemMode.IsChecked = mode == DnsPolicyMode.System && !pendingDnsCryptActivation;
+        _directMode.IsChecked = mode == DnsPolicyMode.Direct && !pendingDnsCryptActivation;
+        _proxyMode.IsChecked = mode == DnsPolicyMode.Proxy && !pendingDnsCryptActivation;
+        _customDohMode.IsChecked = mode == DnsPolicyMode.CustomDoh && !pendingDnsCryptActivation;
+        _dnsCryptMode.IsChecked = mode == DnsPolicyMode.DnsCrypt || pendingDnsCryptActivation;
     }
 
     private void ApplyRuntimeState(DnsCryptManagementStatus status, TrafficCaptureStatus traffic, DnsPolicyConfig policy)
@@ -809,7 +822,7 @@ public sealed class DnsPage : Page, IRefreshablePage
             .GroupBy(resolver => resolver.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        if (_resolverCatalog.Count == 0)
+        if (_resolverCatalog.Length == 0)
         {
             _resolverCatalog = active.ToArray();
             return;
@@ -932,7 +945,7 @@ public sealed class DnsPage : Page, IRefreshablePage
         GroupName = "DnsMode",
     };
 
-    private Button CreateButton(string text, Func<Task> action)
+    private static Button CreateButton(string text, Func<Task> action)
     {
         var button = new Button { Content = text };
         button.Click += async (_, _) => await action();
@@ -1009,9 +1022,8 @@ public sealed class DnsPage : Page, IRefreshablePage
         _automaticResolverPanel.Visibility = manual ? Visibility.Collapsed : Visibility.Visible;
         if (!manual)
         {
-            _resolverLatencyCancellation?.Cancel();
-            _resolverLatencyCancellation?.Dispose();
-            _resolverLatencyCancellation = null;
+            _cancelResolverLatency?.Invoke();
+            _cancelResolverLatency = null;
         }
     }
 
@@ -1299,22 +1311,24 @@ public sealed class DnsPage : Page, IRefreshablePage
             }
         }
 
-        await RunOperationAsync(async cancellationToken =>
+        bool requiresInstall = !_context.Controller.GetDnsCryptManagementStatus().Component.IsInstalled;
+        await RunDnsCryptOperationAsync(async cancellationToken =>
         {
-            if (!_context.Controller.GetDnsCryptManagementStatus().Component.IsInstalled)
+            if (requiresInstall)
                 await _context.Controller.InstallDnsCryptAsync(CreateProgress(), cancellationToken);
+            SetProgressText("Preparing signed DNSCrypt resolver catalog through DoH over Shadowsocks");
             await _context.Controller.SetDnsPolicyAsync(DnsPolicyMode.DnsCrypt, cancellationToken);
             SetProgressText("DNSCrypt mode selected; runtime is running.");
-        });
+        }, requiresInstall ? "Installing DNSCrypt Proxy" : "Activating DNSCrypt");
     }
 
-    private Task InstallAsync() => RunOperationAsync(async cancellationToken =>
+    private Task InstallAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         await _context.Controller!.InstallDnsCryptAsync(CreateProgress(), cancellationToken);
         SetProgressText("DNSCrypt Proxy installed.");
-    });
+    }, "Installing DNSCrypt Proxy");
 
-    private Task CheckUpdateAsync() => RunOperationAsync(async cancellationToken =>
+    private Task CheckUpdateAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         SetProgressText("Checking latest version");
         DnsCryptReleaseInfo release = await _context.Controller!.CheckDnsCryptUpdateAsync(cancellationToken);
@@ -1322,31 +1336,31 @@ public sealed class DnsPage : Page, IRefreshablePage
         SetProgressText(status.UpdateAvailable
             ? _context.LF("DNSCrypt Proxy {0} is available.", release.Version)
             : _context.L("DNSCrypt Proxy is up to date."));
-    });
+    }, "Checking latest version");
 
-    private Task UpdateAsync() => RunOperationAsync(async cancellationToken =>
+    private Task UpdateAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         await _context.Controller!.UpdateDnsCryptAsync(CreateProgress(), cancellationToken);
         SetProgressText("DNSCrypt Proxy updated.");
-    });
+    }, "Updating DNSCrypt Proxy");
 
-    private Task RestartAsync() => RunOperationAsync(async cancellationToken =>
+    private Task RestartAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         SetProgressText("Starting DNSCrypt");
         await _context.Controller!.RestartDnsCryptAsync(cancellationToken);
         SetProgressText("DNSCrypt Proxy restarted.");
-    });
+    }, "Starting DNSCrypt");
 
-    private Task TestDnsCryptAsync() => RunOperationAsync(async cancellationToken =>
+    private Task TestDnsCryptAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         SetProgressText("Testing DNSCrypt");
         bool healthy = await _context.Controller!.TestDnsCryptAsync(cancellationToken);
         if (!healthy)
             throw new InvalidOperationException(_context.L("DNSCrypt test failed."));
         SetProgressText("DNSCrypt test passed.");
-    });
+    }, "Testing DNSCrypt");
 
-    private Task TestDnsPrivacyAsync() => RunOperationAsync(async cancellationToken =>
+    private Task TestDnsPrivacyAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         SetProgressText("Testing DNS privacy");
         DnsPrivacySelfTestResult result = await _context.Controller!.TestDnsPrivacyAsync(cancellationToken);
@@ -1370,13 +1384,13 @@ public sealed class DnsPage : Page, IRefreshablePage
             "DNS privacy",
             _context.LF("DNS privacy self-test failed: {0}", failure),
             InfoBarSeverity.Error);
-    });
+    }, "Testing DNS privacy");
 
-    private Task ReinstallAsync() => RunOperationAsync(async cancellationToken =>
+    private Task ReinstallAsync() => RunDnsCryptOperationAsync(async cancellationToken =>
     {
         await _context.Controller!.ReinstallDnsCryptAsync(CreateProgress(), cancellationToken);
         SetProgressText("DNSCrypt Proxy reinstalled.");
-    });
+    }, "Installing DNSCrypt Proxy");
 
     private async Task RemoveAsync()
     {
@@ -1385,24 +1399,29 @@ public sealed class DnsPage : Page, IRefreshablePage
         ContentDialogResult result = await ShowRemoveDialogAsync();
         if (result != ContentDialogResult.Primary)
             return;
-        await RunOperationAsync(async cancellationToken =>
+        await RunDnsCryptOperationAsync(async cancellationToken =>
         {
             await _context.Controller.RemoveDnsCryptAsync(CreateProgress(), cancellationToken);
             SetProgressText("DNSCrypt Proxy removed.");
-        });
+        }, "Removing DNSCrypt Proxy");
     }
 
     private void ScheduleDnsCryptSettingsApply()
     {
-        _settingsApplyCancellation?.Cancel();
-        _settingsApplyCancellation?.Dispose();
-        _settingsApplyCancellation = new CancellationTokenSource();
+        if (_disposed)
+            return;
+
+        _cancelSettingsApply?.Invoke();
         long generation = ++_settingsApplyGeneration;
-        _ = ApplyDnsCryptSettingsDebouncedAsync(generation, _settingsApplyCancellation.Token);
+        _ = ApplyDnsCryptSettingsDebouncedAsync(generation);
     }
 
-    private async Task ApplyDnsCryptSettingsDebouncedAsync(long generation, CancellationToken cancellationToken)
+    private async Task ApplyDnsCryptSettingsDebouncedAsync(long generation)
     {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        _cancelSettingsApply = cancel;
+        CancellationToken cancellationToken = cancellation.Token;
         try
         {
             await Task.Delay(450, cancellationToken);
@@ -1444,6 +1463,11 @@ public sealed class DnsPage : Page, IRefreshablePage
                 _context.LF("DNSCrypt operation failed: {0}", exception.Message),
                 InfoBarSeverity.Error);
         }
+        finally
+        {
+            if (ReferenceEquals(_cancelSettingsApply, cancel))
+                _cancelSettingsApply = null;
+        }
     }
 
     private bool IsManualResolverSupported(string name)
@@ -1468,7 +1492,10 @@ public sealed class DnsPage : Page, IRefreshablePage
             ipv6Servers = _ipv6Servers.IsOn,
             routeThroughShadowsocks = _routeThroughShadowsocks.IsOn,
             automaticResolvers = _resolverAutomatic.IsChecked == true,
-            failClosed = true,
+            // Fail Closed is an internal compatibility field, not a UI toggle. Preserve
+            // the persisted value while Administrator-mode DNSCrypt capture enforces its
+            // own effective fail-closed security invariant.
+            failClosed = _context.Controller?.GetCurrentConfiguration().dnsPolicy?.dnsCrypt?.failClosed ?? true,
             serverNames = _resolverSelected.IsChecked == true
                 ? _manualResolverNames
                     .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -1479,19 +1506,42 @@ public sealed class DnsPage : Page, IRefreshablePage
         };
     }
 
+    private async Task RunDnsCryptOperationAsync(
+        Func<CancellationToken, Task> operation,
+        string initialStatus)
+    {
+        if (_busy || _context.Controller is null)
+            return;
+
+        _dnsCryptOperationActive = true;
+        SetProgressText(initialStatus);
+        try
+        {
+            await RunOperationAsync(operation);
+        }
+        finally
+        {
+            _dnsCryptOperationActive = false;
+            Refresh();
+        }
+    }
+
     private async Task RunOperationAsync(Func<CancellationToken, Task> operation)
     {
         if (_busy || _context.Controller is null)
             return;
 
         _busy = true;
-        _operationCancellation = new CancellationTokenSource();
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        _cancelOperation = cancel;
         _cancelButton.IsEnabled = true;
+        _progressRing.IsActive = true;
         _progressBar.IsIndeterminate = true;
         Refresh();
         try
         {
-            await operation(_operationCancellation.Token);
+            await operation(cancellation.Token);
         }
         catch (OperationCanceledException)
         {
@@ -1499,27 +1549,52 @@ public sealed class DnsPage : Page, IRefreshablePage
         }
         catch (Exception exception)
         {
-            SetProgressText(_context.LF("Failed: {0}", exception.Message));
             bool dnsCryptContext = _dnsCryptMode.IsChecked == true;
+            string failure = FormatOperationFailure(exception, dnsCryptContext);
+            SetProgressText(_context.LF("Failed: {0}", failure));
             _context.ShowInfo(
                 dnsCryptContext ? "DNSCrypt Proxy" : "DNS",
-                dnsCryptContext
-                    ? _context.LF("DNSCrypt operation failed: {0}", exception.Message)
-                    : _context.LF("DNS operation failed: {0}", exception.Message),
+                failure,
                 InfoBarSeverity.Error);
         }
         finally
         {
-            _operationCancellation.Dispose();
-            _operationCancellation = null;
+            if (ReferenceEquals(_cancelOperation, cancel))
+                _cancelOperation = null;
             _busy = false;
             _cancelButton.IsEnabled = false;
+            _progressRing.IsActive = false;
             _progressBar.IsIndeterminate = false;
             Refresh();
         }
     }
 
-    private IProgress<DnsCryptComponentProgress> CreateProgress() => new Progress<DnsCryptComponentProgress>(progress =>
+    private string FormatOperationFailure(Exception exception, bool dnsCryptContext)
+    {
+        if (exception is DnsCryptComponentNetworkException)
+        {
+            return _context.L(
+                "DNSCrypt could not reach GitHub through Cloudflare DoH over Shadowsocks or the Google DoH fallback. Verify that a Shadowsocks server is connected and HTTPS through the proxy works, then try again. No DNSCrypt component changes were applied.");
+        }
+
+        if (exception is DnsCryptBootstrapException)
+        {
+            return _context.L(
+                "DNSCrypt could not refresh the signed resolver catalog through Cloudflare DoH over Shadowsocks or the Google DoH fallback. Verify that a Shadowsocks server is connected and HTTPS through the proxy works, then try again. The previous DNS mode was kept.");
+        }
+
+        if (exception is DnsCryptRuntimeStartupException)
+        {
+            return _context.L(
+                "DNSCrypt Proxy could not become ready. Open Logs to see the upstream error, then try again. The previous DNS mode was kept.");
+        }
+
+        return dnsCryptContext
+            ? _context.LF("DNSCrypt operation failed: {0}", exception.Message)
+            : _context.LF("DNS operation failed: {0}", exception.Message);
+    }
+
+    private Progress<DnsCryptComponentProgress> CreateProgress() => new(progress =>
     {
         string stage = progress.Stage switch
         {
@@ -1601,7 +1676,7 @@ public sealed class DnsPage : Page, IRefreshablePage
         EnsureConfiguredResolversVisible(_manualResolverNames);
         RefreshResolverCountryFilter();
         RebuildResolverList();
-        _resolverListStatus.Text = _context.LF("Loaded {0} upstream resolvers. Measuring latency in the background.", _resolverCatalog.Count);
+        _resolverListStatus.Text = _context.LF("Loaded {0} upstream resolvers. Measuring latency in the background.", _resolverCatalog.Length);
         SetProgressText("Resolver list loaded.");
         StartResolverLatencyRefresh();
     });
@@ -1621,7 +1696,7 @@ public sealed class DnsPage : Page, IRefreshablePage
             EnsureConfiguredResolversVisible(_manualResolverNames);
             RefreshResolverCountryFilter();
             RebuildResolverList();
-            _resolverListStatus.Text = _context.LF("Loaded {0} upstream resolvers. Measuring latency in the background.", _resolverCatalog.Count);
+            _resolverListStatus.Text = _context.LF("Loaded {0} upstream resolvers. Measuring latency in the background.", _resolverCatalog.Length);
             if (_resolverSelected.IsChecked == true)
                 StartResolverLatencyRefresh();
             else
@@ -1639,17 +1714,19 @@ public sealed class DnsPage : Page, IRefreshablePage
 
     private void StartResolverLatencyRefresh()
     {
-        if (!_resolverCatalogLoaded || _context.Controller is null || _resolverCatalog.Count == 0)
+        if (!_resolverCatalogLoaded || _context.Controller is null || _resolverCatalog.Length == 0)
             return;
 
-        _resolverLatencyCancellation?.Cancel();
-        _resolverLatencyCancellation?.Dispose();
-        _resolverLatencyCancellation = new CancellationTokenSource();
-        _ = RefreshResolverLatenciesInBackgroundAsync(_resolverLatencyCancellation.Token);
+        _cancelResolverLatency?.Invoke();
+        _ = RefreshResolverLatenciesInBackgroundAsync();
     }
 
-    private async Task RefreshResolverLatenciesInBackgroundAsync(CancellationToken cancellationToken)
+    private async Task RefreshResolverLatenciesInBackgroundAsync()
     {
+        using var cancellation = new CancellationTokenSource();
+        Action cancel = cancellation.Cancel;
+        _cancelResolverLatency = cancel;
+        CancellationToken cancellationToken = cancellation.Token;
         try
         {
             string[] unresolved = _resolverCatalog
@@ -1682,7 +1759,7 @@ public sealed class DnsPage : Page, IRefreshablePage
                 _resolverListStatus.Text = _context.LF(
                     "Latency available for {0} of {1} resolver(s).",
                     measuredCount,
-                    _resolverCatalog.Count);
+                    _resolverCatalog.Length);
             }
         }
         catch (OperationCanceledException)
@@ -1691,6 +1768,11 @@ public sealed class DnsPage : Page, IRefreshablePage
         catch (Exception exception)
         {
             _resolverListStatus.Text = _context.LF("Resolver latency measurement failed: {0}", exception.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_cancelResolverLatency, cancel))
+                _cancelResolverLatency = null;
         }
     }
 
@@ -1827,6 +1909,21 @@ public sealed class DnsPage : Page, IRefreshablePage
     private static bool Contains(string? value, string query)
         => !string.IsNullOrWhiteSpace(value)
             && value.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        _cancelOperation?.Invoke();
+        _cancelSettingsApply?.Invoke();
+        _cancelResolverLatency?.Invoke();
+        _cancelOperation = null;
+        _cancelSettingsApply = null;
+        _cancelResolverLatency = null;
+        GC.SuppressFinalize(this);
+    }
 
     private static string FormatBytes(long bytes)
     {

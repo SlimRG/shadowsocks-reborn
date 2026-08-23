@@ -46,7 +46,8 @@ namespace Shadowsocks.Controller
 
         public UpdateChecker(ShadowsocksController controller)
         {
-            this.controller = controller ?? throw new ArgumentNullException(nameof(controller));
+            ArgumentNullException.ThrowIfNull(controller);
+            this.controller = controller;
             httpClient = controller.GetHttpClient();
         }
 
@@ -69,7 +70,8 @@ namespace Shadowsocks.Controller
             {
                 string json = await GetReleasesJsonAsync().ConfigureAwait(false);
                 JArray releases = JArray.Parse(json);
-                JToken selected = SelectLatestEligibleRelease(releases, config, currentVersion, out Version selectedVersion);
+                Version installedVersion = ResolveEffectiveInstalledVersion();
+                JToken selected = SelectLatestEligibleRelease(releases, config, installedVersion, out Version selectedVersion);
                 if (selected != null)
                 {
                     releaseObject = selected;
@@ -107,6 +109,13 @@ namespace Shadowsocks.Controller
             string transactionDirectory = null;
             try
             {
+                Version installedVersion = ResolveEffectiveInstalledVersion();
+                if (!IsStrictlyNewerVersion(releaseVersion, installedVersion))
+                {
+                    throw new InvalidOperationException(
+                        $"Release {releaseVersion} is not newer than the installed application version {installedVersion}.");
+                }
+
                 JArray assets = releaseObject["assets"] as JArray ?? new JArray();
                 JObject zipAsset = SelectReleaseZipAsset(assets)
                     ?? throw new InvalidDataException($"The GitHub release does not contain the required {PreferredReleaseZipFilename} asset.");
@@ -187,7 +196,7 @@ namespace Shadowsocks.Controller
                 }
 
                 if (!TryParseReleaseVersion(tag, out Version parsed)
-                    || parsed.CompareTo(installedVersion) <= 0)
+                    || !IsStrictlyNewerVersion(parsed, installedVersion))
                 {
                     continue;
                 }
@@ -212,6 +221,61 @@ namespace Shadowsocks.Controller
             return selected;
         }
 
+        internal static bool IsStrictlyNewerVersion(Version candidateVersion, Version installedVersion)
+        {
+            ArgumentNullException.ThrowIfNull(candidateVersion);
+            ArgumentNullException.ThrowIfNull(installedVersion);
+            return candidateVersion.CompareTo(installedVersion) > 0;
+        }
+
+        internal static Version SelectEffectiveInstalledVersion(Version processVersion, Version primaryExecutableVersion)
+        {
+            ArgumentNullException.ThrowIfNull(processVersion);
+            return primaryExecutableVersion != null && primaryExecutableVersion.CompareTo(processVersion) > 0
+                ? primaryExecutableVersion
+                : processVersion;
+        }
+
+        private Version ResolveEffectiveInstalledVersion()
+        {
+            string primaryExecutable = AutoStartup.GetPrimaryExecutablePath();
+            Version primaryVersion = TryReadExecutableVersion(primaryExecutable);
+            Version effectiveVersion = SelectEffectiveInstalledVersion(currentVersion, primaryVersion);
+
+            if (primaryVersion != null && !effectiveVersion.Equals(currentVersion))
+            {
+                logger.Info(
+                    "Update check is running from version {0}, but primary executable {1} is version {2}; using {2} as the installed version.",
+                    currentVersion,
+                    primaryExecutable,
+                    primaryVersion);
+            }
+
+            return effectiveVersion;
+        }
+
+        internal static Version TryReadExecutableVersion(string executablePath)
+        {
+            if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(executablePath);
+                return new Version(
+                    Math.Max(0, versionInfo.FileMajorPart),
+                    Math.Max(0, versionInfo.FileMinorPart),
+                    Math.Max(0, versionInfo.FileBuildPart),
+                    Math.Max(0, versionInfo.FilePrivatePart));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         internal static bool TryParseReleaseVersion(string tagName, out Version version)
         {
             version = null;
@@ -223,13 +287,13 @@ namespace Shadowsocks.Controller
             string normalized = tagName.Trim();
             if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
             {
-                normalized = normalized.Substring(1);
+                normalized = normalized[1..];
             }
 
-            int suffixIndex = normalized.IndexOfAny(new[] { '-', '+' });
+            int suffixIndex = normalized.AsSpan().IndexOfAny('-', '+');
             if (suffixIndex >= 0)
             {
-                normalized = normalized.Substring(0, suffixIndex);
+                normalized = normalized[..suffixIndex];
             }
 
             string[] parts = normalized.Split('.');

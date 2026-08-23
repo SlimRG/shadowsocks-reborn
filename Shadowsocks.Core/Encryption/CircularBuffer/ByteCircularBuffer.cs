@@ -41,7 +41,7 @@ namespace Shadowsocks.Encryption.CircularBuffer
     /// <remarks>
     /// <para>The capacity of a <see cref="ByteCircularBuffer" /> is the number of elements the <see cref="ByteCircularBuffer"/> can hold. </para>
     /// <para>ByteCircularBuffer accepts <c>null</c> as a valid value for reference types and allows duplicate elements.</para>
-    /// <para>The <see cref="Get()"/> methods will remove the items that are returned from the ByteCircularBuffer. To view the contents of the ByteCircularBuffer without removing items, use the <see cref="Peek()"/> or <see cref="PeekLast"/> methods.</para>
+    /// <para>The <see cref="Read()"/> methods will remove the items that are returned from the ByteCircularBuffer. To view the contents of the ByteCircularBuffer without removing items, use the <see cref="Peek()"/> or <see cref="PeekLast"/> methods.</para>
     /// </remarks>
     public class ByteCircularBuffer
     {
@@ -242,12 +242,12 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// </summary>
         /// <param name="count">The number of elements to remove and return from the <see cref="ByteCircularBuffer"/>.</param>
         /// <returns>The objects that are removed from the beginning of the <see cref="ByteCircularBuffer"/>.</returns>
-        public byte[] Get(int count)
+        public byte[] Read(int count)
         {
-            if (count <= 0) throw new ArgumentOutOfRangeException("should greater than 0");
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
             var result = new byte[count];
 
-            this.Get(result);
+            Read(result);
 
             return result;
         }
@@ -257,10 +257,11 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// </summary>
         /// <param name="array">The one-dimensional <see cref="Array"/> that is the destination of the elements copied from <see cref="ByteCircularBuffer"/>. The <see cref="Array"/> must have zero-based indexing.</param>
         /// <returns>The actual number of elements copied into <paramref name="array"/>.</returns>
-        public int Get(byte[] array)
+        public int Read(byte[] array)
         {
-            if (array.Length <= 0) throw new ArgumentOutOfRangeException("should greater than 0");
-            return this.Get(array, 0, array.Length);
+            ArgumentNullException.ThrowIfNull(array);
+            if (array.Length == 0) throw new ArgumentException("Array must not be empty.", nameof(array));
+            return Read(array, 0, array.Length);
         }
 
         /// <summary>
@@ -270,16 +271,11 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// <param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param>
         /// <param name="count">The number of elements to copy.</param>
         /// <returns>The actual number of elements copied into <paramref name="array"/>.</returns>
-        public virtual int Get(byte[] array, int arrayIndex, int count)
+        public virtual int Read(byte[] array, int arrayIndex, int count)
         {
-            if (arrayIndex < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), "Negative offset specified. Offsets must be positive.");
-            }
-            if (count < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(count), "Negative count specified. Count must be positive.");
-            }
+            ArgumentNullException.ThrowIfNull(array);
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
             if (count > this.Size)
             {
                 throw new ArgumentException("Ringbuffer contents insufficient for take/read operation.", nameof(count));
@@ -309,7 +305,7 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// <returns>The object that is removed from the beginning of the <see cref="ByteCircularBuffer"/>.</returns>
         /// <exception cref="System.InvalidOperationException">Thrown if the buffer is empty.</exception>
         /// <remarks>This method is similar to the <see cref="Peek()"/> method, but <c>Peek</c> does not modify the <see cref="ByteCircularBuffer"/>.</remarks>
-        public virtual byte Get()
+        public virtual byte Read()
         {
             if (this.IsEmpty)
             {
@@ -398,7 +394,8 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// <remarks>If <see cref="Size"/> plus the size of <paramref name="array"/> exceeds the capacity of the <see cref="ByteCircularBuffer"/> and the <see cref="AllowOverwrite"/> property is <c>true</c>, the oldest items in the <see cref="ByteCircularBuffer"/> are overwritten with <paramref name="array"/>.</remarks>
         public int Put(byte[] array)
         {
-            return this.Put(array, 0, array.Length);
+            ArgumentNullException.ThrowIfNull(array);
+            return Put(array, 0, array.Length);
         }
 
         /// <summary>
@@ -411,7 +408,9 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// <remarks>If <see cref="Size"/> plus <paramref name="count"/> exceeds the capacity of the <see cref="ByteCircularBuffer"/> and the <see cref="AllowOverwrite"/> property is <c>true</c>, the oldest items in the <see cref="ByteCircularBuffer"/> are overwritten with <paramref name="array"/>.</remarks>
         public virtual int Put(byte[] array, int arrayIndex, int count)
         {
-            if (count <= 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be positive.");
+            ArgumentNullException.ThrowIfNull(array);
+            ArgumentOutOfRangeException.ThrowIfNegative(arrayIndex);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
             if (this.Size + count > this.Capacity)
             {
                 throw new InvalidOperationException("The buffer does not have sufficient capacity to put new items.");
@@ -477,10 +476,7 @@ namespace Shadowsocks.Encryption.CircularBuffer
         /// <param name="count">The number of elements to increment the data buffer start index by.</param>
         public void Skip(int count)
         {
-            if (count < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(count), "Negative count specified. Count must be positive.");
-            }
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
             if (count > this.Size)
             {
                 throw new ArgumentException("Ringbuffer contents insufficient for operation.", nameof(count));

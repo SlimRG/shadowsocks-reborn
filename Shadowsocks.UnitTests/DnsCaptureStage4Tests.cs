@@ -268,7 +268,7 @@ public class DnsCaptureStage4Tests
 
         Assert.IsTrue(policy.IsExcludedProcess(4321, executable));
         Assert.IsTrue(policy.IsDnsInterceptionExempt(4321, executable));
-        Assert.AreEqual(RouteAction.Direct, policy.Evaluate(4321, executable, "dnscrypt-proxy"));
+        Assert.AreEqual(RouteAction.Direct, policy.Evaluate(6, 443, 4321, executable, "dnscrypt-proxy"));
     }
 
     [TestMethod]
@@ -286,7 +286,7 @@ public class DnsCaptureStage4Tests
 
         Assert.IsFalse(policy.IsExcludedProcess(4321, executable));
         Assert.IsFalse(policy.IsDnsInterceptionExempt(4321, executable));
-        Assert.AreEqual(RouteAction.Proxy, policy.Evaluate(4321, executable, "dnscrypt-proxy"));
+        Assert.AreEqual(RouteAction.Proxy, policy.Evaluate(6, 443, 4321, executable, "dnscrypt-proxy"));
     }
 
     [TestMethod]
@@ -379,7 +379,7 @@ public class DnsCaptureStage4Tests
         application.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         ushort applicationPort = checked((ushort)((IPEndPoint)application.LocalEndPoint!).Port);
         FlowKey key = new(17, IPAddress.Loopback, applicationPort, IPAddress.Loopback, 53);
-        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, DateTime.UtcNow));
+        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, RouteAction.Direct, DateTime.UtcNow));
 
         byte[] payload = [0x12, 0x34, 0x01, 0x00, 0x00, 0x01];
         await application.SendToAsync(
@@ -427,7 +427,7 @@ public class DnsCaptureStage4Tests
         application.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         ushort applicationPort = checked((ushort)((IPEndPoint)application.LocalEndPoint!).Port);
         FlowKey key = new(17, IPAddress.Loopback, applicationPort, IPAddress.Loopback, 53);
-        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, DateTime.UtcNow));
+        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, RouteAction.Direct, DateTime.UtcNow));
 
         byte[] payload = [0x12, 0x34, 0x01, 0x00, 0x00, 0x01];
         await application.SendToAsync(
@@ -481,7 +481,7 @@ public class DnsCaptureStage4Tests
         application.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         ushort applicationPort = checked((ushort)((IPEndPoint)application.LocalEndPoint!).Port);
         FlowKey key = new(6, IPAddress.Loopback, applicationPort, IPAddress.Loopback, 53);
-        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, DateTime.UtcNow));
+        flows.MarkReflected(new FlowState(key, 77, null, "test", RouteAction.Direct, RouteAction.Direct, DateTime.UtcNow));
 
         await application.ConnectAsync(new IPEndPoint(IPAddress.Loopback, relay.TcpPort), timeout.Token).ConfigureAwait(false);
         byte[] payload = [0x00, 0x04, 0x12, 0x34, 0x01, 0x00];
@@ -557,8 +557,8 @@ public class DnsCaptureStage4Tests
             IPAddress.Parse("9.9.9.9"),
             53);
         FlowKey secondKey = firstKey with { LocalAddress = IPAddress.Parse("192.0.2.11") };
-        FlowState first = new(firstKey, 77, null, "test-1", RouteAction.Direct, now.AddSeconds(-1));
-        FlowState second = new(secondKey, 78, null, "test-2", RouteAction.Direct, now);
+        FlowState first = new(firstKey, 77, null, "test-1", RouteAction.Direct, RouteAction.Direct, now.AddSeconds(-1));
+        FlowState second = new(secondKey, 78, null, "test-2", RouteAction.Direct, RouteAction.Direct, now);
         flows.MarkReflected(first);
         flows.MarkReflected(second);
 

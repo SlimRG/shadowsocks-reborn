@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.UI.Dispatching;
 using NLog;
 using Shadowsocks.Controller;
@@ -25,10 +26,14 @@ internal sealed class WinUIHotkeyManager : IDisposable
         Action showWindow,
         Action showLogsPage)
     {
-        _controller = controller ?? throw new ArgumentNullException(nameof(controller));
-        _dispatcherQueue = dispatcherQueue ?? throw new ArgumentNullException(nameof(dispatcherQueue));
-        _showWindow = showWindow ?? throw new ArgumentNullException(nameof(showWindow));
-        _showLogsPage = showLogsPage ?? throw new ArgumentNullException(nameof(showLogsPage));
+        ArgumentNullException.ThrowIfNull(controller);
+        ArgumentNullException.ThrowIfNull(dispatcherQueue);
+        ArgumentNullException.ThrowIfNull(showWindow);
+        ArgumentNullException.ThrowIfNull(showLogsPage);
+        _controller = controller;
+        _dispatcherQueue = dispatcherQueue;
+        _showWindow = showWindow;
+        _showLogsPage = showLogsPage;
     }
 
     public IReadOnlyList<string> RegisterConfiguredHotkeys()
@@ -78,7 +83,7 @@ internal sealed class WinUIHotkeyManager : IDisposable
         _hotkeys.Dispose();
     }
 
-    private void Register(string name, string gesture, Action callback, ICollection<string> failures)
+    private void Register(string name, string gesture, Action callback, List<string> failures)
     {
         if (string.IsNullOrWhiteSpace(gesture))
         {
@@ -104,13 +109,13 @@ internal sealed class WinUIHotkeyManager : IDisposable
     private void ToggleSystemProxy()
     {
         Configuration config = _controller.GetCurrentConfiguration();
-        _controller.ToggleEnable(!config.enabled);
+        _controller.ToggleEnable(!config.Enabled);
     }
 
     private void ToggleSystemProxyMode()
     {
         Configuration config = _controller.GetCurrentConfiguration();
-        if (config.enabled)
+        if (config.Enabled)
         {
             _controller.ToggleGlobal(!config.global);
         }
@@ -130,19 +135,23 @@ internal sealed class WinUIHotkeyManager : IDisposable
     private void MoveServer(int delta)
     {
         Configuration config = _controller.GetCurrentConfiguration();
-        int count = config.configs?.Count ?? 0;
-        if (count == 0)
+        int[] configuredIndices = (config.configs ?? [])
+            .Select((server, index) => (server, index))
+            .Where(item => item.server?.IsConfigured == true)
+            .Select(item => item.index)
+            .ToArray();
+        if (configuredIndices.Length == 0)
         {
             return;
         }
 
-        int index = config.index;
-        if (index < 0 || index >= count)
+        int position = Array.IndexOf(configuredIndices, config.index);
+        if (position < 0)
         {
-            index = 0;
+            position = delta >= 0 ? -1 : 0;
         }
 
-        index = (index + delta + count) % count;
-        _controller.SelectServerIndex(index);
+        position = (position + delta + configuredIndices.Length) % configuredIndices.Length;
+        _controller.SelectServerIndex(configuredIndices[position]);
     }
 }

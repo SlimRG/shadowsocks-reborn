@@ -1,5 +1,4 @@
 ﻿using System;
-using Newtonsoft.Json;
 
 namespace Shadowsocks.Model
 {
@@ -10,20 +9,20 @@ namespace Shadowsocks.Model
     [Serializable]
     public class LogViewerConfig
     {
-        public bool topMost;
-        public bool wrapText;
-        public bool toolbarShown;
-        public int width = 600;
-        public int height = 400;
-        public int top;
-        public int left;
-        public bool maximized = true;
+        public bool topMost { get; set; }
+        public bool wrapText { get; set; }
+        public bool toolbarShown { get; set; }
+        public int width { get; set; } = 600;
+        public int height { get; set; } = 400;
+        public int top { get; set; }
+        public int left { get; set; }
+        public bool maximized { get; set; } = true;
 
-        public string fontFamily = "Consolas";
-        public float fontSize = 8F;
-        public int fontStyle;
-        public int backgroundArgb = unchecked((int)0xFF000000);
-        public int textArgb = unchecked((int)0xFFFFFFFF);
+        public string fontFamily { get; set; } = "Consolas";
+        public float fontSize { get; set; } = 8F;
+        public int fontStyle { get; set; }
+        public int backgroundArgb { get; set; } = unchecked((int)0xFF000000);
+        public int textArgb { get; set; } = unchecked((int)0xFFFFFFFF);
 
         public LogViewerConfig()
         {
@@ -32,10 +31,5 @@ namespace Shadowsocks.Model
             toolbarShown = true;
         }
 
-        [JsonIgnore] public int Width { get => width; set => width = value; }
-        [JsonIgnore] public int Height { get => height; set => height = value; }
-        [JsonIgnore] public int Top { get => top; set => top = value; }
-        [JsonIgnore] public int Left { get => left; set => left = value; }
-        [JsonIgnore] public bool Maximized { get => maximized; set => maximized = value; }
     }
 }
