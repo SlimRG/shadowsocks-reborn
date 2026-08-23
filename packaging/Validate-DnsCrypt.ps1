@@ -97,6 +97,7 @@ $unexpectedNativeFiles = @(
             $forbiddenNativeNames -contains $_.Name
         }
 )
-Test-Condition ($unexpectedNativeFiles.Count -eq 0) "Downloaded runtime binaries must not be committed to the source tree: $($unexpectedNativeFiles.FullName -join ', ')"
+$unexpectedNativeFileNames = @($unexpectedNativeFiles | ForEach-Object { $_.FullName }) -join ', '
+Test-Condition ($unexpectedNativeFiles.Count -eq 0) "Downloaded runtime binaries must not be committed to the source tree: $unexpectedNativeFileNames"
 
 Write-Information 'DNSCrypt/WinDivert release invariants validated.' -InformationAction Continue

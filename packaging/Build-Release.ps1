@@ -156,7 +156,8 @@ try {
 
     $publishEntries = @(Get-ChildItem -LiteralPath $publishDir -Force)
     if ($publishEntries.Count -ne 1 -or $publishEntries[0].PSIsContainer -or $publishEntries[0].Name -ne 'Shadowsocks.exe') {
-        throw "Final publish must contain exactly Shadowsocks.exe. Found: $($publishEntries.Name -join ', ')"
+        $publishEntryNames = @($publishEntries | ForEach-Object { $_.Name }) -join ', '
+        throw "Final publish must contain exactly Shadowsocks.exe. Found: $publishEntryNames"
     }
 
     $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExecutable)
@@ -179,7 +180,8 @@ try {
     try {
         $entries = @($archive.Entries | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) })
         if ($entries.Count -ne 1 -or $entries[0].FullName -ne 'Shadowsocks.exe') {
-            throw "Release ZIP must contain exactly Shadowsocks.exe. Found: $($entries.FullName -join ', ')"
+            $entryNames = @($entries | ForEach-Object { $_.FullName }) -join ', '
+            throw "Release ZIP must contain exactly Shadowsocks.exe. Found: $entryNames"
         }
     }
     finally {

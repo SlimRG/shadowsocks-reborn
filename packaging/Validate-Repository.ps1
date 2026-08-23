@@ -77,7 +77,7 @@ function Test-PowerShellSyntax {
         $tokens = $null
         $errors = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$errors)
-        if ($errors.Count -ne 0) {
+        if (@($errors).Count -ne 0) {
             $messages = $errors | ForEach-Object { "$($_.Extent.StartLineNumber):$($_.Extent.StartColumnNumber) $($_.Message)" }
             throw "PowerShell syntax error in '$($file.FullName)': $($messages -join '; ')"
         }
@@ -98,6 +98,20 @@ function Test-TextEncodingAndLineEndings {
         Test-Condition ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) "Text file must be UTF-8 with BOM: $($file.FullName)"
         $text = [System.Text.Encoding]::UTF8.GetString($bytes, 3, $bytes.Length - 3)
         Test-Condition ($text -notmatch '(?<!\r)\n') "Text file must use CRLF line endings: $($file.FullName)"
+    }
+}
+
+function Test-PowerShellStrictModeCollectionFormatting {
+    [CmdletBinding()]
+    param()
+
+    $packagingRoot = Join-Path $repoRoot 'packaging'
+    $scripts = @(Get-ChildItem -LiteralPath $packagingRoot -File -Filter '*.ps1')
+    $unsafeMemberEnumeration = '\$\(\s*\$[A-Za-z_][A-Za-z0-9_]*\.(?:FullName|Name)\s+-join\b'
+
+    foreach ($script in $scripts) {
+        $text = Get-Content -LiteralPath $script.FullName -Raw
+        Test-Condition ($text -notmatch $unsafeMemberEnumeration) "PowerShell StrictMode-unsafe collection member formatting found in $($script.FullName). Project collection properties through ForEach-Object before joining them."
     }
 }
 
@@ -159,13 +173,16 @@ foreach ($file in $requiredFiles) {
 $allFiles = Get-RepositoryFiles
 Test-PowerShellSyntax @($allFiles | Where-Object Extension -EQ '.ps1')
 Test-TextEncodingAndLineEndings $allFiles
+Test-PowerShellStrictModeCollectionFormatting
 Test-WinUiIsEnabledAssignments
 
 $unexpectedBuildTrees = @(Get-ChildItem -LiteralPath $repoRoot -Recurse -Directory | Where-Object { $_.Name -in @('bin', 'obj', 'artifacts') -and $_.FullName -notmatch '[\\/](?:\.git|\.github)[\\/]' })
-Test-Condition ($unexpectedBuildTrees.Count -eq 0) "Source archive must not contain build output directories: $($unexpectedBuildTrees.FullName -join ', ')"
+$unexpectedBuildTreeNames = @($unexpectedBuildTrees | ForEach-Object { $_.FullName }) -join ', '
+Test-Condition ($unexpectedBuildTrees.Count -eq 0) "Source archive must not contain build output directories: $unexpectedBuildTreeNames"
 
 $javascriptFiles = @($allFiles | Where-Object { $_.Extension.ToLowerInvariant() -in @('.js', '.mjs', '.cjs') })
-Test-Condition ($javascriptFiles.Count -eq 0) "Bundled JavaScript is not allowed in the source tree: $($javascriptFiles.FullName -join ', ')"
+$javascriptFileNames = @($javascriptFiles | ForEach-Object { $_.FullName }) -join ', '
+Test-Condition ($javascriptFiles.Count -eq 0) "Bundled JavaScript is not allowed in the source tree: $javascriptFileNames"
 
 $forbiddenProjectDirectories = @('Shadowsocks.Engine', 'Shadowsocks.UI')
 foreach ($directory in $forbiddenProjectDirectories) {
@@ -282,7 +299,8 @@ Test-Condition ($i18nRows.Count -gt 0) 'i18n.csv must contain translations.'
 $actualLocales = @($i18nRows[0].PSObject.Properties.Name)
 Test-Condition (($actualLocales -join ',') -eq ($expectedLocales -join ',')) "i18n.csv locale columns must be: $($expectedLocales -join ', ')."
 $duplicateKeys = @($i18nRows | Group-Object en | Where-Object Count -GT 1)
-Test-Condition ($duplicateKeys.Count -eq 0) "i18n.csv contains duplicate English keys: $($duplicateKeys.Name -join ', ')"
+$duplicateKeyNames = @($duplicateKeys | ForEach-Object { $_.Name }) -join ', '
+Test-Condition ($duplicateKeys.Count -eq 0) "i18n.csv contains duplicate English keys: $duplicateKeyNames"
 foreach ($row in $i18nRows) {
     if ([string]$row.en -match '^#') {
         continue
@@ -296,7 +314,8 @@ foreach ($row in $i18nRows) {
 }
 
 $xsdFiles = @($allFiles | Where-Object Extension -EQ '.xsd')
-Test-Condition ($xsdFiles.Count -eq 0) "Generated XSD files must not be stored in the source tree: $($xsdFiles.FullName -join ', ')"
+$xsdFileNames = @($xsdFiles | ForEach-Object { $_.FullName }) -join ', '
+Test-Condition ($xsdFiles.Count -eq 0) "Generated XSD files must not be stored in the source tree: $xsdFileNames"
 foreach ($weaverPath in @('Shadowsocks.Core\FodyWeavers.xml', 'Shadowsocks.Windows\FodyWeavers.xml')) {
     Test-RequiredFile $weaverPath
     $weaverText = Get-Content -LiteralPath (Join-Path $repoRoot $weaverPath) -Raw
