@@ -96,7 +96,7 @@ function Test-TextEncodingAndLineEndings {
     [CmdletBinding()]
     param([Parameter(Mandatory)][System.IO.FileInfo[]]$Files)
 
-    $extensions = @('.cs', '.csproj', '.props', '.targets', '.pubxml', '.xml', '.xaml', '.resx', '.json', '.md', '.txt', '.csv', '.ps1', '.sln', '.manifest', '.config')
+    $extensions = @('.cs', '.csproj', '.props', '.targets', '.pubxml', '.xml', '.xaml', '.resx', '.json', '.md', '.txt', '.csv', '.ps1', '.sln', '.manifest', '.config', '.yml', '.yaml')
     foreach ($file in $Files) {
         if ($extensions -notcontains $file.Extension.ToLowerInvariant() -and $file.Name -notin @('CHANGES', 'NuGet.Config')) {
             continue
@@ -137,6 +137,25 @@ function Test-PowerShellReturnStatementUsage {
     }
 }
 
+function Test-GitHubWorkflowContracts {
+    [CmdletBinding()]
+    param()
+
+    $ciPath = Join-Path $repoRoot '.github\workflows\ci.yml'
+    $releasePath = Join-Path $repoRoot '.github\workflows\release.yml'
+    $workflowFiles = @(Get-Item -LiteralPath $ciPath, $releasePath)
+    Test-TextEncodingAndLineEndings $workflowFiles
+
+    $ciText = Get-Content -LiteralPath $ciPath -Raw
+    $releaseText = Get-Content -LiteralPath $releasePath -Raw
+
+    Test-Condition ($ciText.IndexOf('Directory.Build.props', [StringComparison]::Ordinal) -ge 0) 'CI publish validation must read the canonical version from Directory.Build.props.'
+    Test-Condition ($ciText.IndexOf('Published Shadowsocks.exe FileVersion', [StringComparison]::Ordinal) -ge 0) 'CI must validate the published executable FileVersion.'
+    Test-Condition ($ciText.IndexOf('Shadowsocks.WinUI.csproj does not declare <Version>', [StringComparison]::Ordinal) -lt 0) 'CI must not require a project-local <Version>; projects inherit the canonical version.'
+    Test-Condition ($ciText.IndexOf('$projectXml.Project.PropertyGroup.Version', [StringComparison]::Ordinal) -lt 0) 'CI must not read Version directly from Shadowsocks.WinUI.csproj.'
+    Test-Condition ($releaseText.IndexOf('.\packaging\Build-Release.ps1', [StringComparison]::Ordinal) -ge 0) 'Release workflow must package through packaging\Build-Release.ps1.'
+}
+
 function Test-WinUiIsEnabledAssignments {
     [CmdletBinding()]
     param()
@@ -159,6 +178,8 @@ function Test-WinUiIsEnabledAssignments {
 }
 
 $requiredFiles = @(
+    '.github\workflows\ci.yml',
+    '.github\workflows\release.yml',
     'Directory.Build.props',
     'global.json',
     'NuGet.Config',
@@ -197,6 +218,7 @@ Test-PowerShellSyntax @($allFiles | Where-Object Extension -EQ '.ps1')
 Test-TextEncodingAndLineEndings $allFiles
 Test-PowerShellStrictModeCollectionFormatting
 Test-PowerShellReturnStatementUsage
+Test-GitHubWorkflowContracts
 Test-WinUiIsEnabledAssignments
 
 $unexpectedBuildTrees = @(Get-ChildItem -LiteralPath $repoRoot -Recurse -Directory | Where-Object { $_.Name -in @('bin', 'obj', 'artifacts') -and $_.FullName -notmatch '[\\/](?:\.git|\.github)[\\/]' })

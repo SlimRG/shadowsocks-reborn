@@ -3,14 +3,13 @@
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*'
-      - 'v[0-9]*.[0-9]*.[0-9]*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: Package version label, for example 2.2.31
+        description: Package version label, for example v5.2.31
         required: true
-        default: 2.2.31
+        default: v5.2.31
 
 permissions:
   contents: write
@@ -22,33 +21,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Parse PowerShell scripts
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $parseFailures = @(
-            foreach ($script in Get-ChildItem -LiteralPath .\packaging -Filter *.ps1 -File) {
-              $tokens = $null
-              $errors = $null
-              [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
-              foreach ($parseError in @($errors)) {
-                '{0}:{1}:{2}: {3}' -f $script.Name, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message
-              }
-            }
-          )
-          if ($parseFailures.Count -gt 0) {
-            $failureText = $parseFailures -join [Environment]::NewLine
-            throw "PowerShell parser validation failed:`n$failureText"
-          }
+        uses: actions/checkout@v7
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.x
 
       - name: Resolve version label
         id: version
@@ -56,7 +34,8 @@ jobs:
         run: |
           if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             "label=${{ inputs.version }}" >> $env:GITHUB_OUTPUT
-          } else {
+          }
+          else {
             "label=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
           }
 
@@ -64,12 +43,10 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.label }}
-          NuGetAudit: 'true'
-          NuGetAuditMode: 'all'
         run: .\packaging\Build-Release.ps1 -Version $env:RELEASE_VERSION
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: shadowsocks-reborn-${{ steps.version.outputs.label }}-win-x64
           path: |

@@ -17,37 +17,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Parse PowerShell scripts
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $parseFailures = @(
-            foreach ($script in Get-ChildItem -LiteralPath .\packaging -Filter *.ps1 -File) {
-              $tokens = $null
-              $errors = $null
-              [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
-              foreach ($parseError in @($errors)) {
-                '{0}:{1}:{2}: {3}' -f $script.Name, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message
-              }
-            }
-          )
-          if ($parseFailures.Count -gt 0) {
-            $failureText = $parseFailures -join [Environment]::NewLine
-            throw "PowerShell parser validation failed:`n$failureText"
-          }
+        uses: actions/checkout@v7
 
       - name: Validate repository resources
         shell: pwsh
         run: .\packaging\Validate-Repository.ps1
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.303
+          dotnet-version: 10.0.x
 
       - name: .NET info
         run: dotnet --info
@@ -56,13 +35,13 @@ jobs:
         run: dotnet restore .\Shadowsocks.Core\Shadowsocks.Core.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
 
       - name: Build Core standalone
-        run: dotnet build .\Shadowsocks.Core\Shadowsocks.Core.csproj -c Release --no-restore
+        run: dotnet build .\Shadowsocks.Core\Shadowsocks.Core.csproj -c Release --no-restore -p:TreatWarningsAsErrors=true
 
       - name: Restore
         run: dotnet restore .\shadowsocks-reborn.sln -p:Platform=x64 -r win-x64 -p:NuGetAudit=true -p:NuGetAuditMode=all
 
       - name: Build
-        run: dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore
+        run: dotnet build .\shadowsocks-reborn.sln -c Release -p:Platform=x64 -m:1 --no-restore -p:TreatWarningsAsErrors=true
 
       - name: Test
         run: dotnet test .\Shadowsocks.UnitTests\Shadowsocks.UnitTests.csproj -c Release -p:Platform=x64 --no-build
@@ -71,40 +50,71 @@ jobs:
         run: dotnet restore .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 -p:NuGetAudit=true -p:NuGetAuditMode=all
 
       - name: Publish
-        run: dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --self-contained true -o .\artifacts\publish --no-restore
+        run: dotnet publish .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -c Release -p:Platform=x64 -p:PublishProfile=FolderProfile -r win-x64 --self-contained true -o .\artifacts\publish --no-restore -p:TreatWarningsAsErrors=true
 
       - name: Validate publish
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $publish = Join-Path $PWD 'artifacts\publish'
-          if (-not (Test-Path (Join-Path $publish 'Shadowsocks.exe'))) {
+          $publishedExecutable = Join-Path $publish 'Shadowsocks.exe'
+          if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
             throw "Missing required publish artifact: Shadowsocks.exe"
           }
+
           $entries = @(Get-ChildItem -LiteralPath $publish -Force)
           if ($entries.Count -ne 1 -or $entries[0].PSIsContainer -or $entries[0].Name -ne 'Shadowsocks.exe') {
-            throw "Final product publish must contain exactly Shadowsocks.exe. Found: $($entries.Name -join ', ')"
+            $entryNames = @($entries | ForEach-Object { $_.Name }) -join ', '
+            throw "Final product publish must contain exactly Shadowsocks.exe. Found: $entryNames"
           }
-          $projectXml = [xml](Get-Content -LiteralPath .\Shadowsocks.WinUI\Shadowsocks.WinUI.csproj -Raw)
-          $declaredVersionText = @($projectXml.Project.PropertyGroup.Version | Where-Object { $_ })[0]
-          if ([string]::IsNullOrWhiteSpace($declaredVersionText)) {
-            throw 'Shadowsocks.WinUI.csproj does not declare <Version>.'
+
+          # Directory.Build.props is the canonical product-version source. Individual
+          # projects intentionally inherit <Version> and must not duplicate it.
+          [xml]$versionProps = Get-Content -LiteralPath .\Directory.Build.props -Raw
+          $versionNode = $versionProps.SelectSingleNode('/Project/PropertyGroup/Version')
+          if ($null -eq $versionNode) {
+            throw 'Directory.Build.props does not declare <Version>.'
           }
+
+          $declaredVersionText = ([string]$versionNode.InnerText).Trim()
+          if ($declaredVersionText -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Directory.Build.props Version '$declaredVersionText' must be a stable three-part version."
+          }
+
           $declaredVersion = [Version]$declaredVersionText
           $expectedFileVersion = [Version]::new($declaredVersion.Major, $declaredVersion.Minor, $declaredVersion.Build, 0)
-          $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $publish 'Shadowsocks.exe'))
-          $actualFileVersion = [Version]::new([Math]::Max(0, $versionInfo.FileMajorPart), [Math]::Max(0, $versionInfo.FileMinorPart), [Math]::Max(0, $versionInfo.FileBuildPart), [Math]::Max(0, $versionInfo.FilePrivatePart))
+          $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($publishedExecutable)
+          $actualFileVersion = [Version]::new(
+            [Math]::Max(0, $versionInfo.FileMajorPart),
+            [Math]::Max(0, $versionInfo.FileMinorPart),
+            [Math]::Max(0, $versionInfo.FileBuildPart),
+            [Math]::Max(0, $versionInfo.FilePrivatePart))
           if ($actualFileVersion -ne $expectedFileVersion) {
             throw "Published Shadowsocks.exe FileVersion '$actualFileVersion' does not match '$expectedFileVersion'."
           }
-          foreach ($name in @('Shadowsocks.NetworkService.exe', 'Shadowsocks.NetworkService.dll', 'Shadowsocks.NetworkService.deps.json', 'Shadowsocks.NetworkService.runtimeconfig.json', 'Shadowsocks.pdb', 'privoxy.exe', 'sysproxy.exe', 'sysproxy64.exe', 'libsscrypto.dll', 'dnscrypt-proxy.exe', 'minisign.exe', 'libsodium.dll', 'libsodium-23.dll', 'gui-config.json')) {
-            if (Test-Path (Join-Path $publish $name)) {
+
+          foreach ($name in @(
+            'Shadowsocks.NetworkService.exe',
+            'Shadowsocks.NetworkService.dll',
+            'Shadowsocks.NetworkService.deps.json',
+            'Shadowsocks.NetworkService.runtimeconfig.json',
+            'Shadowsocks.pdb',
+            'privoxy.exe',
+            'sysproxy.exe',
+            'sysproxy64.exe',
+            'libsscrypto.dll',
+            'dnscrypt-proxy.exe',
+            'minisign.exe',
+            'libsodium.dll',
+            'libsodium-23.dll',
+            'gui-config.json')) {
+            if (Test-Path -LiteralPath (Join-Path $publish $name)) {
               throw "Forbidden publish sidecar found: $name"
             }
           }
 
       - name: Upload publish artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: shadowsocks-reborn-win-x64
           path: artifacts/publish/
