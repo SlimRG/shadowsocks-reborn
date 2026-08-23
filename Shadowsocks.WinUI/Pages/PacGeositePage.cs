@@ -157,7 +157,7 @@ public sealed class PacGeositePage : Page, IRefreshablePage
         panel.Children.Add(_userRulesCard);
 
         var sourceCard = new StackPanel { Spacing = 12 };
-        sourceCard.Children.Add(WinUIStyles.CreateSectionTitle("GeoSite sources"));
+        sourceCard.Children.Add(WinUIStyles.CreateSectionTitle("GeoSite Sources"));
         sourceCard.Children.Add(WinUIStyles.CreateText(
             "Sources are tried independently and merged. A missing .sha256sum sidecar is non-fatal."));
 

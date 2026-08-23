@@ -23,6 +23,32 @@ public class LocalizationServiceTests
     }
 
     [TestMethod]
+    public void KeysAreOrdinalCaseSensitive()
+    {
+        const string caseCsv = "en,ru-RU,zh-CN,zh-TW,ja,ko,fr\r\n"
+            + "Active,Активен,,,,,\r\n"
+            + "ACTIVE,АКТИВЕН,,,,,\r\n";
+        var service = new CsvLocalizationService(caseCsv, CultureInfo.GetCultureInfo("ru-RU"));
+
+        Assert.AreEqual("Активен", service["Active"]);
+        Assert.AreEqual("АКТИВЕН", service["ACTIVE"]);
+    }
+
+    [TestMethod]
+    public void EmbeddedCatalogHasNoExactDuplicateEnglishKeys()
+    {
+        var seen = new HashSet<string>(System.StringComparer.Ordinal);
+        string[] duplicates = ParseCsv(Shadowsocks.Core.EmbeddedResources.I18nCsv)
+            .Where(row => row.Length > 0 && !string.IsNullOrWhiteSpace(row[0]) && !row[0].TrimStart().StartsWith('#'))
+            .Select(row => row[0].Trim())
+            .Where(key => !seen.Add(key))
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.AreEqual(0, duplicates.Length, $"Exact duplicate localization keys: {string.Join(", ", duplicates)}");
+    }
+
+    [TestMethod]
     public void FallsBackToSameLanguageRegion()
     {
         var service = new CsvLocalizationService(Csv, CultureInfo.GetCultureInfo("ru-UA"));

@@ -30,8 +30,8 @@ public sealed class OverviewPage : Page, IRefreshablePage
         stateStack.Children.Add(WinUIStyles.CreateSectionTitle("Connection state"));
         stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("Server", out _serverValue));
         stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("Controller", out _statusValue));
-        stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("Traffic mode", out _modeValue));
-        stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("System proxy", out _proxyValue));
+        stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("Traffic Mode", out _modeValue));
+        stateStack.Children.Add(WinUIStyles.CreateKeyValueRow("System Proxy", out _proxyValue));
         panel.Children.Add(WinUIStyles.CreateCard(stateStack));
 
         var backgroundStack = new StackPanel { Spacing = 12 };

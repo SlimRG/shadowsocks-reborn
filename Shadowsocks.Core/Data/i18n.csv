@@ -220,7 +220,6 @@ Game Mode is automatic,Игровой режим включается автом
 game.exe or C:\Games\Game\game.exe,game.exe или C:\Games\Game\game.exe,game.exe 或 C:\Games\Game\game.exe,game.exe 或 C:\Games\Game\game.exe,game.exe または C:\Games\Game\game.exe,game.exe 또는 C:\Games\Game\game.exe,game.exe ou C:\Games\Game\game.exe
 GeoSite,GeoSite,GeoSite,GeoSite,GeoSite,GeoSite,GeoSite
 GeoSite source list saved.,Список источников GeoSite сохранён.,GeoSite 源列表已保存。,GeoSite 來源清單已儲存。,GeoSite ソース一覧を保存しました。,GeoSite 소스 목록을 저장했습니다.,La liste des sources GeoSite a été enregistrée.
-GeoSite sources,Источники GeoSite,GeoSite 源,GeoSite 來源,GeoSite ソース,GeoSite 소스,Sources GeoSite
 GeoSite update did not complete,Обновление GeoSite не завершено,GeoSite 更新未完成,GeoSite 更新未完成,GeoSite の更新が完了しませんでした,GeoSite 업데이트가 완료되지 않았습니다,La mise à jour GeoSite ne s’est pas terminée
 Global shortcuts,Глобальные горячие клавиши,全局快捷键,全域快速鍵,グローバルショートカット,전역 단축키,Raccourcis globaux
 Hotkeys,Горячие клавиши,编辑快捷键,編輯快速鍵,ホットキーの編集,단축키 수정,Modifier les raccourcis clavier
@@ -340,7 +339,6 @@ Stopped,Остановлен,已停止,已停止,停止,중지됨,Arrêté
 Suspended,Приостановлен,已暂停,已暫停,一時停止,일시 중지됨,Suspendu
 Suspended by Game Mode,Приостановлен игровым режимом,被游戏模式暂停,由遊戲模式暫停,Game Mode により一時停止,Game Mode에 의해 일시 중지됨,Suspendu par le Game Mode
 System,Системная,系统,系統,システム,시스템,Système
-System proxy,Системный прокси,系统代理,系統 Proxy,システムプロキシ,시스템 프록시,Proxy système
 System shell,Системная оболочка,系统 shell,系統 Shell,システムシェル,시스템 셸,Shell système
 TCP capture,Захват TCP,TCP 捕获,TCP 擷取,TCP キャプチャ,TCP 캡처,Capture TCP
 TCP redirect port,Порт перенаправления TCP,TCP 重定向端口,TCP 重新導向連接埠,TCP リダイレクトポート,TCP 리디렉션 포트,Port de redirection TCP
@@ -352,7 +350,6 @@ This version will be skipped.,Эта версия будет пропущена.
 Timeout must be between 1 and {0} seconds.,Тайм-аут должен быть от 1 до {0} секунд.,超时必须在 1 到 {0} 秒之间。,逾時必須介於 1 到 {0} 秒之間。,タイムアウトは 1～{0} 秒の範囲で指定してください。,제한 시간은 1초에서 {0}초 사이여야 합니다.,Le délai doit être compris entre 1 et {0} secondes.
 Top most,Поверх остальных окон,始终置顶,最上層,常に手前に表示,항상 위,Toujours au premier plan
 Traffic,Трафик,流量,流量,トラフィック,트래픽,Trafic
-Traffic mode,Режим трафика,流量模式,流量模式,トラフィックモード,트래픽 모드,Mode de trafic
 Traffic unavailable,Данные о трафике недоступны,流量不可用,流量無法使用,トラフィック利用不可,트래픽 사용 불가,Trafic indisponible
 Traffic · last 60 seconds,Трафик · последние 60 секунд,流量 · 最近 60 秒,流量 · 最近 60 秒,トラフィック · 過去60秒,트래픽 · 최근 60초,Trafic · 60 dernières secondes
 Transparent TCP/UDP capture through the elevated NetworkService helper.,"Прозрачный захват TCP/UDP через NetworkService, запущенный с повышенными правами.",通过已提升权限的 NetworkService helper 进行透明 TCP/UDP 捕获。,透過已提高權限的 NetworkService helper 進行透明 TCP/UDP 擷取。,昇格された NetworkService ヘルパーによる透過 TCP/UDP キャプチャです。,권한이 상승된 NetworkService 도우미를 통한 투명 TCP/UDP 캡처입니다.,Capture TCP/UDP transparente via le helper NetworkService élevé.
@@ -371,9 +368,7 @@ Update available: {0},Доступно обновление: {0},有可用更新
 Update postponed for this session.,Обновление отложено до следующего запуска.,本次会话已推迟更新。,本次工作階段已延後更新。,このセッションでは更新を延期しました。,이번 세션에서 업데이트를 연기했습니다.,La mise à jour est reportée pour cette session.
 "Use an executable name, full path, or wildcard pattern. Game Mode is automatic and is never a selectable traffic mode.","Укажите имя исполняемого файла, полный путь или маску. Игровой режим включается автоматически и никогда не является выбираемым режимом трафика.",使用可执行文件名、完整路径或通配符模式。游戏模式是自动的，永远不是可选择的流量模式。,使用執行檔名稱、完整路徑或萬用字元模式。遊戲模式是自動的，永遠不是可選擇的流量模式。,実行ファイル名、完全パス、またはワイルドカードパターンを使用します。Game Mode は自動であり、選択可能なトラフィックモードではありません。,"실행 파일 이름, 전체 경로 또는 와일드카드 패턴을 사용합니다. Game Mode는 자동이며 선택 가능한 트래픽 모드가 아닙니다.","Utiliser un nom d’exécutable, un chemin complet ou un motif générique. Le Game Mode est automatique et n’est jamais un mode de trafic sélectionnable."
 Use Shadowsocks as the Windows system proxy,Использовать Shadowsocks как системный прокси Windows,将 Shadowsocks 用作 Windows 系统代理,將 Shadowsocks 用作 Windows 系統 Proxy,Shadowsocks を Windows システムプロキシとして使用,Shadowsocks를 Windows 시스템 프록시로 사용,Utiliser Shadowsocks comme proxy système Windows
-User mode,Пользовательский режим,用户模式,使用者模式,ユーザーモード,사용자 모드,Mode utilisateur
 Username and password must be specified together.,Имя пользователя и пароль должны быть указаны вместе.,必须同时指定用户名和密码。,必須同時指定使用者名稱與密碼。,ユーザー名とパスワードは両方指定する必要があります。,사용자 이름과 비밀번호를 함께 지정해야 합니다.,Le nom d’utilisateur et le mot de passe doivent être spécifiés ensemble.
-Verbose logging,Подробное логирование,详细日志,詳細記錄,詳細ログ,상세 로깅,Journalisation détaillée
 "Version information, project links and update controls.","Информация о версии, ссылки проекта и управление обновлениями.",版本信息、项目链接和更新控制。,版本資訊、專案連結與更新控制項。,バージョン情報、プロジェクトリンク、更新コントロールです。,"버전 정보, 프로젝트 링크 및 업데이트 제어입니다.","Informations de version, liens du projet et contrôles de mise à jour."
 WinDivert,WinDivert,WinDivert,WinDivert,WinDivert,WinDivert,WinDivert
 Windows proxy,Прокси Windows,Windows 代理,Windows Proxy,Windows プロキシ,Windows 프록시,Proxy Windows

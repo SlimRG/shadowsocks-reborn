@@ -321,9 +321,23 @@ $i18nRows = @(Import-Csv -LiteralPath $i18nPath)
 Test-Condition ($i18nRows.Count -gt 0) 'i18n.csv must contain translations.'
 $actualLocales = @($i18nRows[0].PSObject.Properties.Name)
 Test-Condition (($actualLocales -join ',') -eq ($expectedLocales -join ',')) "i18n.csv locale columns must be: $($expectedLocales -join ', ')."
-$duplicateKeys = @($i18nRows | Group-Object en | Where-Object Count -GT 1)
-$duplicateKeyNames = @($duplicateKeys | ForEach-Object { $_.Name }) -join ', '
-Test-Condition ($duplicateKeys.Count -eq 0) "i18n.csv contains duplicate English keys: $duplicateKeyNames"
+# CsvLocalizationService uses StringComparer.Ordinal, so validation must reject only
+# exact duplicate source keys. PowerShell Group-Object is case-insensitive by default and
+# would incorrectly collapse intentional keys such as 'Active' and 'ACTIVE'.
+$seenEnglishKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+$duplicateKeys = [System.Collections.Generic.List[string]]::new()
+foreach ($row in $i18nRows) {
+    $englishKey = ([string]$row.en).Trim()
+    if ([string]::IsNullOrWhiteSpace($englishKey) -or $englishKey.StartsWith('#')) {
+        continue
+    }
+
+    if (-not $seenEnglishKeys.Add($englishKey) -and -not $duplicateKeys.Contains($englishKey)) {
+        $duplicateKeys.Add($englishKey)
+    }
+}
+$duplicateKeyNames = @($duplicateKeys | Sort-Object) -join ', '
+Test-Condition ($duplicateKeys.Count -eq 0) "i18n.csv contains exact duplicate English keys: $duplicateKeyNames"
 foreach ($row in $i18nRows) {
     if ([string]$row.en -match '^#') {
         continue
