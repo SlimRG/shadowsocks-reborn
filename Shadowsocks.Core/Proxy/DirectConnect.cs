@@ -6,7 +6,7 @@ using Shadowsocks.Util.Sockets;
 
 namespace Shadowsocks.Proxy
 {
-    public class DirectConnect : IProxy
+    public sealed class DirectConnect : IProxy, IDisposable
     {
         private class FakeAsyncResult : IAsyncResult
         {
@@ -16,7 +16,7 @@ namespace Shadowsocks.Proxy
             }
 
             public bool IsCompleted { get; } = true;
-            public WaitHandle AsyncWaitHandle { get; } = null;
+            public WaitHandle AsyncWaitHandle => null;
             public object AsyncState { get; }
             public bool CompletedSynchronously { get; } = true;
         }
@@ -94,6 +94,12 @@ namespace Shadowsocks.Proxy
         public void Close()
         {
             _remote.Dispose();
+        }
+
+        public void Dispose()
+        {
+            Close();
+            GC.SuppressFinalize(this);
         }
     }
 }

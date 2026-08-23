@@ -13,6 +13,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Localization;
 using Windows.ApplicationModel.Activation;
 
@@ -24,11 +25,21 @@ internal static partial class Program
     private static readonly ConcurrentQueue<AppActivationArguments> PendingActivations = new();
     private static Action<AppActivationArguments>? _activationHandler;
     private static ILocalizationService? _localization;
+    private static ProcessSingleInstanceGuard? _processInstanceGuard;
+    private static App? _application;
 
     [STAThread]
     public static int Main()
     {
-        InitializeProcessEnvironment();
+        string[] rawArguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+        if (SelfUpdater.TryRunUpdaterMode(rawArguments, out int updaterExitCode))
+        {
+            return updaterExitCode;
+        }
+
+        SelfUpdater.CleanupCompletedUpdate(rawArguments);
+        string[] applicationArguments = SelfUpdater.RemoveInternalArguments(rawArguments);
+        InitializeProcessEnvironment(applicationArguments);
         _localization = CsvLocalizationService.CreateDefault();
         I18N.Configure(_localization);
 
@@ -48,6 +59,16 @@ internal static partial class Program
             return RedirectActivation(activationArguments, keyInstance);
         }
 
+        // AppInstance registration for an unpackaged application can be scoped by the
+        // executable identity. The stable LocalAppData startup copy and the original
+        // product EXE therefore need an identity-independent process gate as well.
+        _processInstanceGuard = ProcessSingleInstanceGuard.TryAcquire();
+        if (_processInstanceGuard is null)
+        {
+            Debug.WriteLine("Another Shadowsocks Reborn process already owns the process-wide single-instance gate.");
+            return 0;
+        }
+
         keyInstance.Activated += OnInstanceActivated;
         App.ConfigureStartupContext(keyInstance, activationArguments, _localization);
 
@@ -55,22 +76,31 @@ internal static partial class Program
         // redirection can happen before WinUI is initialized. Start WinUI through
         // the public application bootstrap rather than calling generated XAML APIs.
         WinRT.ComWrappersSupport.InitializeComWrappers();
-        Application.Start(static _ =>
+        try
         {
-            var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
-            SynchronizationContext.SetSynchronizationContext(context);
-            new App();
-        });
-        return 0;
+            Application.Start(static _ =>
+            {
+                var context = new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread());
+                SynchronizationContext.SetSynchronizationContext(context);
+                _application = new App();
+            });
+            return 0;
+        }
+        finally
+        {
+            _application?.Dispose();
+            _application = null;
+            _processInstanceGuard?.Dispose();
+            _processInstanceGuard = null;
+        }
     }
 
-    private static void InitializeProcessEnvironment()
+    private static void InitializeProcessEnvironment(string[] commandLineArguments)
     {
         string executablePath = Environment.ProcessPath
             ?? Process.GetCurrentProcess().MainModule?.FileName
             ?? Path.Combine(AppContext.BaseDirectory, "Shadowsocks.exe");
         string workingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory;
-        string[] commandLineArguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
 
         AppRuntimeEnvironment.Initialize(executablePath, workingDirectory, commandLineArguments);
         AppStoragePaths.Initialize(executablePath);
@@ -131,7 +161,10 @@ internal static partial class Program
         }
 
         string arguments = launchArguments.Arguments?.Trim() ?? string.Empty;
-        return !arguments.Contains("--open-url", StringComparison.OrdinalIgnoreCase);
+        return !arguments.Contains("--open-url", StringComparison.OrdinalIgnoreCase)
+            && !arguments.Contains(AutoStartup.StartupHiddenOption, StringComparison.OrdinalIgnoreCase)
+            && !arguments.Contains(AutoStartup.StartupVisibleOption, StringComparison.OrdinalIgnoreCase)
+            && !arguments.Contains(AutoStartup.StartupOriginOption, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string CreateInstanceKey()

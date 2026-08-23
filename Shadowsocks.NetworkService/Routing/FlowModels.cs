@@ -16,10 +16,16 @@ internal readonly record struct ReflectedFlowKey(
     ushort ApplicationPort,
     IPAddress RemoteAddress);
 
+internal readonly record struct PeerFlowKey(
+    byte Protocol,
+    ushort ApplicationPort,
+    IPAddress RemoteAddress);
+
 internal sealed record FlowState(
     FlowKey Key,
     int ProcessId,
     string? ProcessPath,
     string? ProcessName,
     RouteAction Route,
+    RouteAction FallbackRoute,
     DateTime LastSeenUtc);

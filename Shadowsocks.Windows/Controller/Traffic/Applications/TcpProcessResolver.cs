@@ -18,7 +18,7 @@ namespace Shadowsocks.Controller.Traffic.Applications
         private const int AfInet6 = 23;
         private const uint ErrorInsufficientBuffer = 122;
 
-        public ProcessIdentity Resolve(Socket acceptedSocket)
+        public static ProcessIdentity Resolve(Socket acceptedSocket)
         {
             if (acceptedSocket?.RemoteEndPoint is not IPEndPoint client
                 || acceptedSocket.LocalEndPoint is not IPEndPoint proxy)

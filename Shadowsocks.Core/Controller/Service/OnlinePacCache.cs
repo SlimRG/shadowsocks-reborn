@@ -63,8 +63,7 @@ namespace Shadowsocks.Controller.Service
 
         public static async Task<bool> RefreshAsync(Configuration config)
         {
-            if (config == null)
-                throw new ArgumentNullException(nameof(config));
+            ArgumentNullException.ThrowIfNull(config);
             if (string.IsNullOrWhiteSpace(config.pacUrl))
                 throw new InvalidOperationException("Online PAC URL is empty.");
 
@@ -158,7 +157,7 @@ namespace Shadowsocks.Controller.Service
 
         private static bool IsValidPac(string content)
             => !string.IsNullOrWhiteSpace(content) &&
-               content.IndexOf("FindProxyForURL", StringComparison.Ordinal) >= 0;
+               content.Contains("FindProxyForURL", StringComparison.Ordinal);
 
         private static CacheMetadata ReadMetadata()
         {

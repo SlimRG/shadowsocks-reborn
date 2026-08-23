@@ -7,34 +7,58 @@ namespace Shadowsocks.Controller.Traffic
     {
         public static bool Matches(string pattern, string processPath, string processName)
         {
-            if (string.IsNullOrWhiteSpace(pattern))
+            if (!TryCompile(pattern, out CompiledApplicationPattern compiled))
             {
                 return false;
             }
 
-            pattern = pattern.Trim();
-            string path = processPath ?? string.Empty;
-            string name = processName ?? (string.IsNullOrEmpty(path) ? string.Empty : Path.GetFileName(path));
-            string fileName = string.IsNullOrEmpty(path) ? string.Empty : Path.GetFileName(path);
-            string nameWithExe = string.IsNullOrEmpty(name) || name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                ? name
-                : name + ".exe";
+            ApplicationMatchTarget target = CreateTarget(processPath, processName);
+            return Matches(compiled, target);
+        }
 
-            if (!pattern.Contains('*') && !pattern.Contains('?'))
+        internal static bool TryCompile(string pattern, out CompiledApplicationPattern compiled)
+        {
+            if (string.IsNullOrWhiteSpace(pattern))
             {
-                string patternFileName = Path.GetFileName(pattern);
-                return string.Equals(pattern, path, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(pattern, fileName, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(pattern, name, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(pattern, nameWithExe, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(patternFileName, name, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(patternFileName, nameWithExe, StringComparison.OrdinalIgnoreCase);
+                compiled = default;
+                return false;
             }
 
-            return WildcardMatch(path, pattern)
-                || WildcardMatch(fileName, pattern)
-                || WildcardMatch(name, pattern)
-                || WildcardMatch(nameWithExe, pattern);
+            string normalized = pattern.Trim();
+            compiled = new CompiledApplicationPattern(
+                normalized,
+                Path.GetFileName(normalized),
+                normalized.Contains('*') || normalized.Contains('?'));
+            return true;
+        }
+
+        internal static ApplicationMatchTarget CreateTarget(string processPath, string processName)
+        {
+            string path = processPath ?? string.Empty;
+            string fileName = path.Length == 0 ? string.Empty : Path.GetFileName(path);
+            string name = processName ?? fileName;
+            string nameWithExe = name.Length == 0 || name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                ? name
+                : string.Concat(name, ".exe");
+            return new ApplicationMatchTarget(path, fileName, name, nameWithExe);
+        }
+
+        internal static bool Matches(CompiledApplicationPattern compiled, ApplicationMatchTarget target)
+        {
+            if (!compiled.HasWildcards)
+            {
+                return string.Equals(compiled.Pattern, target.Path, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(compiled.Pattern, target.FileName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(compiled.Pattern, target.Name, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(compiled.Pattern, target.NameWithExe, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(compiled.FileName, target.Name, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(compiled.FileName, target.NameWithExe, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return WildcardMatch(target.Path, compiled.Pattern)
+                || WildcardMatch(target.FileName, compiled.Pattern)
+                || WildcardMatch(target.Name, compiled.Pattern)
+                || WildcardMatch(target.NameWithExe, compiled.Pattern);
         }
 
         public static bool WildcardMatch(string value, string pattern)
@@ -79,5 +103,16 @@ namespace Shadowsocks.Controller.Traffic
 
             return patternIndex == pattern.Length;
         }
+
+        internal readonly record struct CompiledApplicationPattern(
+            string Pattern,
+            string FileName,
+            bool HasWildcards);
+
+        internal readonly record struct ApplicationMatchTarget(
+            string Path,
+            string FileName,
+            string Name,
+            string NameWithExe);
     }
 }

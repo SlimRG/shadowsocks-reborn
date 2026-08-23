@@ -28,6 +28,8 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
     private readonly CheckBox _registerAtStartup;
     private readonly Dictionary<string, TextBox> _editors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TextBlock> _status = new(StringComparer.Ordinal);
+    private readonly Button _saveButton;
+    private readonly Button _discardButton;
     private bool _refreshing;
 
     internal HotkeysPage(WinUIPageContext context)
@@ -56,6 +58,8 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
 
         _registerAtStartup = new CheckBox { Content = "Register hotkeys at startup" };
         _context.SetToolTip(_registerAtStartup, "Register the configured global hotkeys automatically when Shadowsocks starts.");
+        _registerAtStartup.Checked += (_, _) => MarkDirty();
+        _registerAtStartup.Unchecked += (_, _) => MarkDirty();
         card.Children.Add(_registerAtStartup);
 
         var actions = new Grid { ColumnSpacing = 8 };
@@ -69,17 +73,17 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
         registerAll.Click += OnRegisterAllClicked;
         actions.Children.Add(registerAll);
 
-        var discard = new Button { Content = "Discard changes", MinWidth = 120 };
-        _context.SetToolTip(discard, "Discard unsaved hotkey edits and reload the saved shortcuts.");
-        discard.Click += (_, _) => Refresh();
-        Grid.SetColumn(discard, 2);
-        actions.Children.Add(discard);
+        _discardButton = new Button { Content = "Discard changes", MinWidth = 120, IsEnabled = false };
+        _context.SetToolTip(_discardButton, "Discard unsaved hotkey edits and reload the saved shortcuts.");
+        _discardButton.Click += (_, _) => Refresh();
+        Grid.SetColumn(_discardButton, 2);
+        actions.Children.Add(_discardButton);
 
-        var save = new Button { Content = "Save", MinWidth = 92 };
-        _context.SetToolTip(save, "Save the hotkey configuration and apply it to the running application.");
-        save.Click += OnSaveClicked;
-        Grid.SetColumn(save, 3);
-        actions.Children.Add(save);
+        _saveButton = new Button { Content = "Save", MinWidth = 92, IsEnabled = false };
+        _context.SetToolTip(_saveButton, "Save the hotkey configuration and apply it to the running application.");
+        _saveButton.Click += OnSaveClicked;
+        Grid.SetColumn(_saveButton, 3);
+        actions.Children.Add(_saveButton);
         card.Children.Add(actions);
 
         panel.Children.Add(WinUIStyles.CreateCard(card));
@@ -115,8 +119,9 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
             _registerAtStartup.IsChecked = config.RegHotkeysAtStartup;
             foreach (TextBlock status in _status.Values)
             {
-                status.Text = "✔";
+                SetRegistrationStatus(status, "—", "Not tested");
             }
+            SetDirty(false);
         }
         finally
         {
@@ -129,7 +134,7 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
         int row = grid.RowDefinitions.Count;
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        TextBlock labelBlock = WinUIStyles.CreateText(label);
+        TextBlock labelBlock = WinUIStyles.CreateText(_context.L(label));
         labelBlock.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetRow(labelBlock, row);
         grid.Children.Add(labelBlock);
@@ -141,6 +146,7 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
             IsReadOnly = true,
         };
         _context.SetToolTip(editor, "Focus this field and press the desired modifier keys plus a key. Press Esc to clear it.");
+        editor.TextChanged += (_, _) => MarkDirty();
         editor.KeyDown += (_, args) => RecordKeyDown(key, args);
         editor.KeyUp += (_, args) => FinishOnKeyUp(key, args);
         _editors[key] = editor;
@@ -148,9 +154,10 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
         Grid.SetColumn(editor, 1);
         grid.Children.Add(editor);
 
-        TextBlock status = WinUIStyles.CreateText("✔", "BodyStrongTextBlockStyle");
+        TextBlock status = WinUIStyles.CreateText("—", "BodyStrongTextBlockStyle");
         status.HorizontalAlignment = HorizontalAlignment.Center;
         status.VerticalAlignment = VerticalAlignment.Center;
+        SetRegistrationStatus(status, "—", "Not tested");
         _status[key] = status;
         Grid.SetRow(status, row);
         Grid.SetColumn(status, 2);
@@ -194,13 +201,13 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
     private void FinishOnKeyUp(string configKey, KeyRoutedEventArgs args)
     {
         args.Handled = true;
-        if (_editors[configKey].Text.EndsWith("+", StringComparison.Ordinal))
+        if (_editors[configKey].Text.EndsWith('+'))
         {
             _editors[configKey].Text = string.Empty;
         }
     }
 
-    // Keep modifier-state lookup on Win32 so the WinUI frontend does not pull the legacy
+    // Keep modifier-state lookup on Win32 so the WinUI frontend does not pull the older
     // UWP XAML projection graph into this process. GetKeyState reports the state that
     // belonged to the keyboard message currently being handled, which is exactly what the
     // shortcut recorder needs.
@@ -296,6 +303,7 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
 
         IReadOnlyList<string> failures = _context.ApplyHotkeys(config);
         UpdateRegistrationStatus(failures);
+        SetDirty(false);
         _context.ShowInfo(
             "Hotkeys",
             failures.Count == 0 ? _context.L("Hotkeys saved and registered.") : _context.LF("Saved, but Windows refused: {0}", string.Join(", ", failures)),
@@ -307,7 +315,7 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
         string[] invalid = _editors
             .Where(pair => !string.IsNullOrWhiteSpace(pair.Value.Text)
                            && !HotkeyGesture.TryParse(pair.Value.Text.Trim(), out _))
-            .Select(pair => Definitions.First(definition => definition.Key == pair.Key).Label)
+            .Select(pair => _context.L(Definitions.First(definition => definition.Key == pair.Key).Label))
             .ToArray();
         if (invalid.Length > 0)
         {
@@ -331,8 +339,32 @@ public sealed partial class HotkeysPage : Page, IRefreshablePage
     {
         foreach ((string key, TextBlock status) in _status)
         {
-            status.Text = failures.Contains(key, StringComparer.Ordinal) ? "✖" : "✔";
+            bool failed = failures.Contains(key, StringComparer.Ordinal);
+            SetRegistrationStatus(status, failed ? "✖" : "✔", failed ? "Registration failed" : "Registered");
         }
+    }
+
+    private void SetRegistrationStatus(TextBlock status, string glyph, string accessibilityKey)
+    {
+        status.Text = glyph;
+        string localizedStatus = _context.L(accessibilityKey);
+        ToolTipService.SetToolTip(status, localizedStatus);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(status, localizedStatus);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(status, localizedStatus);
+    }
+
+    private void MarkDirty()
+    {
+        if (!_refreshing)
+        {
+            SetDirty(true);
+        }
+    }
+
+    private void SetDirty(bool dirty)
+    {
+        _saveButton.IsEnabled = dirty;
+        _discardButton.IsEnabled = dirty;
     }
 
     private string Normalize(string key)

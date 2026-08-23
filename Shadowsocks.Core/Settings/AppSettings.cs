@@ -5,19 +5,21 @@ namespace Shadowsocks.Core.Settings;
 
 public static class AppSettings
 {
-    private static readonly Lazy<AppSettingsDocument> Settings = new(Load);
+    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
 
-    public static LoggingSettings Logging => Settings.Value.Logging;
+    private static readonly Lazy<AppSettingsDocument> s_settings = new(Load);
+
+    public static LoggingSettings Logging => s_settings.Value.Logging;
 
     private static AppSettingsDocument Load()
     {
         try
         {
             string json = EmbeddedResources.AppSettingsJson;
-            return JsonSerializer.Deserialize<AppSettingsDocument>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-            }) ?? new AppSettingsDocument();
+            return JsonSerializer.Deserialize<AppSettingsDocument>(json, s_jsonOptions) ?? new AppSettingsDocument();
         }
         catch (Exception exception)
         {

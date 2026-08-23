@@ -14,12 +14,12 @@ namespace Shadowsocks.Util.Sockets
      * by ourself. Instead, Socket.ConnectAsync() do handle this thing internally by trying
      * each address and returning an established socket connection.
      */
-    public class WrappedSocket
+    public class WrappedSocket : IDisposable
     {
         public EndPoint LocalEndPoint => _activeSocket?.LocalEndPoint;
 
         // Only used during connection and close, so it won't cost too much.
-        private SpinLock _socketSyncLock = new SpinLock();
+        private SpinLock _socketSyncLock;
 
         private bool _disposed;
         private bool Connected => _activeSocket != null;
@@ -28,10 +28,7 @@ namespace Shadowsocks.Util.Sockets
 
         public void BeginConnect(EndPoint remoteEP, AsyncCallback callback, object state)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (Connected)
             {
                 throw new SocketException((int)SocketError.IsConnected);
@@ -51,10 +48,10 @@ namespace Shadowsocks.Util.Sockets
         private class FakeAsyncResult : IAsyncResult
         {
             public bool IsCompleted { get; } = true;
-            public WaitHandle AsyncWaitHandle { get; } = null;
+            public WaitHandle AsyncWaitHandle => null;
             public object AsyncState { get; set; }
             public bool CompletedSynchronously { get; } = true;
-            public Exception InternalException { get; set; } = null;
+            public Exception InternalException { get; set; }
         }
 
         private class TcpUserToken
@@ -129,10 +126,7 @@ namespace Shadowsocks.Util.Sockets
 
         public void EndConnect(IAsyncResult asyncResult)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             var r = asyncResult as FakeAsyncResult;
             if (r == null)
@@ -170,16 +164,14 @@ namespace Shadowsocks.Util.Sockets
                 }
             }
 
+            GC.SuppressFinalize(this);
         }
 
         public IAsyncResult BeginSend(byte[] buffer, int offset, int size, SocketFlags socketFlags,
             AsyncCallback callback,
             object state)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 throw new SocketException((int)SocketError.NotConnected);
@@ -190,10 +182,7 @@ namespace Shadowsocks.Util.Sockets
 
         public int EndSend(IAsyncResult asyncResult)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 throw new SocketException((int)SocketError.NotConnected);
@@ -206,10 +195,7 @@ namespace Shadowsocks.Util.Sockets
             AsyncCallback callback,
             object state)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 throw new SocketException((int)SocketError.NotConnected);
@@ -220,10 +206,7 @@ namespace Shadowsocks.Util.Sockets
 
         public int EndReceive(IAsyncResult asyncResult)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 throw new SocketException((int)SocketError.NotConnected);
@@ -234,10 +217,7 @@ namespace Shadowsocks.Util.Sockets
 
         public void Shutdown(SocketShutdown how)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 return;
@@ -253,10 +233,7 @@ namespace Shadowsocks.Util.Sockets
 
         public void SetSocketOption(SocketOptionLevel optionLevel, SocketOptionName optionName, int optionValue)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (!Connected)
             {
                 throw new SocketException((int)SocketError.NotConnected);

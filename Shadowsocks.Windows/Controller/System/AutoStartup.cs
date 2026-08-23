@@ -10,6 +10,7 @@ using Shadowsocks.Core;
 using AppRuntimeEnvironment = Shadowsocks.Core.RuntimeEnvironment;
 using Shadowsocks.Core.Storage;
 using Shadowsocks.Util;
+using Shadowsocks.Windows.Shell;
 
 namespace Shadowsocks.Controller
 {
@@ -18,11 +19,13 @@ namespace Shadowsocks.Controller
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string Key = "Shadowsocks Reborn";
-        private const string LegacyKeyPrefix = "shadowsocks-reborn_";
-        private const string StartupArguments = "--start-hidden";
+        internal const string StartupHiddenOption = "--start-hidden";
+        internal const string StartupVisibleOption = "--start-visible";
+        internal const string StartupOriginOption = "--startup-origin";
         private static bool StartupCopySynchronized;
+        private static int TrackedWindowVisibility = -1;
 
-        public static bool Set(bool enabled, string arguments = null)
+        public static bool Set(bool enabled, bool windowVisible = false)
         {
             if (AppStoragePaths.IsCleanMode)
             {
@@ -40,7 +43,6 @@ namespace Shadowsocks.Controller
                     return false;
                 }
 
-                CleanupLegacyRunValues(runKey);
                 if (enabled)
                 {
                     if (!EnsureStartupExecutable())
@@ -48,16 +50,21 @@ namespace Shadowsocks.Controller
                         return false;
                     }
 
-                    runKey.SetValue(Key, BuildStartupCommand(arguments));
+                    runKey.SetValue(Key, BuildStartupCommand(windowVisible));
+                    RemoveDuplicateStartupEntries(runKey);
                 }
                 else
                 {
                     runKey.DeleteValue(Key, throwOnMissingValue: false);
+                    // Disabling Start with Windows must also remove legacy Shadowsocks
+                    // Run values. Otherwise an obsolete key can continue launching a
+                    // second process even though the current UI reports autostart off.
+                    RemoveDuplicateStartupEntries(runKey);
                     TryDeleteUnusedStartupCopy();
                 }
 
                 // When autostartup setting changes, change RegisterForRestart state to avoid starting twice.
-                RegisterForRestart(!enabled);
+                RegisterForRestart(!enabled, windowVisible);
                 return true;
             }
             catch (Exception exception)
@@ -88,21 +95,31 @@ namespace Shadowsocks.Controller
                     return false;
                 }
 
-                bool legacyStartupWasEnabled = CleanupLegacyRunValues(runKey);
                 string command = runKey.GetValue(Key)?.ToString();
-                if (!IsStartupExecutableCommand(command) && legacyStartupWasEnabled)
+                if (!IsStartupExecutableCommand(command))
                 {
+                    string primaryExecutable = GetPrimaryExecutablePath();
+                    string currentExecutable = AppRuntimeEnvironment.ExecutablePath;
+                    bool canonicalTargetsProduct = CommandTargetsExecutable(command, primaryExecutable)
+                        || CommandTargetsExecutable(command, currentExecutable);
+                    bool legacyTargetsProduct = HasLegacyStartupEntry(
+                        runKey,
+                        AppStoragePaths.StartupExecutableFile,
+                        primaryExecutable,
+                        currentExecutable);
+                    if (!canonicalTargetsProduct && !legacyTargetsProduct)
+                    {
+                        return false;
+                    }
+
                     if (!EnsureStartupExecutable())
                     {
                         return false;
                     }
-                    command = BuildStartupCommand(StartupArguments);
+
+                    command = BuildStartupCommand(windowVisible: false);
                     runKey.SetValue(Key, command);
-                    Logger.Info("Migrated legacy Start with Windows registration to the LocalAppData executable copy.");
-                }
-                if (!IsStartupExecutableCommand(command))
-                {
-                    return false;
+                    Logger.Info("Migrated legacy Start with Windows command to the stable LocalAppData startup executable.");
                 }
 
                 // A user may update Shadowsocks from a USB drive/download folder while autostart
@@ -117,11 +134,14 @@ namespace Shadowsocks.Controller
                     }
                 }
 
-                string canonical = BuildStartupCommand(StartupArguments);
+                string[] commandArguments = WindowsCommandLine.ParseArguments(command ?? string.Empty);
+                bool windowVisible = !IsHiddenStartup(commandArguments) && IsVisibleStartup(commandArguments);
+                string canonical = BuildStartupCommand(windowVisible);
                 if (!string.Equals(command?.Trim(), canonical, StringComparison.OrdinalIgnoreCase))
                 {
                     runKey.SetValue(Key, canonical);
                 }
+                RemoveDuplicateStartupEntries(runKey);
                 return true;
             }
             catch (Exception exception)
@@ -142,7 +162,7 @@ namespace Shadowsocks.Controller
                 return false;
             }
 
-            string source = AppRuntimeEnvironment.ExecutablePath;
+            string source = GetPrimaryExecutablePath();
             string destination = AppStoragePaths.StartupExecutableFile;
             try
             {
@@ -213,11 +233,157 @@ namespace Shadowsocks.Controller
             return CryptographicOperations.FixedTimeEquals(firstHash, secondHash);
         }
 
-        private static string BuildStartupCommand(string arguments)
+        private static string BuildStartupCommand(bool windowVisible)
         {
             string executable = $"\"{AppStoragePaths.StartupExecutableFile}\"";
-            string normalizedArguments = string.IsNullOrWhiteSpace(arguments) ? StartupArguments : arguments.Trim();
-            return $"{executable} {normalizedArguments}";
+            string uiStateArgument = windowVisible ? StartupVisibleOption : StartupHiddenOption;
+            string primaryExecutable = GetPrimaryExecutablePath();
+            return $"{executable} {uiStateArgument} {StartupOriginOption} \"{primaryExecutable}\"";
+        }
+
+        /// <summary>
+        /// Returns the user-facing product executable that should be updated. When Windows
+        /// starts the stable LocalAppData startup copy, the original product path is carried
+        /// in the Run command so an automatic update cannot update only the startup copy.
+        /// </summary>
+        internal static string GetPrimaryExecutablePath()
+            => ResolvePrimaryExecutablePath(
+                AppRuntimeEnvironment.ExecutablePath,
+                AppStoragePaths.StartupExecutableFile,
+                AppRuntimeEnvironment.Arguments);
+
+        internal static string ResolvePrimaryExecutablePath(
+            string currentExecutablePath,
+            string startupExecutablePath,
+            IReadOnlyList<string> arguments)
+        {
+            string current = Path.GetFullPath(currentExecutablePath);
+            string startup = Path.GetFullPath(startupExecutablePath);
+            if (!PathsEqual(current, startup))
+            {
+                return current;
+            }
+
+            string origin = GetOption(arguments, StartupOriginOption);
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                return current;
+            }
+
+            try
+            {
+                string candidate = Path.GetFullPath(origin);
+                string fileName = Path.GetFileNameWithoutExtension(candidate);
+                if (File.Exists(candidate)
+                    && fileName.StartsWith("Shadowsocks", StringComparison.OrdinalIgnoreCase)
+                    && !PathsEqual(candidate, startup))
+                {
+                    return candidate;
+                }
+            }
+            catch
+            {
+            }
+
+            return current;
+        }
+
+        private static string GetOption(IReadOnlyList<string> arguments, string option)
+        {
+            if (arguments == null)
+            {
+                return null;
+            }
+
+            for (int index = 0; index < arguments.Count; index++)
+            {
+                string argument = arguments[index] ?? string.Empty;
+                if (argument.StartsWith(option + "=", StringComparison.OrdinalIgnoreCase))
+                {
+                    return argument.Substring(option.Length + 1).Trim('\"');
+                }
+                if (argument.Equals(option, StringComparison.OrdinalIgnoreCase) && index + 1 < arguments.Count)
+                {
+                    return (arguments[index + 1] ?? string.Empty).Trim('\"');
+                }
+            }
+            return null;
+        }
+
+        private static bool HasLegacyStartupEntry(RegistryKey runKey, params string[] executablePaths)
+        {
+            foreach (string valueName in runKey.GetValueNames())
+            {
+                if (valueName.Equals(Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string command = runKey.GetValue(valueName)?.ToString();
+                if (executablePaths.Any(path => CommandTargetsExecutable(command, path)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void RemoveDuplicateStartupEntries(RegistryKey runKey)
+        {
+            string startupExecutable = AppStoragePaths.StartupExecutableFile;
+            string primaryExecutable = GetPrimaryExecutablePath();
+            string currentExecutable = AppRuntimeEnvironment.ExecutablePath;
+
+            foreach (string valueName in runKey.GetValueNames())
+            {
+                if (valueName.Equals(Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string command = runKey.GetValue(valueName)?.ToString();
+                if (CommandTargetsExecutable(command, startupExecutable)
+                    || CommandTargetsExecutable(command, primaryExecutable)
+                    || CommandTargetsExecutable(command, currentExecutable))
+                {
+                    runKey.DeleteValue(valueName, throwOnMissingValue: false);
+                    Logger.Info("Removed duplicate Start with Windows registry entry '{0}'.", valueName);
+                }
+            }
+        }
+
+        internal static bool CommandTargetsExecutable(string command, string executablePath)
+        {
+            if (string.IsNullOrWhiteSpace(command) || string.IsNullOrWhiteSpace(executablePath))
+            {
+                return false;
+            }
+
+            string target;
+            try
+            {
+                target = Path.GetFullPath(executablePath);
+            }
+            catch
+            {
+                return false;
+            }
+
+            string[] parsed = WindowsCommandLine.ParseArguments(command);
+            if (parsed.Length > 0 && PathsEqual(parsed[0], target))
+            {
+                return true;
+            }
+
+            // Older Shadowsocks versions could persist an unquoted executable path.
+            // Preserve compatibility long enough to remove that stale Run entry.
+            string trimmed = command.Trim();
+            string quotedTarget = $"\"{target}\"";
+            return trimmed.Equals(target, StringComparison.OrdinalIgnoreCase)
+                || trimmed.Equals(quotedTarget, StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(quotedTarget + " ", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(target + " ", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsStartupExecutableCommand(string command)
@@ -233,20 +399,6 @@ namespace Shadowsocks.Controller
             return trimmed.Equals(path, StringComparison.OrdinalIgnoreCase)
                 || trimmed.Equals(quoted, StringComparison.OrdinalIgnoreCase)
                 || trimmed.StartsWith(quoted + " ", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool CleanupLegacyRunValues(RegistryKey runKey)
-        {
-            bool hadLegacyValue = false;
-            foreach (string valueName in runKey.GetValueNames())
-            {
-                if (valueName.StartsWith(LegacyKeyPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    hadLegacyValue |= !string.IsNullOrWhiteSpace(runKey.GetValue(valueName)?.ToString());
-                    runKey.DeleteValue(valueName, throwOnMissingValue: false);
-                }
-            }
-            return hadLegacyValue;
         }
 
         private static void TryDeleteUnusedStartupCopy()
@@ -306,7 +458,92 @@ namespace Shadowsocks.Controller
             RestartNoReboot = 8,
         }
 
-        public static void RegisterForRestart(bool register)
+        internal static bool IsHiddenStartup(IReadOnlyList<string> arguments)
+            => HasStartupOption(arguments, StartupHiddenOption);
+
+        internal static bool IsVisibleStartup(IReadOnlyList<string> arguments)
+            => HasStartupOption(arguments, StartupVisibleOption);
+
+        private static bool HasStartupOption(IReadOnlyList<string> arguments, string option)
+            => arguments?.Any(argument =>
+                string.Equals(argument, option, StringComparison.OrdinalIgnoreCase)) == true;
+
+        internal static string BuildRestartCommandLine(IReadOnlyList<string> arguments, bool windowVisible)
+        {
+            var restartArguments = new List<string>();
+            foreach (string argument in arguments ?? Array.Empty<string>())
+            {
+                if (string.Equals(argument, StartupHiddenOption, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(argument, StartupVisibleOption, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                restartArguments.Add(argument);
+            }
+
+            restartArguments.Add(windowVisible ? StartupVisibleOption : StartupHiddenOption);
+
+            return string.Join(
+                " ",
+                restartArguments
+                    .Select(argument => argument.Replace("\"", "\\\""))
+                    .Select(argument => argument.Contains(' ') ? "\"" + argument + "\"" : argument));
+        }
+
+        /// <summary>
+        /// Keeps Windows reboot/session restoration synchronized with the shell's
+        /// actual visibility. Start with Windows owns restoration when enabled;
+        /// otherwise Restart Manager owns it. The mechanisms remain mutually exclusive.
+        /// </summary>
+        public static void SynchronizeUiState(bool windowVisible)
+        {
+            System.Threading.Volatile.Write(ref TrackedWindowVisibility, windowVisible ? 1 : 0);
+            if (AppStoragePaths.IsCleanMode)
+            {
+                return;
+            }
+
+            RegistryKey runKey = null;
+            try
+            {
+                bool startupEnabled = Check();
+                if (!startupEnabled)
+                {
+                    RegisterForRestart(true, windowVisible);
+                    return;
+                }
+
+                runKey = WindowsSystemUtilities.OpenRegistryKey(RunKeyPath, true);
+                if (runKey == null)
+                {
+                    Logger.Error(@"Cannot find HKCU\Software\Microsoft\Windows\CurrentVersion\Run");
+                    RegisterForRestart(true, windowVisible);
+                    return;
+                }
+
+                runKey.SetValue(Key, BuildStartupCommand(windowVisible));
+                RemoveDuplicateStartupEntries(runKey);
+                RegisterForRestart(false, windowVisible);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogUsefulException(exception);
+            }
+            finally
+            {
+                runKey?.Dispose();
+            }
+        }
+
+        internal static bool TryGetTrackedWindowVisibility(out bool windowVisible)
+        {
+            int tracked = System.Threading.Volatile.Read(ref TrackedWindowVisibility);
+            windowVisible = tracked == 1;
+            return tracked >= 0;
+        }
+
+        public static void RegisterForRestart(bool register, bool windowVisible = false)
         {
             if (AppStoragePaths.IsCleanMode)
             {
@@ -317,23 +554,24 @@ namespace Shadowsocks.Controller
                 return;
             }
 
-            if (register && !Check())
-            {
-                string[] args = new List<string>(AppRuntimeEnvironment.Arguments)
-                    .Select(p => p.Replace("\"", "\\\""))
-                    .Select(p => p.IndexOf(' ') >= 0 ? "\"" + p + "\"" : p)
-                    .ToArray();
-                string cmdline = string.Join(" ", args);
-                RegisterApplicationRestart(
-                    cmdline,
-                    (int)(ApplicationRestartFlags.RestartNoCrash | ApplicationRestartFlags.RestartNoHang));
-                Logger.Debug("Register restart after system reboot, command line:" + cmdline);
-            }
-            else if (!register)
+            if (!register)
             {
                 UnregisterApplicationRestart();
                 Logger.Debug("Unregister restart after system reboot");
+                return;
             }
+
+            string cmdline = BuildRestartCommandLine(AppRuntimeEnvironment.Arguments, windowVisible);
+            int result = RegisterApplicationRestart(
+                cmdline,
+                (int)(ApplicationRestartFlags.RestartNoCrash | ApplicationRestartFlags.RestartNoHang));
+            if (result != 0)
+            {
+                Logger.Warn("RegisterApplicationRestart failed with HRESULT 0x{0:X8}.", result);
+                return;
+            }
+
+            Logger.Debug("Register restart after system reboot, command line: " + cmdline);
         }
     }
 }

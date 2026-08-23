@@ -17,20 +17,28 @@ namespace Shadowsocks.Controller.Service
     /// Supports CONNECT tunnelling and ordinary absolute-form HTTP requests.
     /// Routing decisions are application-aware and shared with Admin Mode.
     /// </summary>
-    internal sealed class ManagedHttpProxyService(TrafficPolicyEngine policyEngine, Configuration initialConfiguration) : Listener.Service
+    internal sealed class ManagedHttpProxyService : Listener.Service
     {
         private const int MaxHeaderBytes = 64 * 1024;
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-        private readonly TrafficPolicyEngine _policyEngine = policyEngine ?? throw new ArgumentNullException(nameof(policyEngine));
-        private readonly TcpProcessResolver _processResolver = new();
+        private readonly TrafficPolicyEngine _policyEngine;
         private readonly ConcurrentDictionary<long, Connection> _connections = new();
-        private Configuration _configuration = initialConfiguration ?? throw new ArgumentNullException(nameof(initialConfiguration));
+        private Configuration _configuration;
         private long _nextConnectionId;
         private volatile bool _stopping;
 
+        public ManagedHttpProxyService(TrafficPolicyEngine policyEngine, Configuration initialConfiguration)
+        {
+            ArgumentNullException.ThrowIfNull(policyEngine);
+            ArgumentNullException.ThrowIfNull(initialConfiguration);
+            _policyEngine = policyEngine;
+            _configuration = initialConfiguration;
+        }
+
         public void UpdateConfiguration(Configuration configuration)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            ArgumentNullException.ThrowIfNull(configuration);
+            _configuration = configuration;
         }
 
         public override bool Handle(byte[] firstPacket, int length, Socket socket, object state)
@@ -48,7 +56,7 @@ namespace Shadowsocks.Controller.Service
 
             long id = Interlocked.Increment(ref _nextConnectionId);
             byte[] initial = firstPacket.AsSpan(0, length).ToArray();
-            ProcessIdentity identity = _processResolver.Resolve(socket);
+            ProcessIdentity identity = TcpProcessResolver.Resolve(socket);
             Connection connection = new(
                 id,
                 socket,
@@ -62,7 +70,7 @@ namespace Shadowsocks.Controller.Service
             return true;
         }
 
-        public override void Stop()
+        public override void Shutdown()
         {
             _stopping = true;
             foreach (Connection connection in _connections.Values)
@@ -95,6 +103,27 @@ namespace Shadowsocks.Controller.Service
                 || StartsWithAscii(span, "OPTIONS ")
                 || StartsWithAscii(span, "PATCH ")
                 || StartsWithAscii(span, "TRACE ");
+        }
+
+        internal static string BuildRoutingUrlForPolicy(
+            string target,
+            string host,
+            int port,
+            bool isConnect)
+        {
+            if (!isConnect && Uri.TryCreate(target, UriKind.Absolute, out Uri absoluteUri))
+            {
+                return absoluteUri.AbsoluteUri;
+            }
+
+            string normalizedHost = host.Contains(':') ? $"[{host}]" : host;
+            string scheme = isConnect ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+            int defaultPort = isConnect ? 443 : 80;
+            string portText = port == defaultPort ? string.Empty : $":{port}";
+            string path = isConnect || string.IsNullOrWhiteSpace(target) || !target.StartsWith('/')
+                ? "/"
+                : target;
+            return $"{scheme}://{normalizedHost}{portText}{path}";
         }
 
         private static bool StartsWithAscii(ReadOnlySpan<byte> value, string prefix)
@@ -155,10 +184,19 @@ namespace Shadowsocks.Controller.Service
                         ProcessName = _process.ProcessName,
                         Protocol = "TCP",
                         DestinationHost = request.Host,
+                        DestinationUrl = request.RoutingUrl,
                         DestinationPort = request.Port,
                         IsInternal = _process.IsCurrentProcess,
                     };
                     RouteDecision decision = _policyEngine.EvaluateUserMode(context);
+                    Logger.Debug(
+                        "Managed HTTP route {0} for {1}:{2} (pid={3}, process={4}): {5}",
+                        decision.Action,
+                        request.Host,
+                        request.Port,
+                        _process.ProcessId,
+                        _process.ProcessName ?? string.Empty,
+                        decision.Reason);
 
                     if (decision.Action == TrafficRouteAction.Block)
                     {
@@ -345,6 +383,7 @@ namespace Shadowsocks.Controller.Service
             public int Port { get; } = initialPort;
             public bool IsConnect { get; } = initialIsConnect;
             public int HeaderEnd { get; } = initialHeaderEnd;
+            public string RoutingUrl => BuildRoutingUrl();
 
             public static HttpProxyRequest Parse(byte[] requestBytes)
             {
@@ -394,6 +433,9 @@ namespace Shadowsocks.Controller.Service
                 (string fallbackHost, int fallbackPort) = ParseAuthority(hostHeader, 80);
                 return new HttpProxyRequest(method, target, fallbackHost, fallbackPort, false, headerEnd + 4);
             }
+
+            private string BuildRoutingUrl()
+                => ManagedHttpProxyService.BuildRoutingUrlForPolicy(Target, Host, Port, IsConnect);
 
             public byte[] RewriteForOriginServer(byte[] requestBytes)
             {

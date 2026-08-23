@@ -21,10 +21,11 @@ internal sealed class WinUIPageContext
         Func<AppThemePreference> getTheme,
         Action<AppThemePreference> setTheme,
         Func<bool> getStartWithWindows,
-        Func<bool, bool> setStartWithWindows,
+        Func<bool, Task<bool>> setStartWithWindows,
         Action<bool> setAlwaysOnTop,
         Func<HotkeyConfig, IReadOnlyList<string>> registerHotkeys,
         Func<HotkeyConfig, IReadOnlyList<string>> applyHotkeys,
+        Action requestApplicationExit,
         ILocalizationService localization)
     {
         Controller = controller;
@@ -40,7 +41,10 @@ internal sealed class WinUIPageContext
         SetAlwaysOnTop = setAlwaysOnTop;
         RegisterHotkeys = registerHotkeys;
         ApplyHotkeys = applyHotkeys;
-        Localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        ArgumentNullException.ThrowIfNull(requestApplicationExit);
+        ArgumentNullException.ThrowIfNull(localization);
+        RequestApplicationExit = requestApplicationExit;
+        Localization = localization;
     }
 
     public ShadowsocksController? Controller { get; }
@@ -58,10 +62,11 @@ internal sealed class WinUIPageContext
     public Func<AppThemePreference> GetTheme { get; }
     public Action<AppThemePreference> SetTheme { get; }
     public Func<bool> GetStartWithWindows { get; }
-    public Func<bool, bool> SetStartWithWindows { get; }
+    public Func<bool, Task<bool>> SetStartWithWindows { get; }
     public Action<bool> SetAlwaysOnTop { get; }
     public Func<HotkeyConfig, IReadOnlyList<string>> RegisterHotkeys { get; }
     public Func<HotkeyConfig, IReadOnlyList<string>> ApplyHotkeys { get; }
+    public Action RequestApplicationExit { get; }
     public ILocalizationService Localization { get; }
 
     public string L(string key) => Localization[key];

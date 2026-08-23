@@ -8,7 +8,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using NLog;
 using Shadowsocks.Model;
 using Shadowsocks.Core.Storage;
@@ -18,7 +17,7 @@ namespace Shadowsocks.Controller.Service
 {
     public class GeositeResultEventArgs(bool success) : EventArgs
     {
-        public bool Success = success;
+        public bool Success { get; } = success;
     }
 
     public static class GeositeUpdater
@@ -32,9 +31,6 @@ namespace Shadowsocks.Controller.Service
 
         public const string DefaultSourceUrl = "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat";
 
-        // fix28 used one shared dlc.dat cache. fix29 migrates it when there is exactly
-        // one configured source, then keeps a separate cache per URL.
-        private static readonly string LegacyDatabasePath = Path.Combine(Shadowsocks.Core.RuntimeEnvironment.WorkingDirectory, "dlc.dat");
         private static readonly string CacheDirectory = AppStoragePaths.GeositeCacheDirectory;
         private static readonly string AppliedSourcesPath = Path.Combine(CacheDirectory, "active-sources.sha256");
 
@@ -97,7 +93,6 @@ namespace Shadowsocks.Controller.Service
         {
             List<string> normalized = NormalizeSources(sources);
             Directory.CreateDirectory(CacheDirectory);
-            TryMigrateLegacyCache(normalized);
 
             List<Dictionary<string, IList<DomainObject>>> databases = [];
             HashSet<string> needsRefresh = new(StringComparer.OrdinalIgnoreCase);
@@ -147,38 +142,6 @@ namespace Shadowsocks.Controller.Service
             }
 
             return normalized;
-        }
-
-        private static void TryMigrateLegacyCache(IReadOnlyList<string> sources)
-        {
-            if (AppStoragePaths.IsCleanMode)
-            {
-                return;
-            }
-
-            if (sources.Count != 1 || !File.Exists(LegacyDatabasePath))
-            {
-                return;
-            }
-
-            string target = GetCachePath(sources[0]);
-            if (File.Exists(target))
-            {
-                return;
-            }
-
-            try
-            {
-                byte[] legacy = File.ReadAllBytes(LegacyDatabasePath);
-                ParseGeositeList(legacy); // validate before associating it with the source URL
-                File.WriteAllBytes(target, legacy);
-                File.Delete(LegacyDatabasePath);
-                logger.Info($"Migrated legacy GeoSite cache to {target}.");
-            }
-            catch (Exception ex)
-            {
-                logger.Warn(ex, "Could not migrate the legacy dlc.dat cache; it will be ignored.");
-            }
         }
 
         private static Dictionary<string, IList<DomainObject>> ParseGeositeList(byte[] database)
@@ -295,7 +258,7 @@ namespace Shadowsocks.Controller.Service
         /// </summary>
         public static async Task<bool> UpdatePACFromGeosite(Configuration config, bool raiseEvents = true)
         {
-            if (config == null) throw new ArgumentNullException(nameof(config));
+            ArgumentNullException.ThrowIfNull(config);
             if (config.useOnlinePac)
             {
                 logger.Debug("Skipping GeoSite update because Online PAC is enabled.");
@@ -342,10 +305,7 @@ namespace Shadowsocks.Controller.Service
                 }
 
                 LogInvalidConfiguredGroups(config);
-                bool pacFileChanged = MergeAndWritePACFile(
-                    config.geositeDirectGroups,
-                    config.geositeProxiedGroups,
-                    blacklist);
+                bool pacFileChanged = MergeAndWritePACFile();
 
                 if (failedSources.Count > 0)
                 {
@@ -498,27 +458,25 @@ namespace Shadowsocks.Controller.Service
         /// <summary>
         /// Merge and write pac.txt from the cached GeoSite database.
         /// </summary>
-        public static bool MergeAndWritePACFile(List<string> directGroups, List<string> proxiedGroups, bool blacklist)
+        public static bool MergeAndWritePACFile()
         {
             if (!IsDatabaseAvailable)
             {
                 throw new InvalidOperationException("GeoSite database is not installed. Enable Local PAC and wait for the database download to complete.");
             }
 
-            string abpContent = MergePACFile(
-                directGroups ?? [],
-                proxiedGroups ?? [],
-                blacklist);
-            if (File.Exists(PACDaemon.PAC_FILE))
+            string pacContent = PACDaemon.GetManagedFunnelPac();
+            if (File.Exists(PACDaemon.PacFile))
             {
-                string original = FileManager.NonExclusiveReadAllText(PACDaemon.PAC_FILE, Encoding.UTF8);
-                if (original == abpContent)
+                string original = FileManager.NonExclusiveReadAllText(PACDaemon.PacFile, Encoding.UTF8);
+                if (original == pacContent)
                 {
                     MarkCurrentSourceSetApplied();
                     return false;
                 }
             }
-            File.WriteAllText(PACDaemon.PAC_FILE, abpContent, Encoding.UTF8);
+
+            File.WriteAllText(PACDaemon.PacFile, pacContent, Encoding.UTF8);
             MarkCurrentSourceSetApplied();
             return true;
         }
@@ -561,47 +519,17 @@ namespace Shadowsocks.Controller.Service
             return !string.IsNullOrWhiteSpace(groupName);
         }
 
-        private static string MergePACFile(List<string> directGroups, List<string> proxiedGroups, bool blacklist)
-        {
-            string abpContent;
-            if (File.Exists(PACDaemon.USER_ABP_FILE))
-            {
-                abpContent = FileManager.NonExclusiveReadAllText(PACDaemon.USER_ABP_FILE, Encoding.UTF8);
-            }
-            else
-            {
-                abpContent = EmbeddedResources.AbpJs;
-            }
-
-            List<string> userruleLines = [];
-            if (File.Exists(PACDaemon.USER_RULE_FILE))
-            {
-                string userrulesString = FileManager.NonExclusiveReadAllText(PACDaemon.USER_RULE_FILE, Encoding.UTF8);
-                userruleLines = ProcessUserRules(userrulesString);
-            }
-
-            List<string> ruleLines = GenerateRules(directGroups, proxiedGroups, blacklist);
-            abpContent =
-$@"var __USERRULES__ = {JsonConvert.SerializeObject(userruleLines, Formatting.Indented)};
-var __RULES__ = {JsonConvert.SerializeObject(ruleLines, Formatting.Indented)};
-{abpContent}";
-            return abpContent;
-        }
-
-        private static List<string> ProcessUserRules(string content)
-        {
-            List<string> validLines = [];
-            using StringReader stringReader = new(content);
-            for (string line = stringReader.ReadLine(); line != null; line = stringReader.ReadLine())
-            {
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("!") || line.StartsWith("["))
-                {
-                    continue;
-                }
-                validLines.Add(line);
-            }
-            return validLines;
-        }
+        /// <summary>
+        /// Builds the ABP-compatible network rule set consumed by the managed C# routing snapshot.
+        /// Returning a copy keeps the mutable GeoSite
+        /// database behind its existing lock while allowing the compiled FilterEngine to be
+        /// immutable and lock-free during request evaluation.
+        /// </summary>
+        public static IReadOnlyList<string> BuildManagedFilterRules(
+            List<string> directGroups,
+            List<string> proxiedGroups,
+            bool blacklist)
+            => GenerateRules(directGroups ?? [], proxiedGroups ?? [], blacklist).AsReadOnly();
 
         private static List<string> GenerateRules(List<string> directGroups, List<string> proxiedGroups, bool blacklist)
         {

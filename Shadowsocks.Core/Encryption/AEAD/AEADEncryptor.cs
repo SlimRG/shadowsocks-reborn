@@ -15,46 +15,42 @@ namespace Shadowsocks.Encryption.AEAD
     public abstract class AEADEncryptor
         : EncryptorBase
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
-        // We are using the same saltLen and keyLen
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
+        // We are using the same SaltLength and KeyLength
         private const string Info = "ss-subkey";
         private static readonly byte[] InfoBytes = Encoding.ASCII.GetBytes(Info);
 
         // for UDP only
-        protected static byte[] _udpTmpBuf = new byte[65536];
+        private static readonly byte[] s_udpTempBuffer = new byte[65536];
 
         // every connection should create its own buffer
-        private ByteCircularBuffer _encCircularBuffer = new ByteCircularBuffer(MAX_INPUT_SIZE * 2);
-        private ByteCircularBuffer _decCircularBuffer = new ByteCircularBuffer(MAX_INPUT_SIZE * 2);
+        private readonly ByteCircularBuffer _encCircularBuffer = new(MaxInputSize * 2);
+        private readonly ByteCircularBuffer _decCircularBuffer = new(MaxInputSize * 2);
 
-        public const int CHUNK_LEN_BYTES = 2;
-        public const uint CHUNK_LEN_MASK = 0x3FFFu;
+        public const int ChunkLengthBytes = 2;
+        public const uint ChunkLengthMask = 0x3FFFu;
 
-        protected Dictionary<string, EncryptorInfo> ciphers;
-
-        protected string _method;
-        protected int _cipher;
+        protected string MethodName { get; private set; }
+        protected int CipherType { get; private set; }
         // internal name in the crypto library
-        protected string _innerLibName;
-        protected EncryptorInfo CipherInfo;
-        protected byte[] _masterKey;
-        protected int keyLen;
-        protected int saltLen;
-        protected int tagLen;
-        protected int nonceLen;
+        protected byte[] MasterKey { get; private set; }
+        protected int KeyLength { get; private set; }
+        protected int SaltLength { get; private set; }
+        protected int TagLength { get; private set; }
+        protected int NonceLength { get; private set; }
 
-        protected byte[] _encryptSalt;
-        protected byte[] _decryptSalt;
+        protected byte[] EncryptSalt { get; private set; }
+        protected byte[] DecryptSalt { get; private set; }
 
-        protected object _nonceIncrementLock = new object();
-        protected byte[] _encNonce;
-        protected byte[] _decNonce;
+        private readonly object _nonceIncrementLock = new();
+        protected byte[] EncryptNonce { get; private set; }
+        protected byte[] DecryptNonce { get; private set; }
         // Is first packet
-        protected bool _decryptSaltReceived;
-        protected bool _encryptSaltSent;
+        private bool _decryptSaltReceived;
+        private bool _encryptSaltSent;
 
         // Is first chunk(tcp request)
-        protected bool _tcpRequestSent;
+        private bool _tcpRequestSent;
 
         public AEADEncryptor(string method, string password)
             : base(method, password)
@@ -62,28 +58,27 @@ namespace Shadowsocks.Encryption.AEAD
             InitEncryptorInfo(method);
             InitKey(password);
             // Initialize all-zero nonce for each connection
-            _encNonce = new byte[nonceLen];
-            _decNonce = new byte[nonceLen];
+            EncryptNonce = new byte[NonceLength];
+            DecryptNonce = new byte[NonceLength];
         }
 
-        protected abstract Dictionary<string, EncryptorInfo> getCiphers();
+        protected abstract IReadOnlyDictionary<string, EncryptorInfo> GetCiphers();
 
         protected void InitEncryptorInfo(string method)
         {
-            method = method.ToLower();
-            _method = method;
-            ciphers = getCiphers();
-            CipherInfo = ciphers[_method];
-            _innerLibName = CipherInfo.InnerLibName;
-            _cipher = CipherInfo.Type;
-            if (_cipher == 0)
+            method = method.ToLowerInvariant();
+            MethodName = method;
+            IReadOnlyDictionary<string, EncryptorInfo> ciphers = GetCiphers();
+            EncryptorInfo cipherInfo = ciphers[MethodName];
+            CipherType = cipherInfo.Type;
+            if (CipherType == 0)
             {
-                throw new System.Exception("method not found");
+                throw new NotSupportedException($"Encryption method '{MethodName}' is not supported.");
             }
-            keyLen = CipherInfo.KeySize;
-            saltLen = CipherInfo.SaltSize;
-            tagLen = CipherInfo.TagSize;
-            nonceLen = CipherInfo.NonceSize;
+            KeyLength = cipherInfo.KeySize;
+            SaltLength = cipherInfo.SaltSize;
+            TagLength = cipherInfo.TagSize;
+            NonceLength = cipherInfo.NonceSize;
         }
 
         protected void InitKey(string password)
@@ -92,29 +87,34 @@ namespace Shadowsocks.Encryption.AEAD
             // The master key belongs to this encryptor instance. Keeping it per-instance
             // prevents concurrent connections to servers with different passwords from
             // overwriting each other's key material.
-            _masterKey = new byte[keyLen];
-            DeriveKey(passbuf, _masterKey, keyLen);
+            MasterKey = new byte[KeyLength];
+            DeriveKey(passbuf, MasterKey, KeyLength);
         }
 
-        public void DeriveKey(byte[] password, byte[] key, int keylen)
+        public static void DeriveKey(byte[] password, byte[] key, int keylen)
         {
-            byte[] result = new byte[password.Length + MD5_LEN];
+            byte[] result = new byte[password.Length + Md5Length];
             int i = 0;
             byte[] md5sum = null;
             while (i < keylen)
             {
                 if (i == 0)
                 {
+                    // Shadowsocks EVP_BytesToKey compatibility requires MD5; changing it breaks the protocol.
+#pragma warning disable CA5351
                     md5sum = MD5.HashData(password);
+#pragma warning restore CA5351
                 }
                 else
                 {
-                    Array.Copy(md5sum, 0, result, 0, MD5_LEN);
-                    Array.Copy(password, 0, result, MD5_LEN, password.Length);
+                    Array.Copy(md5sum, 0, result, 0, Md5Length);
+                    Array.Copy(password, 0, result, Md5Length, password.Length);
+#pragma warning disable CA5351
                     md5sum = MD5.HashData(result);
+#pragma warning restore CA5351
                 }
-                Array.Copy(md5sum, 0, key, i, Math.Min(MD5_LEN, keylen - i));
-                i += MD5_LEN;
+                Array.Copy(md5sum, 0, key, i, Math.Min(Md5Length, keylen - i));
+                i += Md5Length;
             }
         }
 
@@ -122,9 +122,9 @@ namespace Shadowsocks.Encryption.AEAD
         {
             HKDF.DeriveKey(
                 HashAlgorithmName.SHA1,
-                masterKey.AsSpan(0, keyLen),
-                sessionKey.AsSpan(0, keyLen),
-                salt.AsSpan(0, saltLen),
+                masterKey.AsSpan(0, KeyLength),
+                sessionKey.AsSpan(0, KeyLength),
+                salt.AsSpan(0, SaltLength),
                 InfoBytes);
         }
 
@@ -132,9 +132,9 @@ namespace Shadowsocks.Encryption.AEAD
         {
             lock (_nonceIncrementLock)
             {
-                byte[] nonce = isEncrypt ? _encNonce : _decNonce;
+                byte[] nonce = isEncrypt ? EncryptNonce : DecryptNonce;
                 // Shadowsocks AEAD treats the nonce as a little-endian unsigned integer.
-                for (int i = 0; i < nonceLen; i++)
+                for (int i = 0; i < NonceLength; i++)
                 {
                     nonce[i]++;
                     if (nonce[i] != 0)
@@ -147,15 +147,15 @@ namespace Shadowsocks.Encryption.AEAD
         {
             if (isEncrypt)
             {
-                _encryptSalt = new byte[saltLen];
-                Array.Copy(salt, _encryptSalt, saltLen);
+                EncryptSalt = new byte[SaltLength];
+                Array.Copy(salt, EncryptSalt, SaltLength);
             }
             else
             {
-                _decryptSalt = new byte[saltLen];
-                Array.Copy(salt, _decryptSalt, saltLen);
+                DecryptSalt = new byte[SaltLength];
+                Array.Copy(salt, DecryptSalt, SaltLength);
             }
-            logger.Dump("Salt", salt, saltLen);
+            logger.Dump("Salt", salt, SaltLength);
         }
 
         public static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
@@ -177,11 +177,11 @@ namespace Shadowsocks.Encryption.AEAD
             {
                 _encryptSaltSent = true;
                 // Generate salt
-                byte[] saltBytes = new byte[saltLen];
-                randBytes(saltBytes, saltLen);
+                byte[] saltBytes = new byte[SaltLength];
+                randBytes(saltBytes, SaltLength);
                 InitCipher(saltBytes, true, false);
-                Array.Copy(saltBytes, 0, outbuf, 0, saltLen);
-                outlength = saltLen;
+                Array.Copy(saltBytes, 0, outbuf, 0, SaltLength);
+                outlength = SaltLength;
                 logger.Trace($"_encryptSaltSent outlength {outlength}");
             }
 
@@ -190,10 +190,10 @@ namespace Shadowsocks.Encryption.AEAD
                 _tcpRequestSent = true;
                 // The first TCP request
                 int encAddrBufLength;
-                byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
-                byte[] addrBytes = _encCircularBuffer.Get(AddrBufLength);
+                byte[] encAddrBufBytes = new byte[AddrBufLength + TagLength * 2 + ChunkLengthBytes];
+                byte[] addrBytes = _encCircularBuffer.Read(AddrBufLength);
                 ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
-                Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
+                Debug.Assert(encAddrBufLength == AddrBufLength + TagLength * 2 + ChunkLengthBytes);
                 Array.Copy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
                 outlength += encAddrBufLength;
                 logger.Trace($"_tcpRequestSent outlength {outlength}");
@@ -204,12 +204,12 @@ namespace Shadowsocks.Encryption.AEAD
             {
                 uint bufSize = (uint)_encCircularBuffer.Size;
                 if (bufSize <= 0) return;
-                var chunklength = (int)Math.Min(bufSize, CHUNK_LEN_MASK);
-                byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
+                var chunklength = (int)Math.Min(bufSize, ChunkLengthMask);
+                byte[] chunkBytes = _encCircularBuffer.Read(chunklength);
                 int encChunkLength;
-                byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
+                byte[] encChunkBytes = new byte[chunklength + TagLength * 2 + ChunkLengthBytes];
                 ChunkEncrypt(chunkBytes, chunklength, encChunkBytes, out encChunkLength);
-                Debug.Assert(encChunkLength == chunklength + tagLen * 2 + CHUNK_LEN_BYTES);
+                Debug.Assert(encChunkLength == chunklength + TagLength * 2 + ChunkLengthBytes);
                 Buffer.BlockCopy(encChunkBytes, 0, outbuf, outlength, encChunkLength);
                 outlength += encChunkLength;
                 logger.Trace("chunks enc outlength " + outlength);
@@ -242,15 +242,15 @@ namespace Shadowsocks.Encryption.AEAD
             {
                 bufSize = _decCircularBuffer.Size;
                 // check if we get the leading salt
-                if (bufSize <= saltLen)
+                if (bufSize <= SaltLength)
                 {
                     // need more
                     return;
                 }
                 _decryptSaltReceived = true;
-                byte[] salt = _decCircularBuffer.Get(saltLen);
+                byte[] salt = _decCircularBuffer.Read(SaltLength);
                 InitCipher(salt, false, false);
-                logger.Trace("get salt len " + saltLen);
+                logger.Trace("get salt len " + SaltLength);
             }
 
             // handle chunks
@@ -265,7 +265,7 @@ namespace Shadowsocks.Encryption.AEAD
                 }
 
                 // first get chunk length
-                if (bufSize <= CHUNK_LEN_BYTES + tagLen)
+                if (bufSize <= ChunkLengthBytes + TagLength)
                 {
                     // so we only have chunk length and its tag?
                     return;
@@ -273,15 +273,15 @@ namespace Shadowsocks.Encryption.AEAD
 
                 #region Chunk Decryption
 
-                byte[] encLenBytes = _decCircularBuffer.Peek(CHUNK_LEN_BYTES + tagLen);
+                byte[] encLenBytes = _decCircularBuffer.Peek(ChunkLengthBytes + TagLength);
                 uint decChunkLenLength = 0;
-                byte[] decChunkLenBytes = new byte[CHUNK_LEN_BYTES];
+                byte[] decChunkLenBytes = new byte[ChunkLengthBytes];
                 // try to dec chunk len
-                cipherDecrypt(encLenBytes, CHUNK_LEN_BYTES + (uint)tagLen, decChunkLenBytes, ref decChunkLenLength);
-                Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
+                cipherDecrypt(encLenBytes, ChunkLengthBytes + (uint)TagLength, decChunkLenBytes, ref decChunkLenLength);
+                Debug.Assert(decChunkLenLength == ChunkLengthBytes);
                 // finally we get the real chunk len
                 ushort chunkLen = (ushort)IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(decChunkLenBytes, 0));
-                if (chunkLen > CHUNK_LEN_MASK)
+                if (chunkLen > ChunkLengthMask)
                 {
                     // we get invalid chunk
                     logger.Error($"Invalid chunk length: {chunkLen}");
@@ -289,7 +289,7 @@ namespace Shadowsocks.Encryption.AEAD
                 }
                 logger.Trace("Get the real chunk len:" + chunkLen);
                 bufSize = _decCircularBuffer.Size;
-                if (bufSize < CHUNK_LEN_BYTES + tagLen /* we haven't remove them */+ chunkLen + tagLen)
+                if (bufSize < ChunkLengthBytes + TagLength /* we haven't remove them */+ chunkLen + TagLength)
                 {
                     logger.Trace("No more data to decrypt one chunk");
                     return;
@@ -298,11 +298,11 @@ namespace Shadowsocks.Encryption.AEAD
 
                 // we have enough data to decrypt one chunk
                 // drop chunk len and its tag from buffer
-                _decCircularBuffer.Skip(CHUNK_LEN_BYTES + tagLen);
-                byte[] encChunkBytes = _decCircularBuffer.Get(chunkLen + tagLen);
+                _decCircularBuffer.Skip(ChunkLengthBytes + TagLength);
+                byte[] encChunkBytes = _decCircularBuffer.Read(chunkLen + TagLength);
                 byte[] decChunkBytes = new byte[chunkLen];
                 uint decChunkLen = 0;
-                cipherDecrypt(encChunkBytes, chunkLen + (uint)tagLen, decChunkBytes, ref decChunkLen);
+                cipherDecrypt(encChunkBytes, chunkLen + (uint)TagLength, decChunkBytes, ref decChunkLen);
                 Debug.Assert(decChunkLen == chunkLen);
                 IncrementNonce(false);
 
@@ -334,15 +334,15 @@ namespace Shadowsocks.Encryption.AEAD
         public override void EncryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
             // Generate salt
-            randBytes(outbuf, saltLen);
+            randBytes(outbuf, SaltLength);
             InitCipher(outbuf, true, true);
             uint olen = 0;
-            lock (_udpTmpBuf)
+            lock (s_udpTempBuffer)
             {
-                cipherEncrypt(buf, (uint)length, _udpTmpBuf, ref olen);
-                Debug.Assert(olen == length + tagLen);
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, (int)olen);
-                outlength = (int)(saltLen + olen);
+                cipherEncrypt(buf, (uint)length, s_udpTempBuffer, ref olen);
+                Debug.Assert(olen == length + TagLength);
+                Buffer.BlockCopy(s_udpTempBuffer, 0, outbuf, SaltLength, (int)olen);
+                outlength = (int)(SaltLength + olen);
             }
         }
 
@@ -350,12 +350,12 @@ namespace Shadowsocks.Encryption.AEAD
         {
             InitCipher(buf, false, true);
             uint olen = 0;
-            lock (_udpTmpBuf)
+            lock (s_udpTempBuffer)
             {
                 // copy remaining data to first pos
-                Buffer.BlockCopy(buf, saltLen, buf, 0, length - saltLen);
-                cipherDecrypt(buf, (uint)(length - saltLen), _udpTmpBuf, ref olen);
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, 0, (int)olen);
+                Buffer.BlockCopy(buf, SaltLength, buf, 0, length - SaltLength);
+                cipherDecrypt(buf, (uint)(length - SaltLength), s_udpTempBuffer, ref olen);
+                Buffer.BlockCopy(s_udpTempBuffer, 0, outbuf, 0, (int)olen);
                 outlength = (int)olen;
             }
         }
@@ -365,25 +365,25 @@ namespace Shadowsocks.Encryption.AEAD
         // we know the plaintext length before encryption, so we can do it in one operation
         private void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
         {
-            if (plainLen > CHUNK_LEN_MASK)
+            if (plainLen > ChunkLengthMask)
             {
                 logger.Error("enc chunk too big");
                 throw new CryptoErrorException();
             }
 
             // encrypt len
-            byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
+            byte[] encLenBytes = new byte[ChunkLengthBytes + TagLength];
             uint encChunkLenLength = 0;
             byte[] lenbuf = BitConverter.GetBytes((ushort)IPAddress.HostToNetworkOrder((short)plainLen));
-            cipherEncrypt(lenbuf, CHUNK_LEN_BYTES, encLenBytes, ref encChunkLenLength);
-            Debug.Assert(encChunkLenLength == CHUNK_LEN_BYTES + tagLen);
+            cipherEncrypt(lenbuf, ChunkLengthBytes, encLenBytes, ref encChunkLenLength);
+            Debug.Assert(encChunkLenLength == ChunkLengthBytes + TagLength);
             IncrementNonce(true);
 
             // encrypt corresponding data
-            byte[] encBytes = new byte[plainLen + tagLen];
+            byte[] encBytes = new byte[plainLen + TagLength];
             uint encBufLength = 0;
             cipherEncrypt(plaintext, (uint)plainLen, encBytes, ref encBufLength);
-            Debug.Assert(encBufLength == plainLen + tagLen);
+            Debug.Assert(encBufLength == plainLen + TagLength);
             IncrementNonce(true);
 
             // construct outbuf

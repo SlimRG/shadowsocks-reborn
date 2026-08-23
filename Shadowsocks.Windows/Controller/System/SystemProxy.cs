@@ -20,7 +20,7 @@ namespace Shadowsocks.Controller
 
         internal static SystemProxyMode GetCurrentMode(Configuration config, PACServer pacSrv)
         {
-            if (!config.enabled || !WinINet.Operational)
+            if (!config.Enabled || !WinINet.Operational)
             {
                 return SystemProxyMode.Disabled;
             }
@@ -55,7 +55,7 @@ namespace Shadowsocks.Controller
         public static void Update(Configuration config, bool forceDisable, PACServer pacSrv, IUserInteractionService interaction = null, bool noRetry = false)
         {
             interaction ??= NullUserInteractionService.Instance;
-            bool enabled = config.enabled && !forceDisable;
+            bool enabled = config.Enabled && !forceDisable;
 
             try
             {

@@ -10,34 +10,35 @@ namespace Shadowsocks.Controller.Strategy
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
-        protected ServerStatus _currentServer;
-        protected Dictionary<Server, ServerStatus> _serverStatus;
+        private ServerStatus _currentServer;
+        private Dictionary<Server, ServerStatus> _serverStatus;
         private readonly Func<Configuration> _configurationProvider;
 
         public class ServerStatus
         {
             // time interval between SYN and SYN+ACK
-            public TimeSpan latency;
-            public DateTime lastTimeDetectLatency;
+            public TimeSpan Latency { get; set; }
+            public DateTime LastTimeDetectLatency { get; set; }
 
             // last time anything received
-            public DateTime lastRead;
+            public DateTime LastRead { get; set; }
 
             // last time anything sent
-            public DateTime lastWrite;
+            public DateTime LastWrite { get; set; }
 
             // connection refused or closed before anything received
-            public DateTime lastFailure;
+            public DateTime LastFailure { get; set; }
 
-            public Server server;
+            public Server Server { get; set; }
 
-            public double score;
+            public double Score { get; set; }
         }
 
         public HighAvailabilityStrategy(Func<Configuration> configurationProvider)
         {
-            _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
-            _serverStatus = new Dictionary<Server, ServerStatus>();
+            ArgumentNullException.ThrowIfNull(configurationProvider);
+            _configurationProvider = configurationProvider;
+            _serverStatus = new Dictionary<Server, ServerStatus>(ReferenceEqualityComparer.Instance);
         }
 
         public string Name
@@ -52,29 +53,42 @@ namespace Shadowsocks.Controller.Strategy
 
         public void ReloadServers()
         {
-            // make a copy to avoid locking
-            var newServerStatus = new Dictionary<Server, ServerStatus>(_serverStatus);
+            Dictionary<Server, ServerStatus> previous = _serverStatus;
+            Dictionary<Server, ServerStatus> current = new(ReferenceEqualityComparer.Instance);
+            DateTime now = DateTime.Now;
 
-            foreach (var server in _configurationProvider().configs)
+            foreach (Server server in _configurationProvider().configs ?? [])
             {
-                if (!newServerStatus.ContainsKey(server))
+                if (server?.IsConfigured != true)
                 {
-                    var status = new ServerStatus();
-                    status.server = server;
-                    status.lastFailure = DateTime.MinValue;
-                    status.lastRead = DateTime.Now;
-                    status.lastWrite = DateTime.Now;
-                    status.latency = new TimeSpan(0, 0, 0, 0, 10);
-                    status.lastTimeDetectLatency = DateTime.Now;
-                    newServerStatus[server] = status;
+                    continue;
+                }
+
+                if (!previous.TryGetValue(server, out ServerStatus status))
+                {
+                    status = new ServerStatus
+                    {
+                        Server = server,
+                        LastFailure = DateTime.MinValue,
+                        LastRead = now,
+                        LastWrite = now,
+                        Latency = TimeSpan.FromMilliseconds(10),
+                        LastTimeDetectLatency = now,
+                    };
                 }
                 else
                 {
-                    // update settings for existing server
-                    newServerStatus[server].server = server;
+                    status.Server = server;
                 }
+
+                current[server] = status;
             }
-            _serverStatus = newServerStatus;
+
+            _serverStatus = current;
+            if (_currentServer is not null && !current.ContainsValue(_currentServer))
+            {
+                _currentServer = null;
+            }
 
             ChooseNewServer();
         }
@@ -89,7 +103,7 @@ namespace Shadowsocks.Controller.Strategy
             {
                 return null;
             }
-            return _currentServer.server;
+            return _currentServer.Server;
         }
 
         /**
@@ -100,41 +114,28 @@ namespace Shadowsocks.Controller.Strategy
          */
         public void ChooseNewServer()
         {
-            ServerStatus oldServer = _currentServer;
-            List<ServerStatus> servers = new List<ServerStatus>(_serverStatus.Values);
             DateTime now = DateTime.Now;
-            foreach (var status in servers)
+            ServerStatus best = null;
+
+            foreach (ServerStatus status in _serverStatus.Values)
             {
-                // all of failure, latency, (lastread - lastwrite) normalized to 1000, then
-                // 100 * failure - 2 * latency - 0.5 * (lastread - lastwrite)
-                status.score =
-                    100 * 1000 * Math.Min(5 * 60, (now - status.lastFailure).TotalSeconds)
-                    - 2 * 5 * (Math.Min(2000, status.latency.TotalMilliseconds) / (1 + (now - status.lastTimeDetectLatency).TotalSeconds / 30 / 10) +
-                    -0.5 * 200 * Math.Min(5, (status.lastRead - status.lastWrite).TotalSeconds));
-                logger.Debug($"server: {status.server} latency:{status.latency} score: {status.score}");
-            }
-            ServerStatus max = null;
-            foreach (var status in servers)
-            {
-                if (max == null)
+                status.Score =
+                    100 * 1000 * Math.Min(5 * 60, (now - status.LastFailure).TotalSeconds)
+                    - 2 * 5 * (Math.Min(2000, status.Latency.TotalMilliseconds) /
+                               (1 + (now - status.LastTimeDetectLatency).TotalSeconds / 300))
+                    + 0.5 * 200 * Math.Min(5, (status.LastWrite - status.LastRead).TotalSeconds);
+
+                logger.Debug($"server: {status.Server} latency:{status.Latency} score: {status.Score}");
+                if (best is null || status.Score >= best.Score)
                 {
-                    max = status;
-                }
-                else
-                {
-                    if (status.score >= max.score)
-                    {
-                        max = status;
-                    }
+                    best = status;
                 }
             }
-            if (max != null)
+
+            if (best is not null && (_currentServer is null || best.Score - _currentServer.Score > 200))
             {
-                if (_currentServer == null || max.score - _currentServer.score > 200)
-                {
-                    _currentServer = max;
-                    logger.Info($"HA switching to server: {_currentServer.server.ToString()}");
-                }
+                _currentServer = best;
+                logger.Info($"HA switching to server: {_currentServer.Server}");
             }
         }
 
@@ -145,8 +146,8 @@ namespace Shadowsocks.Controller.Strategy
             ServerStatus status;
             if (_serverStatus.TryGetValue(server, out status))
             {
-                status.latency = latency;
-                status.lastTimeDetectLatency = DateTime.Now;
+                status.Latency = latency;
+                status.LastTimeDetectLatency = DateTime.Now;
             }
         }
 
@@ -157,7 +158,7 @@ namespace Shadowsocks.Controller.Strategy
             ServerStatus status;
             if (_serverStatus.TryGetValue(server, out status))
             {
-                status.lastRead = DateTime.Now;
+                status.LastRead = DateTime.Now;
             }
         }
 
@@ -168,7 +169,7 @@ namespace Shadowsocks.Controller.Strategy
             ServerStatus status;
             if (_serverStatus.TryGetValue(server, out status))
             {
-                status.lastWrite = DateTime.Now;
+                status.LastWrite = DateTime.Now;
             }
         }
 
@@ -179,7 +180,7 @@ namespace Shadowsocks.Controller.Strategy
             ServerStatus status;
             if (_serverStatus.TryGetValue(server, out status))
             {
-                status.lastFailure = DateTime.Now;
+                status.LastFailure = DateTime.Now;
             }
         }
     }

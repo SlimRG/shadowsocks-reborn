@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using NLog;
 using Shadowsocks.Model;
 using Shadowsocks.Core.Storage;
 using Shadowsocks.Util.ProcessManagement;
@@ -13,21 +15,24 @@ namespace Shadowsocks.Controller.Service
     // https://github.com/shadowsocks/shadowsocks-org/wiki/Plugin
     public sealed class Sip003Plugin : IDisposable
     {
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
         public IPEndPoint LocalEndPoint { get; private set; }
         public int ProcessId => _started ? _pluginProcess.Id : 0;
 
         private readonly object _startProcessLock = new object();
         private readonly Job _pluginJob;
         private readonly Process _pluginProcess;
+        private readonly Func<bool> _showPluginOutputProvider;
         private bool _started;
         private bool _disposed;
 
         public static Sip003Plugin CreateIfConfigured(Server server, bool showPluginOutput)
+            => CreateIfConfigured(server, () => showPluginOutput);
+
+        public static Sip003Plugin CreateIfConfigured(Server server, Func<bool> showPluginOutputProvider)
         {
-            if (server == null)
-            {
-                throw new ArgumentNullException(nameof(server));
-            }
+            ArgumentNullException.ThrowIfNull(server);
 
             if (string.IsNullOrWhiteSpace(server.plugin))
             {
@@ -36,26 +41,31 @@ namespace Shadowsocks.Controller.Service
 
             return new Sip003Plugin(
                 server.plugin,
-                server.plugin_opts,
-                server.plugin_args,
+                server.PluginOptions,
+                server.PluginArguments,
                 server.server,
-                server.server_port,
-                showPluginOutput);
+                server.ServerPort,
+                showPluginOutputProvider);
         }
 
-        private Sip003Plugin(string plugin, string pluginOpts, string pluginArgs, string serverAddress, int serverPort, bool showPluginOutput)
+        private Sip003Plugin(string plugin, string pluginOpts, string pluginArgs, string serverAddress, int serverPort, Func<bool> showPluginOutputProvider)
         {
-            if (plugin == null) throw new ArgumentNullException(nameof(plugin));
+            ArgumentNullException.ThrowIfNull(plugin);
+            _showPluginOutputProvider = showPluginOutputProvider ?? (() => false);
             if (string.IsNullOrWhiteSpace(serverAddress))
             {
                 throw new ArgumentException("Value cannot be null or whitespace.", nameof(serverAddress));
             }
             if (serverPort <= 0 || serverPort > 65535)
             {
-                throw new ArgumentOutOfRangeException("serverPort");
+                throw new ArgumentOutOfRangeException(nameof(serverPort));
             }
 
-            string resolvedPlugin = ResolvePluginPath(plugin);
+            string resolvedPlugin = PluginManager.ResolveExecutable(plugin);
+            if (string.IsNullOrWhiteSpace(resolvedPlugin))
+            {
+                throw new FileNotFoundException(I18N.GetString("Cannot find the plugin program file"), plugin);
+            }
             string pluginWorkingDirectory = AppStoragePaths.EnsureTempDirectory(
                 Path.Combine(AppStoragePaths.TempWorkingRoot, "Plugins"));
 
@@ -66,36 +76,29 @@ namespace Shadowsocks.Controller.Service
                     FileName = resolvedPlugin,
                     Arguments = pluginArgs,
                     UseShellExecute = false,
-                    CreateNoWindow = !showPluginOutput,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     ErrorDialog = false,
                     WindowStyle = ProcessWindowStyle.Hidden,
                     WorkingDirectory = pluginWorkingDirectory,
                     Environment =
                     {
                         ["SS_REMOTE_HOST"] = serverAddress,
-                        ["SS_REMOTE_PORT"] = serverPort.ToString(),
+                        ["SS_REMOTE_PORT"] = serverPort.ToString(CultureInfo.InvariantCulture),
                         ["SS_PLUGIN_OPTIONS"] = pluginOpts
                     }
                 }
             };
+            _pluginProcess.OutputDataReceived += OnPluginOutputDataReceived;
+            _pluginProcess.ErrorDataReceived += OnPluginErrorDataReceived;
 
             _pluginJob = new Job();
         }
 
-        private static string ResolvePluginPath(string plugin)
-        {
-            // Product storage is intentionally independent from the Shadowsocks.exe directory.
-            // Absolute plugin paths are honored as configured; relative program names are left
-            // to the normal Windows PATH resolution performed by Process.Start.
-            return Path.IsPathRooted(plugin) ? Path.GetFullPath(plugin) : plugin;
-        }
-
         public bool StartIfNeeded()
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
             lock (_startProcessLock)
             {
@@ -108,7 +111,7 @@ namespace Shadowsocks.Controller.Service
                 LocalEndPoint = new IPEndPoint(IPAddress.Loopback, localPort);
 
                 _pluginProcess.StartInfo.Environment["SS_LOCAL_HOST"] = LocalEndPoint.Address.ToString();
-                _pluginProcess.StartInfo.Environment["SS_LOCAL_PORT"] = LocalEndPoint.Port.ToString();
+                _pluginProcess.StartInfo.Environment["SS_LOCAL_PORT"] = LocalEndPoint.Port.ToString(CultureInfo.InvariantCulture);
                 _pluginProcess.StartInfo.Arguments = ExpandEnvironmentVariables(_pluginProcess.StartInfo.Arguments, _pluginProcess.StartInfo.EnvironmentVariables);
                 try
                 {
@@ -116,14 +119,14 @@ namespace Shadowsocks.Controller.Service
                 }
                 catch (System.ComponentModel.Win32Exception ex)
                 {
-                    // do not use File.Exists(...), it can not handle the scenarios when the plugin file is in system environment path.
-                    // ERROR_FILE_NOT_FOUND (2)
                     if (ex.NativeErrorCode == 0x00000002)
                     {
                         throw new FileNotFoundException(I18N.GetString("Cannot find the plugin program file"), _pluginProcess.StartInfo.FileName, ex);
                     }
-                    throw new ApplicationException(I18N.GetString("Plugin Program"), ex);
+                    throw new InvalidOperationException(I18N.GetString("Plugin Program"), ex);
                 }
+                _pluginProcess.BeginOutputReadLine();
+                _pluginProcess.BeginErrorReadLine();
                 _pluginJob.AddProcess(_pluginProcess.Handle);
                 _started = true;
             }
@@ -131,7 +134,25 @@ namespace Shadowsocks.Controller.Service
             return true;
         }
 
-        public string ExpandEnvironmentVariables(string name, StringDictionary environmentVariables = null)
+        private void OnPluginOutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data) && IsPluginOutputEnabled())
+                Logger.Info("SIP003 | STDOUT | {0}", e.Data);
+        }
+
+        private void OnPluginErrorDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data) && IsPluginOutputEnabled())
+                Logger.Warn("SIP003 | STDERR | {0}", e.Data);
+        }
+
+        private bool IsPluginOutputEnabled()
+        {
+            try { return _showPluginOutputProvider(); }
+            catch { return false; }
+        }
+
+        public static string ExpandEnvironmentVariables(string name, StringDictionary environmentVariables = null)
         {
             // Expand the environment variables from the new process itself
             if (environmentVariables != null)
@@ -167,7 +188,7 @@ namespace Shadowsocks.Controller.Service
                 if (!_pluginProcess.HasExited)
                 {
                     _pluginProcess.Kill();
-                    _pluginProcess.WaitForExit();
+                    _pluginProcess.WaitForExit(1500);
                 }
             }
             catch (Exception) { }
@@ -175,6 +196,8 @@ namespace Shadowsocks.Controller.Service
             {
                 try
                 {
+                    _pluginProcess.OutputDataReceived -= OnPluginOutputDataReceived;
+                    _pluginProcess.ErrorDataReceived -= OnPluginErrorDataReceived;
                     _pluginProcess.Dispose();
                     _pluginJob.Dispose();
                 }

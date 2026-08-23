@@ -17,7 +17,7 @@ public sealed class ForwardProxyPage : Page, IRefreshablePage
     private readonly NumberBox _timeout;
     private readonly TextBox _username;
     private readonly PasswordBox _password;
-    private readonly Grid _details;
+    private readonly StackPanel _proxySettingsPanel;
     private bool _refreshing;
 
     internal ForwardProxyPage(WinUIPageContext context)
@@ -40,36 +40,38 @@ public sealed class ForwardProxyPage : Page, IRefreshablePage
         _context.SetToolTip(_noProxy, "Connect to the Shadowsocks server directly, without an upstream proxy.");
         _context.SetToolTip(_socks5, "Connect to the Shadowsocks server through an upstream SOCKS5 proxy.");
         _context.SetToolTip(_http, "Connect to the Shadowsocks server through an upstream HTTP proxy.");
-        _noProxy.Checked += (_, _) => UpdateDetailsEnabled();
-        _socks5.Checked += (_, _) => UpdateDetailsEnabled();
-        _http.Checked += (_, _) => UpdateDetailsEnabled();
+        _noProxy.Checked += (_, _) => UpdateProxySettingsVisibility();
+        _socks5.Checked += (_, _) => UpdateProxySettingsVisibility();
+        _http.Checked += (_, _) => UpdateProxySettingsVisibility();
         modes.Children.Add(_noProxy);
         modes.Children.Add(_socks5);
         modes.Children.Add(_http);
         card.Children.Add(modes);
 
-        card.Children.Add(WinUIStyles.CreateSectionTitle("Details"));
-        _details = CreateFormGrid();
+        _proxySettingsPanel = new StackPanel { Spacing = 16 };
+        _proxySettingsPanel.Children.Add(WinUIStyles.CreateSectionTitle("Details"));
+        Grid details = CreateFormGrid();
         _server = new TextBox { PlaceholderText = "127.0.0.1" };
         _context.SetToolTip(_server, "Hostname or IP address of the upstream proxy.");
-        AddRow(_details, "Address", _server);
+        AddRow(details, "Address", _server);
         _port = CreateNumberBox(1, 65535, 1080);
         _context.SetToolTip(_port, "TCP port of the upstream proxy.");
-        AddRow(_details, "Port", _port);
+        AddRow(details, "Port", _port);
         _timeout = CreateNumberBox(1, ForwardProxyConfig.MaxProxyTimeoutSec, 3);
         _context.SetToolTip(_timeout, "Connection timeout for the upstream proxy, in seconds.");
-        AddRow(_details, "Timeout", _timeout);
-        card.Children.Add(_details);
+        AddRow(details, "Timeout", _timeout);
+        _proxySettingsPanel.Children.Add(details);
 
-        card.Children.Add(WinUIStyles.CreateSectionTitle("Credentials (optional)"));
-        var credentials = CreateFormGrid();
+        _proxySettingsPanel.Children.Add(WinUIStyles.CreateSectionTitle("Credentials (optional)"));
+        Grid credentials = CreateFormGrid();
         _username = new TextBox();
         _context.SetToolTip(_username, "Optional username for upstream proxy authentication.");
         AddRow(credentials, "Username", _username);
         _password = new PasswordBox { PasswordRevealMode = PasswordRevealMode.Peek };
         _context.SetToolTip(_password, "Optional password for upstream proxy authentication.");
         AddRow(credentials, "Password", _password);
-        card.Children.Add(credentials);
+        _proxySettingsPanel.Children.Add(credentials);
+        card.Children.Add(_proxySettingsPanel);
 
         var actions = new StackPanel
         {
@@ -104,14 +106,14 @@ public sealed class ForwardProxyPage : Page, IRefreshablePage
         try
         {
             _noProxy.IsChecked = !proxy.useProxy;
-            _http.IsChecked = proxy.useProxy && proxy.proxyType == ForwardProxyConfig.PROXY_HTTP;
-            _socks5.IsChecked = proxy.useProxy && proxy.proxyType != ForwardProxyConfig.PROXY_HTTP;
+            _http.IsChecked = proxy.useProxy && proxy.proxyType == ForwardProxyConfig.ProxyHttp;
+            _socks5.IsChecked = proxy.useProxy && proxy.proxyType != ForwardProxyConfig.ProxyHttp;
             _server.Text = proxy.proxyServer ?? string.Empty;
             _port.Value = proxy.proxyPort > 0 ? proxy.proxyPort : 1080;
             _timeout.Value = proxy.proxyTimeout > 0 ? proxy.proxyTimeout : 3;
             _username.Text = proxy.authUser ?? string.Empty;
             _password.Password = proxy.authPwd ?? string.Empty;
-            UpdateDetailsEnabled();
+            UpdateProxySettingsVisibility();
         }
         finally
         {
@@ -119,20 +121,10 @@ public sealed class ForwardProxyPage : Page, IRefreshablePage
         }
     }
 
-    private void UpdateDetailsEnabled()
-    {
-        bool enabled = _noProxy.IsChecked != true;
-        foreach (UIElement child in _details.Children)
-        {
-            if (child is Control control)
-            {
-                control.IsEnabled = enabled;
-            }
-        }
-        _details.Opacity = enabled ? 1.0 : 0.55;
-        _username.IsEnabled = enabled;
-        _password.IsEnabled = enabled;
-    }
+    private void UpdateProxySettingsVisibility()
+        => _proxySettingsPanel.Visibility = _noProxy.IsChecked == true
+            ? Visibility.Collapsed
+            : Visibility.Visible;
 
     private void OnSaveClicked(object _, RoutedEventArgs _1)
     {
@@ -172,7 +164,7 @@ public sealed class ForwardProxyPage : Page, IRefreshablePage
         _context.Controller.SaveProxy(new ForwardProxyConfig
         {
             useProxy = useProxy,
-            proxyType = _http.IsChecked == true ? ForwardProxyConfig.PROXY_HTTP : ForwardProxyConfig.PROXY_SOCKS5,
+            proxyType = _http.IsChecked == true ? ForwardProxyConfig.ProxyHttp : ForwardProxyConfig.ProxySocks5,
             proxyServer = _server.Text?.Trim() ?? string.Empty,
             proxyPort = useProxy ? port : 0,
             proxyTimeout = useProxy ? timeout : 3,

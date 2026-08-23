@@ -1,0 +1,4 @@
+﻿Shadowsocks Reborn TODO
+
+SIP003 plugins
+- Custom repository sources: design repository trust/validation, release asset-selection rules, provenance and UI warnings, and regression tests before exposing an arbitrary repository field. Background auto-update intentionally remains limited to the trusted built-in catalog; manual ZIP/TAR.GZ import remains supported.

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Linq;
 using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller.Strategy
@@ -11,7 +12,8 @@ namespace Shadowsocks.Controller.Strategy
 
         public BalancingStrategy(Func<Configuration> configurationProvider)
         {
-            _configurationProvider = configurationProvider ?? throw new ArgumentNullException(nameof(configurationProvider));
+            ArgumentNullException.ThrowIfNull(configurationProvider);
+            _configurationProvider = configurationProvider;
             _random = new Random();
         }
 
@@ -32,17 +34,22 @@ namespace Shadowsocks.Controller.Strategy
 
         public Server GetAServer(IStrategyCallerType type, IPEndPoint localIPEndPoint, EndPoint destEndPoint)
         {
-            var configs = _configurationProvider().configs;
-            int index;
+            Server[] configs = (_configurationProvider().configs ?? [])
+                .Where(server => server?.IsConfigured == true)
+                .ToArray();
+            if (configs.Length == 0)
+            {
+                return null;
+            }
+
             if (type == IStrategyCallerType.TCP)
             {
-                index = _random.Next();
+                return configs[_random.Next(configs.Length)];
             }
-            else
-            {
-                index = localIPEndPoint.GetHashCode();
-            }
-            return configs[index % configs.Count];
+
+            int index = localIPEndPoint.GetHashCode();
+            int selectedIndex = (int)((uint)index % (uint)configs.Length);
+            return configs[selectedIndex];
         }
 
         public void UpdateLatency(Model.Server server, TimeSpan latency)

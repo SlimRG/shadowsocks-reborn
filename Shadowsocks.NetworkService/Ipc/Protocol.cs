@@ -8,6 +8,7 @@ internal enum RouteAction
     Proxy = 1,
     Direct = 2,
     Block = 3,
+    Deferred = 4,
 }
 
 internal enum DnsPolicyMode
@@ -16,6 +17,7 @@ internal enum DnsPolicyMode
     Direct = 1,
     Proxy = 2,
     CustomDoh = 3,
+    DnsCrypt = 4,
 }
 
 internal sealed class ApplicationRuleDto
@@ -28,7 +30,40 @@ internal sealed class ApplicationRuleDto
 internal sealed class DnsPolicyDto
 {
     public DnsPolicyMode Mode { get; set; } = DnsPolicyMode.System;
+    public string DirectDnsServer { get; set; } = string.Empty;
+    public string DirectDnsFallbackServer { get; set; } = string.Empty;
+    public bool DirectDnsRouteThroughShadowsocks { get; set; }
     public string CustomDohUrl { get; set; } = string.Empty;
+    public bool CustomDohRouteThroughShadowsocks { get; set; }
+    public int DnsCryptPort { get; set; }
+    public int DnsCryptProcessId { get; set; }
+    public string DnsCryptComponentRoot { get; set; } = string.Empty;
+    public bool FailClosed { get; set; } = true;
+
+    [JsonIgnore]
+    public bool DirectDnsReady => Mode == DnsPolicyMode.Direct
+        && System.Net.IPAddress.TryParse(DirectDnsServer?.Trim(), out _)
+        && (string.IsNullOrWhiteSpace(DirectDnsFallbackServer)
+            || System.Net.IPAddress.TryParse(DirectDnsFallbackServer.Trim(), out _));
+
+    [JsonIgnore]
+    public bool DnsCryptReady => Mode == DnsPolicyMode.DnsCrypt
+        && DnsCryptPort is >= 1 and <= 65535
+        && DnsCryptProcessId > 0;
+
+    [JsonIgnore]
+    public bool CustomDohReady => Mode == DnsPolicyMode.CustomDoh
+        && Uri.TryCreate(CustomDohUrl, UriKind.Absolute, out Uri? uri)
+        && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+}
+
+
+internal sealed class ManagedRoutingDto
+{
+    public bool Enabled { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public List<string> DefaultRules { get; set; } = [];
+    public List<string> UserRules { get; set; } = [];
 }
 
 internal sealed class StartRequest
@@ -41,6 +76,7 @@ internal sealed class StartRequest
     public RouteAction DefaultRoute { get; set; } = RouteAction.Direct;
     public List<ApplicationRuleDto> ApplicationRules { get; set; } = [];
     public List<int> ExcludedProcessIds { get; set; } = [];
+    public ManagedRoutingDto ManagedRouting { get; set; } = new();
     public DnsPolicyDto DnsPolicy { get; set; } = new();
 }
 
@@ -56,11 +92,17 @@ internal sealed class ServiceResponse
     public string Version { get; set; } = string.Empty;
     public int TcpRedirectPort { get; set; }
     public int UdpRedirectPort { get; set; }
+    public bool CaptureActive { get; set; }
+    public bool DnsInterceptionActive { get; set; }
+    public bool DnsFailClosedActive { get; set; }
+    public bool ManagedRoutingActive { get; set; }
+    public int ManagedRoutingRuleCount { get; set; }
     public bool DriverRemoved { get; set; }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(StartRequest))]
+[JsonSerializable(typeof(ManagedRoutingDto))]
 [JsonSerializable(typeof(ControlRequest))]
 [JsonSerializable(typeof(ServiceResponse))]
 internal partial class NetworkServiceJsonContext : JsonSerializerContext

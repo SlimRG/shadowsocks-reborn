@@ -8,7 +8,7 @@ namespace Shadowsocks.Encryption.Stream
     {
         const int CIPHER_NONE = 1;
 
-        private static Dictionary<string, EncryptorInfo> _ciphers = new Dictionary<string, EncryptorInfo> {
+        private static readonly Dictionary<string, EncryptorInfo> _ciphers = new Dictionary<string, EncryptorInfo> {
             { "plain", new EncryptorInfo("PLAIN", 0, 0, CIPHER_NONE) },
             { "none", new EncryptorInfo("PLAIN", 0, 0, CIPHER_NONE) }
         };
@@ -22,10 +22,6 @@ namespace Shadowsocks.Encryption.Stream
             return new List<string>(_ciphers.Keys);
         }
 
-        protected Dictionary<string, EncryptorInfo> getCiphers()
-        {
-            return _ciphers;
-        }
 
         #region TCP
 

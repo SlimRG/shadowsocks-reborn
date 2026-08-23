@@ -24,6 +24,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
     private readonly ToggleSwitch _shareLanToggle;
     private readonly RadioButton _userMode;
     private readonly RadioButton _adminMode;
+    private readonly ProgressRing _captureModeProgress;
     private readonly NumberBox _localPortBox;
     private readonly TextBlock _runtimeMode;
     private readonly TextBlock _winDivertStatus;
@@ -32,9 +33,11 @@ public sealed class TrafficPage : Page, IRefreshablePage
     private readonly TextBlock _udpCaptureStatus;
     private readonly TextBlock _tcpRedirectPort;
     private readonly TextBlock _udpRedirectPort;
+    private readonly Border _adminStatusCard;
     private readonly StackPanel _ruleList;
     private readonly List<RuleEditor> _rules = new();
     private readonly Button _saveRoutingButton;
+    private readonly Button _discardRoutingButton;
     private bool _refreshing;
     private bool _rulesDirty;
     private bool _captureModeChanging;
@@ -69,7 +72,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
         };
         adminModeContent.Children.Add(new FontIcon
         {
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe Fluent Icons"),
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
             Glyph = "\uEA18",
             FontSize = 16,
         });
@@ -89,6 +92,16 @@ public sealed class TrafficPage : Page, IRefreshablePage
         TextBlock adminDescription = WinUIStyles.CreateText("Transparent TCP/UDP capture through the elevated NetworkService helper.", "CaptionTextBlockStyle");
         adminDescription.Opacity = 0.72;
         captureCard.Children.Add(adminDescription);
+        _captureModeProgress = new ProgressRing
+        {
+            Width = 20,
+            Height = 20,
+            IsActive = false,
+            Visibility = Visibility.Collapsed,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        _context.SetToolTip(_captureModeProgress, "Applying traffic capture mode…");
+        captureCard.Children.Add(_captureModeProgress);
         panel.Children.Add(WinUIStyles.CreateCard(captureCard));
 
         var stateCard = new StackPanel { Spacing = 10 };
@@ -100,7 +113,8 @@ public sealed class TrafficPage : Page, IRefreshablePage
         stateCard.Children.Add(WinUIStyles.CreateKeyValueRow("UDP capture", out _udpCaptureStatus));
         stateCard.Children.Add(WinUIStyles.CreateKeyValueRow("TCP redirect port", out _tcpRedirectPort));
         stateCard.Children.Add(WinUIStyles.CreateKeyValueRow("UDP redirect port", out _udpRedirectPort));
-        panel.Children.Add(WinUIStyles.CreateCard(stateCard));
+        _adminStatusCard = WinUIStyles.CreateCard(stateCard);
+        panel.Children.Add(_adminStatusCard);
 
         var windowsProxyCard = new StackPanel { Spacing = 14 };
         windowsProxyCard.Children.Add(WinUIStyles.CreateSectionTitle("Windows proxy"));
@@ -152,18 +166,18 @@ public sealed class TrafficPage : Page, IRefreshablePage
         _context.SetToolTip(addRule, "Add a per-application routing rule.");
         addRule.Click += (_, _) => AddRule(new ApplicationRouteRule(), markDirty: true);
         ruleActions.Children.Add(addRule);
-        _saveRoutingButton = new Button { Content = "Save routing" };
+        _saveRoutingButton = new Button { Content = "Save routing", IsEnabled = false };
         _context.SetToolTip(_saveRoutingButton, "Validate and save all application routing rules.");
         _saveRoutingButton.Click += OnSaveRoutingClicked;
         ruleActions.Children.Add(_saveRoutingButton);
-        var discard = new Button { Content = "Discard changes" };
-        _context.SetToolTip(discard, "Discard unsaved routing-rule changes and reload the saved configuration.");
-        discard.Click += (_, _) =>
+        _discardRoutingButton = new Button { Content = "Discard changes", IsEnabled = false };
+        _context.SetToolTip(_discardRoutingButton, "Discard unsaved routing-rule changes and reload the saved configuration.");
+        _discardRoutingButton.Click += (_, _) =>
         {
-            _rulesDirty = false;
+            SetRulesDirty(false);
             Refresh();
         };
-        ruleActions.Children.Add(discard);
+        ruleActions.Children.Add(_discardRoutingButton);
         routesCard.Children.Add(ruleActions);
         panel.Children.Add(WinUIStyles.CreateCard(routesCard));
 
@@ -191,7 +205,8 @@ public sealed class TrafficPage : Page, IRefreshablePage
         _refreshing = true;
         try
         {
-            _systemProxyToggle.IsOn = configuration.enabled;
+            _systemProxyToggle.IsOn = configuration.Enabled;
+            _systemProxyToggle.IsEnabled = configuration.HasConfiguredServer;
             _shareLanToggle.IsOn = configuration.shareOverLan;
             _localPortBox.Value = configuration.localPort;
 
@@ -203,8 +218,11 @@ public sealed class TrafficPage : Page, IRefreshablePage
             _networkServiceStatus.Text = status.NetworkServiceRunning ? _context.L("Running") : _context.L("Stopped");
             _tcpCaptureStatus.Text = status.GameModeActive ? _context.L("Suspended") : status.TcpCaptureActive ? _context.L("Active") : _context.L("Inactive");
             _udpCaptureStatus.Text = status.GameModeActive ? _context.L("Suspended") : status.UdpCaptureActive ? _context.L("Active") : _context.L("Inactive");
-            _tcpRedirectPort.Text = status.TcpRedirectPort > 0 ? status.TcpRedirectPort.ToString() : "—";
-            _udpRedirectPort.Text = status.UdpRedirectPort > 0 ? status.UdpRedirectPort.ToString() : "—";
+            _tcpRedirectPort.Text = status.TcpRedirectPort > 0 ? status.TcpRedirectPort.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—";
+            _udpRedirectPort.Text = status.UdpRedirectPort > 0 ? status.UdpRedirectPort.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—";
+            bool showAdminStatus = configuration.trafficCaptureMode == TrafficCaptureMode.Admin
+                || status.RuntimeMode is TrafficRuntimeMode.Admin or TrafficRuntimeMode.Game;
+            _adminStatusCard.Visibility = showAdminStatus ? Visibility.Visible : Visibility.Collapsed;
 
             if (!_rulesDirty)
             {
@@ -266,6 +284,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
             empty.Opacity = 0.68;
             _ruleList.Children.Add(empty);
         }
+        SetRulesDirty(false);
     }
 
     private void AddRule(ApplicationRouteRule rule, bool markDirty)
@@ -283,7 +302,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
 
         var enabled = new CheckBox
         {
-            IsChecked = rule.enabled,
+            IsChecked = rule.Enabled,
             VerticalAlignment = VerticalAlignment.Center,
         };
         enabled.Checked += (_, _) => MarkRulesDirty();
@@ -293,7 +312,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
 
         var application = new TextBox
         {
-            Text = rule.application ?? string.Empty,
+            Text = rule.Application ?? string.Empty,
             PlaceholderText = "application.exe",
         };
         application.TextChanged += (_, _) => MarkRulesDirty();
@@ -305,7 +324,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
         action.Items.Add(new ComboBoxItem { Content = _context.L("Proxy"), Tag = TrafficRouteAction.Proxy });
         action.Items.Add(new ComboBoxItem { Content = _context.L("Direct"), Tag = TrafficRouteAction.Direct });
         action.Items.Add(new ComboBoxItem { Content = _context.L("Block"), Tag = TrafficRouteAction.Block });
-        TrafficRouteAction normalizedAction = rule.action == TrafficRouteAction.Default ? TrafficRouteAction.Proxy : rule.action;
+        TrafficRouteAction normalizedAction = rule.Action == TrafficRouteAction.Default ? TrafficRouteAction.Proxy : rule.Action;
         foreach (object item in action.Items)
         {
             if (item is ComboBoxItem comboItem && comboItem.Tag is TrafficRouteAction itemAction && itemAction == normalizedAction)
@@ -335,7 +354,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
         {
             _rules.Remove(editor);
             _ruleList.Children.Remove(grid);
-            _rulesDirty = true;
+            SetRulesDirty(true);
             if (_rules.Count == 0)
             {
                 TextBlock empty = WinUIStyles.CreateText(_context.L("No application-specific rules."));
@@ -348,7 +367,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
         _ruleList.Children.Add(grid);
         if (markDirty)
         {
-            _rulesDirty = true;
+            SetRulesDirty(true);
         }
     }
 
@@ -356,8 +375,15 @@ public sealed class TrafficPage : Page, IRefreshablePage
     {
         if (!_refreshing)
         {
-            _rulesDirty = true;
+            SetRulesDirty(true);
         }
+    }
+
+    private void SetRulesDirty(bool dirty)
+    {
+        _rulesDirty = dirty;
+        _saveRoutingButton.IsEnabled = dirty;
+        _discardRoutingButton.IsEnabled = dirty;
     }
 
     private async void OnCaptureModeChecked(object sender, RoutedEventArgs _)
@@ -378,6 +404,8 @@ public sealed class TrafficPage : Page, IRefreshablePage
         _captureModeChanging = true;
         _userMode.IsEnabled = false;
         _adminMode.IsEnabled = false;
+        _captureModeProgress.Visibility = Visibility.Visible;
+        _captureModeProgress.IsActive = true;
         try
         {
             bool applied = await _context.Controller.SetTrafficCaptureModeAsync(requestedMode);
@@ -393,6 +421,8 @@ public sealed class TrafficPage : Page, IRefreshablePage
         }
         finally
         {
+            _captureModeProgress.IsActive = false;
+            _captureModeProgress.Visibility = Visibility.Collapsed;
             _captureModeChanging = false;
             _userMode.IsEnabled = true;
             _adminMode.IsEnabled = true;
@@ -404,6 +434,24 @@ public sealed class TrafficPage : Page, IRefreshablePage
     {
         if (_refreshing || _context.Controller is null)
         {
+            return;
+        }
+
+        if (!_context.Controller.GetCurrentConfiguration().HasConfiguredServer)
+        {
+            _refreshing = true;
+            try
+            {
+                _systemProxyToggle.IsOn = false;
+            }
+            finally
+            {
+                _refreshing = false;
+            }
+            _context.ShowInfo(
+                "Windows proxy",
+                "Add a configured Shadowsocks server before enabling the Windows system proxy.",
+                InfoBarSeverity.Warning);
             return;
         }
 
@@ -469,9 +517,9 @@ public sealed class TrafficPage : Page, IRefreshablePage
             }
             rules.Add(new ApplicationRouteRule
             {
-                enabled = editor.Enabled.IsChecked == true,
-                application = application,
-                action = action,
+                Enabled = editor.Enabled.IsChecked == true,
+                Application = application,
+                Action = action,
             });
         }
 
@@ -483,7 +531,7 @@ public sealed class TrafficPage : Page, IRefreshablePage
                 mode,
                 rules,
                 configuration.gameModeApplications ?? []);
-            _rulesDirty = !saved;
+            SetRulesDirty(!saved);
             _context.ShowInfo(
                 "Traffic Routing",
                 saved ? "Traffic routing applied." : "The requested routing configuration could not be applied.",
@@ -491,7 +539,8 @@ public sealed class TrafficPage : Page, IRefreshablePage
         }
         finally
         {
-            _saveRoutingButton.IsEnabled = true;
+            _saveRoutingButton.IsEnabled = _rulesDirty;
+            _discardRoutingButton.IsEnabled = _rulesDirty;
         }
         Refresh();
     }

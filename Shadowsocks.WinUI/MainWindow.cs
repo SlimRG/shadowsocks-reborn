@@ -20,7 +20,9 @@ public sealed class MainWindow : Window
 {
     private const string OverviewTag = "overview";
     private const string ServersTag = "servers";
+    private const string PluginsTag = "plugins";
     private const string TrafficTag = "traffic";
+    private const string DnsTag = "dns";
     private const string GamesTag = "games";
     private const string PacTag = "pac";
     private const string ForwardProxyTag = "forward-proxy";
@@ -37,28 +39,36 @@ public sealed class MainWindow : Window
     private readonly InfoBar _statusInfoBar;
     private readonly ShadowsocksController? _controller;
     private readonly Func<bool> _getStartWithWindows;
-    private readonly Func<bool, bool> _setStartWithWindows;
+    private readonly Func<bool, Task<bool>> _setStartWithWindows;
     private readonly WinUIPageContext _pageContext;
     private readonly Dictionary<Type, Page> _pageCache = new();
     private readonly ILocalizationService _localization;
+    private readonly Action<bool> _visibilityChanged;
 
     private AppThemePreference _themePreference;
     private Type? _currentPageType;
     private bool _hasBeenActivated;
+    private bool _isVisibleToUser;
+    private bool _systemSessionEnding;
     private bool _applicationExitRequested;
 
     public MainWindow(
         ShadowsocksController? controller,
         Func<bool> getStartWithWindows,
-        Func<bool, bool> setStartWithWindows,
+        Func<bool, Task<bool>> setStartWithWindows,
         Func<HotkeyConfig, IReadOnlyList<string>> registerHotkeys,
         Func<HotkeyConfig, IReadOnlyList<string>> applyHotkeys,
+        Action requestApplicationExit,
+        Action<bool> visibilityChanged,
         ILocalizationService localization)
     {
         _controller = controller;
         _getStartWithWindows = getStartWithWindows;
         _setStartWithWindows = setStartWithWindows;
-        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
+        ArgumentNullException.ThrowIfNull(visibilityChanged);
+        _visibilityChanged = visibilityChanged;
+        ArgumentNullException.ThrowIfNull(localization);
+        _localization = localization;
         _themePreference = ParseTheme(controller?.GetCurrentConfiguration().uiTheme);
 
         Title = _localization["Shadowsocks Reborn"];
@@ -114,6 +124,7 @@ public sealed class MainWindow : Window
             SetAlwaysOnTop,
             registerHotkeys,
             applyHotkeys,
+            requestApplicationExit,
             _localization);
 
         Content = _rootGrid;
@@ -149,8 +160,29 @@ public sealed class MainWindow : Window
 
     public void NavigateToOverview() => NavigateAndSelect(OverviewTag);
     public void NavigateToServers() => NavigateAndSelect(ServersTag);
+    public void NavigateToPlugins() => NavigateAndSelect(PluginsTag);
     public void NavigateToTraffic() => NavigateAndSelect(TrafficTag);
-    public void NavigateToPac() => NavigateAndSelect(PacTag);
+    public void NavigateToDns()
+    {
+        if (EnsureConfiguredServerForFeature("DNS"))
+            NavigateAndSelect(DnsTag);
+    }
+
+    public async Task NavigateToDnsAndEnableAsync()
+    {
+        if (!EnsureConfiguredServerForFeature("DNS"))
+            return;
+
+        NavigateAndSelect(DnsTag);
+        ShowFromTray();
+        if (_contentHost.Content is DnsPage dnsPage)
+            await dnsPage.RequestEnableDnsCryptAsync();
+    }
+    public void NavigateToPac()
+    {
+        if (EnsureConfiguredServerForFeature("PAC / GeoSite"))
+            NavigateAndSelect(PacTag);
+    }
     public void NavigateToForwardProxy() => NavigateAndSelect(ForwardProxyTag);
     public void NavigateToHotkeys() => NavigateAndSelect(HotkeysTag);
     public void NavigateToSharing() => NavigateAndSelect(SharingTag);
@@ -169,7 +201,7 @@ public sealed class MainWindow : Window
         NavigateAndSelect(AboutTag);
         if (checkNow && _contentHost.Content is AboutPage aboutPage)
         {
-            aboutPage.CheckForUpdates();
+            _ = aboutPage.CheckForUpdatesAsync();
         }
     }
 
@@ -185,12 +217,17 @@ public sealed class MainWindow : Window
         }
     }
 
+    public bool IsVisibleToUser => _isVisibleToUser;
+
     public void HideToTray()
     {
-        if (!_applicationExitRequested)
+        if (_applicationExitRequested)
         {
-            AppWindow.Hide();
+            return;
         }
+
+        AppWindow.Hide();
+        SetVisibleToUser(false);
     }
 
     public void ShowFromTray()
@@ -217,6 +254,8 @@ public sealed class MainWindow : Window
             Activate();
         }
 
+        SetVisibleToUser(true);
+
         // AppWindow.Show(true) requests activation, but an already-visible desktop
         // window may still remain behind another top-level window. A tray click is
         // explicit user interaction, so also request foreground activation for the HWND.
@@ -225,6 +264,27 @@ public sealed class MainWindow : Window
         {
             _ = SetForegroundWindow(windowHandle);
         }
+    }
+
+    private void SetVisibleToUser(bool visible)
+    {
+        if (_isVisibleToUser == visible)
+        {
+            return;
+        }
+
+        _isVisibleToUser = visible;
+        _visibilityChanged(visible);
+    }
+
+    public void PrepareForSystemSessionEnd()
+    {
+        _systemSessionEnding = true;
+    }
+
+    public void CancelSystemSessionEnd()
+    {
+        _systemSessionEnding = false;
     }
 
     public void SetShellStatus(string status, InfoBarSeverity severity)
@@ -244,19 +304,9 @@ public sealed class MainWindow : Window
             return;
         }
 
-        if (status.Contains("failed", StringComparison.OrdinalIgnoreCase))
-        {
-            ShowInfo(_localization["System shell"], status, InfoBarSeverity.Error);
-        }
-        else if (status.Contains("warning", StringComparison.OrdinalIgnoreCase)
-                 || status.Contains("hotkey", StringComparison.OrdinalIgnoreCase))
-        {
-            ShowInfo(_localization["System shell"], status, InfoBarSeverity.Warning);
-        }
-        else if (status.Contains("activation", StringComparison.OrdinalIgnoreCase))
-        {
-            ShowInfo(_localization["Activation"], status, InfoBarSeverity.Informational);
-        }
+        // Severity must never depend on English keywords after the message has been localized.
+        // Callers that need Warning/Error use the explicit overload; the default is informational.
+        ShowInfo(_localization["System shell"], status, InfoBarSeverity.Informational);
     }
 
 
@@ -274,6 +324,7 @@ public sealed class MainWindow : Window
 
         var icon = new FontIcon
         {
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
             Glyph = "\uE946",
             FontSize = 30,
             Margin = new Thickness(2, 2, 16, 0),
@@ -377,6 +428,18 @@ public sealed class MainWindow : Window
         await dialog.ShowAsync();
     }
 
+    internal void DisposeCachedPages()
+    {
+        _contentHost.Content = null;
+        foreach (Page page in _pageCache.Values)
+        {
+            if (page is IDisposable disposablePage)
+                disposablePage.Dispose();
+        }
+        _pageCache.Clear();
+        _currentPageType = null;
+    }
+
     public void CloseForApplicationExit()
     {
         if (_applicationExitRequested)
@@ -385,6 +448,8 @@ public sealed class MainWindow : Window
         }
 
         _applicationExitRequested = true;
+        DisposeCachedPages();
+
         if (_controller is not null)
         {
             UnsubscribeControllerEvents(_controller);
@@ -399,7 +464,11 @@ public sealed class MainWindow : Window
         {
             Title = _localization["Shadowsocks Reborn"],
             Subtitle = _localization["Starting…"],
-            IconSource = new SymbolIconSource { Symbol = Symbol.Globe },
+            IconSource = new FontIconSource
+            {
+                FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe MDL2 Assets"),
+                Glyph = "\uE774",
+            },
             IsPaneToggleButtonVisible = true,
         };
         titleBar.PaneToggleRequested += (_, _) => _navigationView.IsPaneOpen = !_navigationView.IsPaneOpen;
@@ -420,31 +489,42 @@ public sealed class MainWindow : Window
             CompactPaneLength = 48,
         };
 
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Overview"], OverviewTag, Symbol.Home, "Open the connection overview and current runtime status."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Servers"], ServersTag, Symbol.World, "Manage Shadowsocks servers and local client connection settings."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Traffic"], TrafficTag, Symbol.Sync, "Configure capture mode, Windows proxy settings and per-application routing."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Game Mode"], GamesTag, Symbol.Play, "Manage applications that automatically suspend WinDivert while they are running."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["PAC / GeoSite"], PacTag, Symbol.Globe, "Configure PAC behavior, local PAC security and GeoSite sources."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Forward Proxy"], ForwardProxyTag, Symbol.Forward, "Configure an optional upstream proxy used to reach Shadowsocks servers."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Online Config"], OnlineConfigTag, Symbol.Sync, "Manage SIP008 and other online server configuration sources."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Hotkeys"], HotkeysTag, Symbol.Keyboard, "Configure global keyboard shortcuts for common Shadowsocks actions."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Share / QR"], SharingTag, Symbol.Share, "Share servers and import ss:// links or QR codes."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Overview"], OverviewTag, "\uE80F", "Open the connection overview and current runtime status."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Servers"], ServersTag, "\uE909", "Manage Shadowsocks servers and local client connection settings."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Plugins"], PluginsTag, "\uE710", "Install and manage SIP003 plugins."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Traffic"], TrafficTag, "\uE895", "Configure capture mode, Windows proxy settings and per-application routing."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["DNS"], DnsTag, "\uE774", "Manage DNS policy and DNSCrypt Proxy."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Game Mode"], GamesTag, "\uE768", "Manage applications that automatically suspend WinDivert while they are running."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["PAC / GeoSite"], PacTag, "\uE774", "Configure PAC behavior, local PAC security and GeoSite sources."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Forward Proxy"], ForwardProxyTag, "\uE72A", "Configure an optional upstream proxy used to reach Shadowsocks servers."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Online Config"], OnlineConfigTag, "\uE895", "Manage SIP008 and other online server configuration sources."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Hotkeys"], HotkeysTag, "\uE765", "Configure global keyboard shortcuts for common Shadowsocks actions."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Share / QR"], SharingTag, "\uE72D", "Share servers and import ss:// links or QR codes."));
         navigationView.MenuItems.Add(new NavigationViewItemSeparator());
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Logs"], LogsTag, Symbol.Document, "View logs, traffic history and logging options."));
-        navigationView.MenuItems.Add(CreateNavigationItem(_localization["About"], AboutTag, Symbol.Help, "View version information and configure update checks."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["Logs"], LogsTag, "\uE8A5", "View logs, traffic history and logging options."));
+        navigationView.MenuItems.Add(CreateNavigationItem(_localization["About"], AboutTag, "\uE897", "View version information and configure update checks."));
+
+        if (navigationView.SettingsItem is NavigationViewItem settingsItem)
+        {
+            settingsItem.Content = _localization["Settings"];
+            settingsItem.Icon = WinUIStyles.CreateWindows10Icon("\uE713");
+            string settingsTooltip = _localization["Open application appearance, startup and storage settings."];
+            ToolTipService.SetToolTip(settingsItem, settingsTooltip);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(settingsItem, settingsTooltip);
+        }
 
         navigationView.SelectionChanged += OnNavigationSelectionChanged;
         navigationView.DisplayModeChanged += OnNavigationDisplayModeChanged;
         return navigationView;
     }
 
-    private NavigationViewItem CreateNavigationItem(string content, string tag, Symbol symbol, string tooltipKey)
+    private NavigationViewItem CreateNavigationItem(string content, string tag, string glyph, string tooltipKey)
     {
         var item = new NavigationViewItem
         {
             Content = content,
             Tag = tag,
-            Icon = new SymbolIcon(symbol),
+            Icon = WinUIStyles.CreateWindows10Icon(glyph),
         };
         string tooltip = _localization[tooltipKey];
         ToolTipService.SetToolTip(item, tooltip);
@@ -471,7 +551,9 @@ public sealed class MainWindow : Window
         Type pageType = tag switch
         {
             ServersTag => typeof(ServersPage),
+            PluginsTag => typeof(PluginsPage),
             TrafficTag => typeof(TrafficPage),
+            DnsTag => typeof(DnsPage),
             GamesTag => typeof(GamesPage),
             PacTag => typeof(PacGeositePage),
             ForwardProxyTag => typeof(ForwardProxyPage),
@@ -508,7 +590,9 @@ public sealed class MainWindow : Window
 
         Page page = pageType == typeof(OverviewPage) ? new OverviewPage(_pageContext)
             : pageType == typeof(ServersPage) ? new ServersPage(_pageContext)
+            : pageType == typeof(PluginsPage) ? new PluginsPage(_pageContext)
             : pageType == typeof(TrafficPage) ? new TrafficPage(_pageContext)
+            : pageType == typeof(DnsPage) ? new DnsPage(_pageContext)
             : pageType == typeof(GamesPage) ? new GamesPage(_pageContext)
             : pageType == typeof(PacGeositePage) ? new PacGeositePage(_pageContext)
             : pageType == typeof(ForwardProxyPage) ? new ForwardProxyPage(_pageContext)
@@ -538,6 +622,45 @@ public sealed class MainWindow : Window
         }
     }
 
+    private bool EnsureConfiguredServerForFeature(string featureName)
+    {
+        if (_controller?.GetCurrentConfiguration().HasConfiguredServer == true)
+            return true;
+
+        NavigateAndSelect(ServersTag);
+        ShowInfo(
+            _localization[featureName],
+            _localization["Add a configured Shadowsocks server before using DNS or PAC settings."],
+            InfoBarSeverity.Warning);
+        return false;
+    }
+
+    private void UpdateServerDependentNavigationState()
+    {
+        bool available = _controller?.GetCurrentConfiguration().HasConfiguredServer == true;
+        foreach (object item in _navigationView.MenuItems)
+        {
+            if (item is not NavigationViewItem navigationItem)
+                continue;
+
+            string? tag = navigationItem.Tag?.ToString();
+            if (string.Equals(tag, DnsTag, StringComparison.Ordinal)
+                || string.Equals(tag, PacTag, StringComparison.Ordinal))
+            {
+                navigationItem.IsEnabled = available;
+            }
+        }
+
+        if (!available && (_currentPageType == typeof(DnsPage) || _currentPageType == typeof(PacGeositePage)))
+        {
+            NavigateAndSelect(ServersTag);
+            ShowInfo(
+                _localization["Servers"],
+                _localization["Add a configured Shadowsocks server before using DNS or PAC settings."],
+                InfoBarSeverity.Warning);
+        }
+    }
+
     private void OnNavigationDisplayModeChanged(NavigationView _, NavigationViewDisplayModeChangedEventArgs _1)
     {
         // Keep the page edge fixed when NavigationView changes between expanded, compact
@@ -553,9 +676,8 @@ public sealed class MainWindow : Window
         controller.EnableStatusChanged += OnControllerStateChanged;
         controller.EnableGlobalChanged += OnControllerStateChanged;
         controller.ShareOverLANStatusChanged += OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged += OnControllerStateChanged;
-        controller.ShowPluginOutputChanged += OnControllerStateChanged;
         controller.TrafficModeChanged += OnControllerStateChanged;
+        controller.DnsCryptStatusChanged += OnControllerStateChanged;
     }
 
     private void UnsubscribeControllerEvents(ShadowsocksController controller)
@@ -564,9 +686,8 @@ public sealed class MainWindow : Window
         controller.EnableStatusChanged -= OnControllerStateChanged;
         controller.EnableGlobalChanged -= OnControllerStateChanged;
         controller.ShareOverLANStatusChanged -= OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged -= OnControllerStateChanged;
-        controller.ShowPluginOutputChanged -= OnControllerStateChanged;
         controller.TrafficModeChanged -= OnControllerStateChanged;
+        controller.DnsCryptStatusChanged -= OnControllerStateChanged;
     }
 
     private void OnControllerStateChanged(object? _, EventArgs _1)
@@ -588,6 +709,7 @@ public sealed class MainWindow : Window
 
     private void RefreshShellSummary()
     {
+        UpdateServerDependentNavigationState();
         if (_controller is null)
         {
             _titleBar.Subtitle = _localization["Controller unavailable"];
@@ -659,7 +781,7 @@ public sealed class MainWindow : Window
 
     private void OnAppWindowClosing(AppWindow _, AppWindowClosingEventArgs args)
     {
-        if (_applicationExitRequested)
+        if (_applicationExitRequested || _systemSessionEnding)
         {
             return;
         }

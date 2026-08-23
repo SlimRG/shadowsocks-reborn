@@ -6,12 +6,12 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.DataTransfer;
 using ZXing;
 using ZXing.Common;
-using Windows.ApplicationModel.DataTransfer;
 using ZXing.QrCode;
 
-namespace Shadowsocks.Windows.Shell;
+namespace Shadowsocks.Windows.WinUI.Shell;
 
 /// <summary>
 /// Windows-only QR scanner used by the WinUI sharing page. Supports virtual-desktop capture,

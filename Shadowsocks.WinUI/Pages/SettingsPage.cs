@@ -12,9 +12,11 @@ public sealed class SettingsPage : Page, IRefreshablePage
 {
     private readonly ComboBox _themeBox;
     private readonly ToggleSwitch _startupToggle;
+    private readonly ProgressRing _startupProgress;
     private readonly TextBlock _storagePath;
     private readonly WinUIPageContext _context;
     private bool _refreshing;
+    private bool _startupChanging;
 
     internal SettingsPage(WinUIPageContext context)
     {
@@ -53,7 +55,22 @@ public sealed class SettingsPage : Page, IRefreshablePage
         };
         _startupToggle.Toggled += OnStartupToggled;
         _context.SetToolTip(_startupToggle, "Start Shadowsocks automatically when you sign in to Windows. This option is unavailable in Clean Mode.");
-        behavior.Children.Add(_startupToggle);
+        _startupProgress = new ProgressRing
+        {
+            Width = 20,
+            Height = 20,
+            IsActive = false,
+            Visibility = Visibility.Collapsed,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var startupRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+        };
+        startupRow.Children.Add(_startupToggle);
+        startupRow.Children.Add(_startupProgress);
+        behavior.Children.Add(startupRow);
         if (AppStoragePaths.IsCleanMode)
         {
             behavior.Children.Add(WinUIStyles.CreateText("Start on Boot is unavailable in Clean Mode.", "CaptionTextBlockStyle"));
@@ -115,17 +132,32 @@ public sealed class SettingsPage : Page, IRefreshablePage
         _context.SetTheme(theme);
     }
 
-    private void OnStartupToggled(object _, Microsoft.UI.Xaml.RoutedEventArgs _1)
+    private async void OnStartupToggled(object _, Microsoft.UI.Xaml.RoutedEventArgs _1)
     {
-        if (_refreshing || _context is null || AppStoragePaths.IsCleanMode)
+        if (_refreshing || _startupChanging || _context is null || AppStoragePaths.IsCleanMode)
         {
             return;
         }
 
-        if (!_context.SetStartWithWindows(_startupToggle.IsOn))
+        bool requested = _startupToggle.IsOn;
+        _startupChanging = true;
+        _startupToggle.IsEnabled = false;
+        _startupProgress.Visibility = Visibility.Visible;
+        _startupProgress.IsActive = true;
+        try
         {
-            _context.ShowInfo("Startup", "Failed to update Start on Boot.", InfoBarSeverity.Error);
-            Refresh();
+            if (!await _context.SetStartWithWindows(requested))
+            {
+                _context.ShowInfo("Startup", "Failed to update Start on Boot.", InfoBarSeverity.Error);
+                Refresh();
+            }
+        }
+        finally
+        {
+            _startupProgress.IsActive = false;
+            _startupProgress.Visibility = Visibility.Collapsed;
+            _startupChanging = false;
+            _startupToggle.IsEnabled = !AppStoragePaths.IsCleanMode;
         }
     }
 

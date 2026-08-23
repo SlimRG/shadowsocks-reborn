@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.AppLifecycle;
 using NLog;
 using Shadowsocks.Controller;
+using Shadowsocks.Controller.Service;
 using Shadowsocks.Controller.Traffic;
 using Shadowsocks.Core;
 using Shadowsocks.Core.Logging;
@@ -27,7 +28,7 @@ using Windows.ApplicationModel.DataTransfer;
 
 namespace Shadowsocks.WinUI;
 
-public sealed partial class App : Application
+public sealed partial class App : Application, IDisposable
 {
     private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -53,6 +54,8 @@ public sealed partial class App : Application
     private bool _controllerErrorDialogActive;
     private bool _alreadyRunningDialogActive;
     private bool _shuttingDown;
+    private bool _systemSessionEnding;
+    private bool _disposed;
 
     public App()
     {
@@ -104,15 +107,11 @@ public sealed partial class App : Application
         s_startupLocalization = localization;
     }
 
-    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs _)
+    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
 
         Program.RegisterActivationHandler(OnRedirectedActivation);
-        if (!AppStoragePaths.IsCleanMode)
-        {
-            AutoStartup.RegisterForRestart(true);
-        }
 
         try
         {
@@ -130,9 +129,11 @@ public sealed partial class App : Application
         _window = new MainWindow(
             _controller,
             AutoStartup.Check,
-            SetStartWithWindows,
+            SetStartWithWindowsAsync,
             RegisterHotkeys,
             ApplyHotkeys,
+            ShutdownAndExit,
+            OnWindowVisibilityChanged,
             _localization);
         if (_userInteraction is not null)
         {
@@ -162,19 +163,32 @@ public sealed partial class App : Application
             _window.SetShellStatus(_localization.Format("Shell initialization warning: {0}", exception.Message), InfoBarSeverity.Warning);
         }
 
+        bool startHidden = AutoStartup.IsHiddenStartup(RuntimeEnvironment.Arguments);
+        bool startVisible = !startHidden && AutoStartup.IsVisibleStartup(RuntimeEnvironment.Arguments);
+        if (startHidden)
+        {
+            // Creating a WinUI Window materializes an HWND even before Activate().
+            // Explicitly hide it when the previous session ended in the notification area.
+            _window.HideToTray();
+        }
+
         ScheduleStartupOnlineConfigRefresh();
 
         Configuration? startupConfiguration = _controller?.GetCurrentConfiguration();
         bool firstRun = startupConfiguration?.firstRun == true;
-        if (firstRun)
+        if (firstRun && !startHidden)
         {
             // Match the original Shadowsocks startup behavior: only the first run
-            // opens configuration. Normal launches remain tray-only until the user
-            // explicitly requests a window.
+            // opens configuration. A restored hidden state still takes precedence.
             _window.NavigateToServers();
             _window.ShowFromTray();
         }
-        else if (startupConfiguration?.autoCheckUpdate == true)
+        else if (startVisible)
+        {
+            _window.ShowFromTray();
+        }
+
+        if (!firstRun && startupConfiguration?.autoCheckUpdate == true)
         {
             StartAutomaticUpdateCheck();
         }
@@ -183,10 +197,17 @@ public sealed partial class App : Application
 
         // Controller startup errors (for example, an occupied local port) still
         // need a visible XamlRoot so the user sees the same explicit error flow
-        // as the legacy client. This is an exceptional path, not normal startup.
-        if (!firstRun && !_pendingControllerErrors.IsEmpty)
+        // as expected by the controller contract. This is an exceptional path, not normal startup.
+        if (!_pendingControllerErrors.IsEmpty)
         {
             ShowMainWindow();
+        }
+
+        // Whichever Windows mechanism owns the next reboot restore now records the
+        // actual shell state after first-run and activation handling have completed.
+        if (!AppStoragePaths.IsCleanMode)
+        {
+            AutoStartup.SynchronizeUiState(_window.IsVisibleToUser);
         }
     }
 
@@ -198,8 +219,49 @@ public sealed partial class App : Application
         }
 
         _powerModeMonitor = new PowerModeMonitor(_window);
+        _powerModeMonitor.SessionEnding += OnSystemSessionEnding;
+        _powerModeMonitor.SessionEndCancelled += OnSystemSessionEndCancelled;
         _powerModeMonitor.Suspending += OnSystemSuspending;
         _powerModeMonitor.Resumed += OnSystemResumed;
+    }
+
+    private void OnSystemSessionEnding(object? sender, EventArgs e)
+    {
+        if (_systemSessionEnding)
+        {
+            return;
+        }
+
+        _systemSessionEnding = true;
+
+        // WM_QUERYENDSESSION arrives before Windows closes the top-level window.
+        // Snapshot the real pre-shutdown visibility now; any later Closing event must
+        // neither turn an open-window state into "hidden" nor cancel Windows shutdown.
+        if (_window is not null)
+        {
+            bool windowVisible = _window.IsVisibleToUser;
+            _window.PrepareForSystemSessionEnd();
+            if (!AppStoragePaths.IsCleanMode)
+            {
+                AutoStartup.SynchronizeUiState(windowVisible);
+            }
+        }
+    }
+
+    private void OnSystemSessionEndCancelled(object? sender, EventArgs e)
+    {
+        if (!_systemSessionEnding)
+        {
+            return;
+        }
+
+        _systemSessionEnding = false;
+        _window?.CancelSystemSessionEnd();
+
+        if (!AppStoragePaths.IsCleanMode && _window is not null)
+        {
+            AutoStartup.SynchronizeUiState(_window.IsVisibleToUser);
+        }
     }
 
     private void OnSystemSuspending(object? sender, EventArgs e)
@@ -267,7 +329,7 @@ public sealed partial class App : Application
                 _ = _dispatcherQueue?.TryEnqueue(() =>
                 {
                     ShowMainWindow();
-                    DrainControllerErrorQueue();
+                    _ = DrainControllerErrorQueueAsync();
                 });
             }
         }, cancellationToken);
@@ -297,7 +359,7 @@ public sealed partial class App : Application
                     return;
                 }
 
-                IReadOnlyList<string> failures = await controller.UpdateAllOnlineConfig().ConfigureAwait(false);
+                List<string> failures = await controller.UpdateAllOnlineConfig().ConfigureAwait(false);
                 if (failures.Count > 0)
                 {
                     Logger.Warn("Startup online-config refresh completed with {0} failure(s): {1}", failures.Count, string.Join(", ", failures));
@@ -371,7 +433,7 @@ public sealed partial class App : Application
         }
         else
         {
-            _window.SetShellStatus(_localization["Single instance · tray active · controller unavailable"]);
+            _window.SetShellStatus(_localization["Single instance · tray active · controller unavailable"], InfoBarSeverity.Warning);
         }
     }
 
@@ -381,11 +443,9 @@ public sealed partial class App : Application
         controller.EnableStatusChanged += OnControllerStateChanged;
         controller.EnableGlobalChanged += OnControllerStateChanged;
         controller.ShareOverLANStatusChanged += OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged += OnControllerStateChanged;
-        controller.ShowPluginOutputChanged += OnControllerStateChanged;
         controller.TrafficModeChanged += OnControllerStateChanged;
+        controller.DnsCryptStatusChanged += OnControllerStateChanged;
         controller.TrafficChanged += OnControllerTrafficChanged;
-        controller.PACFileReadyToOpen += OnControllerPathReadyToOpen;
         controller.UserRuleFileReadyToOpen += OnControllerPathReadyToOpen;
         controller.Errored += OnControllerErrored;
     }
@@ -396,11 +456,9 @@ public sealed partial class App : Application
         controller.EnableStatusChanged -= OnControllerStateChanged;
         controller.EnableGlobalChanged -= OnControllerStateChanged;
         controller.ShareOverLANStatusChanged -= OnControllerStateChanged;
-        controller.VerboseLoggingStatusChanged -= OnControllerStateChanged;
-        controller.ShowPluginOutputChanged -= OnControllerStateChanged;
         controller.TrafficModeChanged -= OnControllerStateChanged;
+        controller.DnsCryptStatusChanged -= OnControllerStateChanged;
         controller.TrafficChanged -= OnControllerTrafficChanged;
-        controller.PACFileReadyToOpen -= OnControllerPathReadyToOpen;
         controller.UserRuleFileReadyToOpen -= OnControllerPathReadyToOpen;
         controller.Errored -= OnControllerErrored;
     }
@@ -412,7 +470,7 @@ public sealed partial class App : Application
             contentRoot.Loaded -= OnMainWindowContentLoaded;
         }
 
-        DrainControllerErrorQueue();
+        _ = DrainControllerErrorQueueAsync();
     }
 
     private void OnControllerErrored(object? _, System.IO.ErrorEventArgs e)
@@ -424,7 +482,7 @@ public sealed partial class App : Application
         {
             _ = dispatcherQueue.TryEnqueue(() =>
             {
-                // Legacy Shadowsocks surfaced controller errors immediately even when
+                // Controller errors are surfaced immediately even when
                 // it was otherwise tray-only. Lazily activate the WinUI host only for
                 // that exceptional dialog path.
                 if (_window?.Content?.XamlRoot is null)
@@ -432,7 +490,7 @@ public sealed partial class App : Application
                     ShowMainWindow();
                 }
 
-                DrainControllerErrorQueue();
+                _ = DrainControllerErrorQueueAsync();
             });
         }
     }
@@ -457,7 +515,7 @@ public sealed partial class App : Application
         });
     }
 
-    private async void DrainControllerErrorQueue()
+    private async Task DrainControllerErrorQueueAsync()
     {
         if (_controllerErrorDialogActive || _window is null || _window.Content?.XamlRoot is null)
         {
@@ -469,7 +527,14 @@ public sealed partial class App : Application
         {
             while (_pendingControllerErrors.TryDequeue(out Exception? exception))
             {
-                await _window.ShowControllerErrorAsync(exception);
+                try
+                {
+                    await _window.ShowControllerErrorAsync(exception);
+                }
+                catch (Exception dialogException)
+                {
+                    Logger.Error(dialogException, "Failed to display a controller error dialog.");
+                }
             }
         }
         finally
@@ -490,9 +555,9 @@ public sealed partial class App : Application
             return;
         }
 
-        ShadowsocksController.TrafficPerSecond? current = _controller.trafficPerSecondQueue.LastOrDefault();
-        bool inbound = current?.inboundIncreasement > 0;
-        bool outbound = current?.outboundIncreasement > 0;
+        ShadowsocksController.TrafficPerSecond? current = _controller.GetLatestTrafficSample();
+        bool inbound = current?.InboundIncrement > 0;
+        bool outbound = current?.OutboundIncrement > 0;
         _ = _dispatcherQueue.TryEnqueue(() => _trayIcon?.UpdateActivity(inbound, outbound));
     }
 
@@ -513,9 +578,13 @@ public sealed partial class App : Application
                 TraySystemProxyMode.Disabled,
                 TrayTrafficMode.User,
                 _localization["WinDivert: inactive"],
+                TrayDnsMode.System,
+                _localization["DNSCrypt: Not installed"],
+                false,
+                false,
                 Array.Empty<TrayStrategyMenuItem>(),
                 Array.Empty<TrayServerMenuItem>(),
-                false, false, false,
+                false, false, false, false,
                 AutoStartup.Check(),
                 !AppStoragePaths.IsCleanMode,
                 ProtocolHandler.Check(),
@@ -544,6 +613,20 @@ public sealed partial class App : Application
             _ => _localization["WinDivert: inactive"],
         };
 
+        DnsCryptManagementStatus dns = _controller.GetDnsCryptManagementStatus();
+        TrayDnsMode trayDnsMode = dns.Mode switch
+        {
+            DnsPolicyMode.Direct => TrayDnsMode.Direct,
+            DnsPolicyMode.Proxy => TrayDnsMode.Proxy,
+            DnsPolicyMode.CustomDoh => TrayDnsMode.CustomDoh,
+            DnsPolicyMode.DnsCrypt => TrayDnsMode.DnsCrypt,
+            _ => TrayDnsMode.System,
+        };
+        DnsCryptTrayPresentation dnsPresentation = DnsCryptPresentation.GetTrayPresentation(dns);
+        string dnsStatus = dnsPresentation.Version is null
+            ? _localization[dnsPresentation.LocalizationKey]
+            : _localization.Format(dnsPresentation.LocalizationKey, dnsPresentation.Version);
+
         var strategies = _controller.GetStrategies()
             .Select(strategy => new TrayStrategyMenuItem(
                 strategy.ID,
@@ -551,8 +634,15 @@ public sealed partial class App : Application
                 string.Equals(config.strategy, strategy.ID, StringComparison.Ordinal)))
             .ToArray();
 
-        var serverIndices = Enumerable.Range(0, Math.Min(config.configs.Count, 20)).ToList();
-        if (config.index >= 20 && config.index < config.configs.Count && !serverIndices.Contains(config.index))
+        int configuredServerCount = config.configs.Count(server => server?.IsConfigured == true);
+        var serverIndices = Enumerable.Range(0, config.configs.Count)
+            .Where(index => config.configs[index]?.IsConfigured == true)
+            .Take(20)
+            .ToList();
+        if (config.index >= 0
+            && config.index < config.configs.Count
+            && config.configs[config.index]?.IsConfigured == true
+            && !serverIndices.Contains(config.index))
         {
             serverIndices.Add(config.index);
         }
@@ -560,20 +650,26 @@ public sealed partial class App : Application
             .Select(index => new TrayServerMenuItem(index, config.configs[index].ToString(), string.IsNullOrEmpty(config.strategy) && config.index == index))
             .ToArray();
 
-        string serverInfo = _controller.GetCurrentStrategy()?.Name
-            ?? (_controller.GetCurrentServer()?.ToString() ?? _localization["No server configured"]);
+        string serverInfo = config.HasConfiguredServer
+            ? (_controller.GetCurrentStrategy()?.Name ?? _controller.GetCurrentServer().ToString())
+            : _localization["No server configured"];
         string proxyText = proxyMode == SystemProxyMode.Disabled
             ? _localization.Format("Running: Port {0}", config.localPort)
             : _localization["System Proxy On:"] + " " + (proxyMode == SystemProxyMode.Global ? _localization["Global"] : _localization["PAC"]);
-        string tooltip = $"{_localization["shadowsocks-reborn"]} {UpdateChecker.Version}\n{proxyText}\n{serverInfo}";
+        string tooltip = $"{_localization["shadowsocks-reborn"]} {ApplicationInfo.Version}\n{proxyText}\n{serverInfo}";
 
         return new TrayMenuState(
             tooltip,
             trayProxyMode,
             trayTrafficMode,
             trafficStatus,
+            trayDnsMode,
+            dnsStatus,
+            dns.Component.IsInstalled,
+            dns.UpdateAvailable,
             strategies,
             servers,
+            config.HasConfiguredServer,
             config.useOnlinePac,
             config.secureLocalPac,
             config.regeneratePacOnUpdate,
@@ -582,7 +678,7 @@ public sealed partial class App : Application
             ProtocolHandler.Check(),
             config.shareOverLan,
             config.checkPreRelease,
-            config.configs.Count);
+            configuredServerCount);
     }
 
     private async void OnTrayCommandRequested(object? _, TrayCommandEventArgs e)
@@ -604,8 +700,16 @@ public sealed partial class App : Application
                     _window.NavigateToServers();
                     ShowMainWindow();
                     break;
+                case TrayCommandKind.OpenPlugins:
+                    _window.NavigateToPlugins();
+                    ShowMainWindow();
+                    break;
                 case TrayCommandKind.OpenTraffic:
                     _window.NavigateToTraffic();
+                    ShowMainWindow();
+                    break;
+                case TrayCommandKind.OpenDns:
+                    _window.NavigateToDns();
                     ShowMainWindow();
                     break;
                 case TrayCommandKind.OpenSharing:
@@ -672,6 +776,48 @@ public sealed partial class App : Application
                         await _controller.SetTrafficCaptureModeAsync(TrafficCaptureMode.Admin);
                     }
                     break;
+                case TrayCommandKind.SetDnsSystem:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.System);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsDirect:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.Direct);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsProxy:
+                    if (_controller is not null)
+                    {
+                        await _controller.SetDnsPolicyAsync(DnsPolicyMode.Proxy);
+                    }
+                    break;
+                case TrayCommandKind.SetDnsDnsCrypt:
+                    if (_controller is not null)
+                    {
+                        if (_controller.GetDnsCryptManagementStatus().Component.IsInstalled)
+                        {
+                            await _controller.SetDnsPolicyAsync(DnsPolicyMode.DnsCrypt);
+                        }
+                        else
+                        {
+                            ShowMainWindow();
+                            await _window.NavigateToDnsAndEnableAsync();
+                        }
+                    }
+                    break;
+                case TrayCommandKind.CheckDnsCryptUpdate:
+                    if (_controller is not null)
+                    {
+                        DnsCryptReleaseInfo release = await _controller.CheckDnsCryptUpdateAsync();
+                        DnsCryptManagementStatus dns = _controller.GetDnsCryptManagementStatus();
+                        _window.SetShellStatus(dns.UpdateAvailable
+                            ? _localization.Format("DNSCrypt Proxy {0} is available.", release.Version)
+                            : _localization["DNSCrypt Proxy is up to date."]);
+                    }
+                    break;
                 case TrayCommandKind.SelectServer:
                     if (_controller is not null && e.Index >= 0)
                     {
@@ -690,7 +836,7 @@ public sealed partial class App : Application
                 case TrayCommandKind.UseOnlinePac:
                     if (_controller is not null)
                     {
-                        if (string.IsNullOrWhiteSpace(_controller.GetCurrentConfiguration().pacUrl))
+                        if (!IsValidPacUrl(_controller.GetCurrentConfiguration().pacUrl))
                         {
                             await EditOnlinePacUrlAsync(enableOnlineAfterSave: true);
                         }
@@ -700,9 +846,6 @@ public sealed partial class App : Application
                         }
                     }
                     break;
-                case TrayCommandKind.EditLocalPacFile:
-                    _controller?.TouchPACFile();
-                    break;
                 case TrayCommandKind.EditUserRuleFile:
                     _controller?.TouchUserRuleFile();
                     break;
@@ -710,7 +853,9 @@ public sealed partial class App : Application
                     if (_controller is not null)
                     {
                         bool updated = await _controller.UpdatePACFromGeositeAsync();
-                        _window.SetShellStatus(updated ? _localization["Local PAC updated from GeoSite"] : _localization["GeoSite update did not complete"]);
+                        _window.SetShellStatus(
+                            updated ? _localization["Local PAC updated from GeoSite"] : _localization["GeoSite update did not complete"],
+                            updated ? InfoBarSeverity.Success : InfoBarSeverity.Warning);
                     }
                     break;
                 case TrayCommandKind.ToggleSecureLocalPac:
@@ -726,7 +871,7 @@ public sealed partial class App : Application
                     }
                     break;
                 case TrayCommandKind.ToggleStartWithWindows:
-                    SetStartWithWindows(!AutoStartup.Check());
+                    await SetStartWithWindowsAsync(!AutoStartup.Check());
                     break;
                 case TrayCommandKind.ToggleProtocolHandler:
                     if (!ProtocolHandler.Set(!ProtocolHandler.Check()))
@@ -769,7 +914,7 @@ public sealed partial class App : Application
             return;
         }
 
-        // Preserve the legacy Online PAC scenario: if no URL exists, editing is
+        // For Online PAC, if no URL exists, editing is
         // performed first and Online PAC is enabled only after a non-empty URL is saved.
         ShowMainWindow();
         await Task.Yield();
@@ -778,7 +923,7 @@ public sealed partial class App : Application
         if (xamlRoot is null)
         {
             _window.NavigateToPac();
-            _window.SetShellStatus(_localization["Please input PAC Url"]);
+            _window.SetShellStatus(_localization["Please input PAC Url"], InfoBarSeverity.Warning);
             return;
         }
 
@@ -790,6 +935,9 @@ public sealed partial class App : Application
             PlaceholderText = "https://example.com/proxy.pac",
             SelectionStart = originalUrl.Length,
         };
+        string pacUrlTooltip = _localization["Enter an absolute HTTP or HTTPS PAC URL."];
+        ToolTipService.SetToolTip(input, pacUrlTooltip);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(input, pacUrlTooltip);
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
@@ -807,9 +955,9 @@ public sealed partial class App : Application
         }
 
         string pacUrl = input.Text.Trim();
-        if (string.IsNullOrEmpty(pacUrl))
+        if (!IsValidPacUrl(pacUrl))
         {
-            _window.SetShellStatus(_localization["Please input PAC Url"]);
+            _window.SetShellStatus(_localization["Enter an absolute HTTP or HTTPS PAC URL."], InfoBarSeverity.Warning);
             return;
         }
 
@@ -838,16 +986,29 @@ public sealed partial class App : Application
 
     private void OnAutomaticUpdateAvailable(object? _, UpdateAvailableEventArgs e)
     {
-        _ = _dispatcherQueue?.TryEnqueue(() =>
+        _ = _dispatcherQueue?.TryEnqueue(async () =>
         {
-            if (_window is null || _startupUpdateChecker is null)
+            UpdateChecker? checker = _startupUpdateChecker;
+            if (_window is null || checker is null || _shuttingDown)
             {
                 return;
             }
 
-            _window.SetShellStatus(_localization.Format("Update available: {0}", _startupUpdateChecker.NewReleaseVersion));
-            ShowMainWindow();
-            _window.NavigateToAbout(checkNow: true);
+            try
+            {
+                _window.SetShellStatus(_localization.Format("Installing update {0}…", checker.NewReleaseVersion));
+                if (await checker.DoUpdate())
+                {
+                    ShutdownAndExit();
+                }
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "Automatic application update failed.");
+                _window?.SetShellStatus(
+                    _localization.Format("Automatic update failed: {0}", exception.Message),
+                    InfoBarSeverity.Error);
+            }
         });
     }
 
@@ -949,22 +1110,40 @@ public sealed partial class App : Application
         return null;
     }
 
-    private bool SetStartWithWindows(bool enabled)
+    private static bool IsValidPacUrl(string? value)
+        => Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri)
+           && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private async Task<bool> SetStartWithWindowsAsync(bool enabled)
     {
         if (AppStoragePaths.IsCleanMode)
         {
-            _window?.SetShellStatus(_localization["Start on Boot is unavailable in Clean Mode."]);
+            _window?.SetShellStatus(_localization["Start on Boot is unavailable in Clean Mode."], InfoBarSeverity.Warning);
             return false;
         }
 
-        if (!AutoStartup.Set(enabled, enabled ? "--start-hidden" : null))
+        bool windowVisible = _window?.IsVisibleToUser == true;
+        bool updated = await Task.Run(() => AutoStartup.Set(enabled, windowVisible));
+        if (!updated)
         {
             return false;
         }
 
         UpdateTrayState();
-        _window?.SetShellStatus(enabled ? _localization["Start on Boot enabled"] : _localization["Start on Boot disabled"]);
+        _window?.SetShellStatus(
+            enabled ? _localization["Start on Boot enabled"] : _localization["Start on Boot disabled"],
+            InfoBarSeverity.Success);
         return true;
+    }
+
+    private void OnWindowVisibilityChanged(bool visible)
+    {
+        if (_systemSessionEnding || _shuttingDown || AppStoragePaths.IsCleanMode)
+        {
+            return;
+        }
+
+        AutoStartup.SynchronizeUiState(visible);
     }
 
     private void ShowMainWindow()
@@ -972,14 +1151,14 @@ public sealed partial class App : Application
         _window?.ShowFromTray();
     }
 
-    private void ShutdownAndExit()
+    public void Dispose()
     {
-        if (_shuttingDown)
+        if (_disposed)
         {
             return;
         }
 
-        _shuttingDown = true;
+        _disposed = true;
         Program.UnregisterActivationHandler(OnRedirectedActivation);
         Program.DetachActivationSource(_appInstance);
 
@@ -990,6 +1169,8 @@ public sealed partial class App : Application
 
         if (_powerModeMonitor is not null)
         {
+            _powerModeMonitor.SessionEnding -= OnSystemSessionEnding;
+            _powerModeMonitor.SessionEndCancelled -= OnSystemSessionEndCancelled;
             _powerModeMonitor.Suspending -= OnSystemSuspending;
             _powerModeMonitor.Resumed -= OnSystemResumed;
             _powerModeMonitor.Dispose();
@@ -1012,17 +1193,22 @@ public sealed partial class App : Application
             _startupUpdateChecker = null;
         }
 
-        if (!AppStoragePaths.IsCleanMode)
+        if (!AppStoragePaths.IsCleanMode && !_systemSessionEnding)
         {
+            // A deliberate application exit must cancel Restart Manager restoration.
+            // During Windows shutdown/logoff we keep the registration intact so Windows
+            // can restore the state captured by WM_QUERYENDSESSION.
             AutoStartup.RegisterForRestart(false);
         }
+
+        _window?.DisposeCachedPages();
 
         if (_controller is not null)
         {
             UnsubscribeControllerEvents(_controller);
             try
             {
-                _controller.Stop();
+                _controller.Dispose();
             }
             catch (Exception exception)
             {
@@ -1036,7 +1222,18 @@ public sealed partial class App : Application
 
         _userInteraction = null;
         _lifetimeCancellation.Dispose();
+        GC.SuppressFinalize(this);
+    }
 
+    private void ShutdownAndExit()
+    {
+        if (_shuttingDown)
+        {
+            return;
+        }
+
+        _shuttingDown = true;
+        Dispose();
         _appInstance.UnregisterKey();
 
         MainWindow? window = _window;

@@ -5,53 +5,61 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using NLog;
-using Shadowsocks.Model;
 using Shadowsocks.Core;
+using Shadowsocks.Model;
 
 namespace Shadowsocks.Controller
 {
-    public class Listener
+    public sealed class Listener : IDisposable
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         public interface IService
         {
             bool Handle(byte[] firstPacket, int length, Socket socket, object state);
 
-            void Stop();
+            void Shutdown();
         }
 
         public abstract class Service : IService
         {
             public abstract bool Handle(byte[] firstPacket, int length, Socket socket, object state);
 
-            public virtual void Stop() { }
+            public virtual void Shutdown() { }
         }
 
-        public class UDPState
+        public sealed class UDPState
         {
-            public UDPState(Socket s)
+            public UDPState(Socket socket)
             {
-                socket = s;
-                remoteEndPoint = new IPEndPoint(s.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any, 0);
+                Socket = socket;
+                Buffer = new byte[4096];
+                RemoteEndPoint = new IPEndPoint(
+                    socket.AddressFamily == AddressFamily.InterNetworkV6 ? IPAddress.IPv6Any : IPAddress.Any,
+                    0);
             }
-            public Socket socket;
-            public byte[] buffer = new byte[4096];
-            public EndPoint remoteEndPoint;
+
+            public Socket Socket { get; }
+            public byte[] Buffer { get; }
+            public EndPoint RemoteEndPoint { get; set; }
         }
 
-        Configuration _config;
-        bool _shareOverLAN;
-        Socket _tcpSocket;
-        Socket _udpSocket;
-        List<IService> _services;
+        private sealed record ReceiveState(Socket Socket, byte[] Buffer);
+
+        private readonly List<IService> _services;
+        private Configuration _config;
+        private bool _shareOverLAN;
+        private Socket _tcpSocket;
+        private Socket _udpSocket;
+        private bool _disposed;
 
         public Listener(List<IService> services)
         {
-            this._services = services;
+            ArgumentNullException.ThrowIfNull(services);
+            _services = services;
         }
 
-        private bool CheckIfPortInUse(int port)
+        private static bool CheckIfPortInUse(int port)
         {
             IPGlobalProperties ipProperties = IPGlobalProperties.GetIPGlobalProperties();
             return ipProperties.GetActiveTcpListeners().Any(endPoint => endPoint.Port == port);
@@ -59,39 +67,49 @@ namespace Shadowsocks.Controller
 
         public void Start(Configuration config)
         {
-            this._config = config;
-            this._shareOverLAN = config.shareOverLan;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ArgumentNullException.ThrowIfNull(config);
+
+            _config = config;
+            _shareOverLAN = config.shareOverLan;
 
             if (CheckIfPortInUse(_config.localPort))
-                throw new Exception(I18N.GetString("Port {0} already in use", _config.localPort));
+            {
+                throw new InvalidOperationException(I18N.GetString("Port {0} already in use", _config.localPort));
+            }
 
             try
             {
-                // Create a TCP/IP socket.
-                _tcpSocket = new Socket(config.isIPv6Enabled ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                _udpSocket = new Socket(config.isIPv6Enabled ? AddressFamily.InterNetworkV6 : AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+                AddressFamily addressFamily = config.isIPv6Enabled
+                    ? AddressFamily.InterNetworkV6
+                    : AddressFamily.InterNetwork;
+                _tcpSocket = new Socket(addressFamily, SocketType.Stream, ProtocolType.Tcp);
+                _udpSocket = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
                 _tcpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
                 _udpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                IPEndPoint localEndPoint = null;
-                localEndPoint = _shareOverLAN
-                    ? new IPEndPoint(config.isIPv6Enabled ? IPAddress.IPv6Any : IPAddress.Any, _config.localPort)
-                    : new IPEndPoint(config.isIPv6Enabled ? IPAddress.IPv6Loopback : IPAddress.Loopback, _config.localPort);
 
-                // Bind the socket to the local endpoint and listen for incoming connections.
+                IPAddress bindAddress = _shareOverLAN
+                    ? (config.isIPv6Enabled ? IPAddress.IPv6Any : IPAddress.Any)
+                    : (config.isIPv6Enabled ? IPAddress.IPv6Loopback : IPAddress.Loopback);
+                IPEndPoint localEndPoint = new(bindAddress, _config.localPort);
+
                 _tcpSocket.Bind(localEndPoint);
                 _udpSocket.Bind(localEndPoint);
                 _tcpSocket.Listen(1024);
 
-                // Start an asynchronous socket to listen for connections.
                 logger.Info($"Shadowsocks started ({ApplicationInfo.Version})");
                 logger.Debug(Encryption.EncryptorFactory.DumpRegisteredEncryptor());
-                _tcpSocket.BeginAccept(new AsyncCallback(AcceptCallback), _tcpSocket);
-                UDPState udpState = new UDPState(_udpSocket);
-                _udpSocket.BeginReceiveFrom(udpState.buffer, 0, udpState.buffer.Length, 0, ref udpState.remoteEndPoint, new AsyncCallback(RecvFromCallback), udpState);
+                _tcpSocket.BeginAccept(AcceptCallback, _tcpSocket);
+
+                UDPState udpState = new(_udpSocket);
+                EndPoint remoteEndPoint = udpState.RemoteEndPoint;
+                _udpSocket.BeginReceiveFrom(
+                    udpState.Buffer, 0, udpState.Buffer.Length, SocketFlags.None, ref remoteEndPoint, RecvFromCallback, udpState);
+                udpState.RemoteEndPoint = remoteEndPoint;
             }
-            catch (SocketException)
+            catch
             {
-                _tcpSocket.Close();
+                Stop();
                 throw;
             }
         }
@@ -100,159 +118,142 @@ namespace Shadowsocks.Controller
         {
             Socket tcpSocket = _tcpSocket;
             _tcpSocket = null;
-            tcpSocket?.Close();
+            tcpSocket?.Dispose();
 
             Socket udpSocket = _udpSocket;
             _udpSocket = null;
-            udpSocket?.Close();
+            udpSocket?.Dispose();
 
-            _services.ForEach(s => s.Stop());
+            foreach (IService service in _services)
+            {
+                service.Shutdown();
+            }
         }
 
         public void RecvFromCallback(IAsyncResult ar)
         {
-            UDPState state = (UDPState)ar.AsyncState;
-            var socket = state.socket;
+            if (ar.AsyncState is not UDPState state)
+            {
+                return;
+            }
+
+            Socket socket = state.Socket;
             try
             {
-                int bytesRead = socket.EndReceiveFrom(ar, ref state.remoteEndPoint);
+                EndPoint remoteEndPoint = state.RemoteEndPoint;
+                int bytesRead = socket.EndReceiveFrom(ar, ref remoteEndPoint);
+                state.RemoteEndPoint = remoteEndPoint;
                 foreach (IService service in _services)
                 {
-                    if (service.Handle(state.buffer, bytesRead, socket, state))
+                    if (service.Handle(state.Buffer, bytesRead, socket, state))
                     {
                         break;
                     }
                 }
             }
-            catch (ObjectDisposedException)
-            {
-                // Expected when the UDP listener is stopped.
-            }
-            catch (SocketException e) when (IsExpectedSocketShutdown(e))
-            {
-                // .NET 7+ reports cancellation of a pending BeginReceiveFrom as OperationAborted.
-            }
+            catch (ObjectDisposedException) { }
+            catch (SocketException e) when (IsExpectedSocketShutdown(e)) { }
             catch (Exception ex)
             {
                 logger.Debug(ex);
             }
             finally
             {
-                // Do not re-arm a callback belonging to a UDP socket that has been
-                // stopped or replaced during a controller restart.
                 if (ReferenceEquals(socket, _udpSocket))
                 {
                     try
                     {
-                        socket.BeginReceiveFrom(state.buffer, 0, state.buffer.Length, 0, ref state.remoteEndPoint, new AsyncCallback(RecvFromCallback), state);
+                        EndPoint remoteEndPoint = state.RemoteEndPoint;
+                        socket.BeginReceiveFrom(
+                            state.Buffer, 0, state.Buffer.Length, SocketFlags.None, ref remoteEndPoint, RecvFromCallback, state);
+                        state.RemoteEndPoint = remoteEndPoint;
                     }
-                    catch (ObjectDisposedException)
-                    {
-                        // Expected during shutdown.
-                    }
-                    catch (SocketException e) when (IsExpectedSocketShutdown(e))
-                    {
-                        // Expected during shutdown on .NET 7+.
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.Debug(ex);
-                    }
+                    catch (ObjectDisposedException) { }
+                    catch (SocketException e) when (IsExpectedSocketShutdown(e)) { }
+                    catch (Exception ex) { logger.Debug(ex); }
                 }
             }
         }
 
         public void AcceptCallback(IAsyncResult ar)
         {
-            Socket listener = (Socket)ar.AsyncState;
+            if (ar.AsyncState is not Socket listener)
+            {
+                return;
+            }
+
+            Socket connection = null;
             try
             {
-                Socket conn = listener.EndAccept(ar);
-
-                byte[] buf = new byte[4096];
-                object[] state = new object[] {
-                    conn,
-                    buf
-                };
-
-                conn.BeginReceive(buf, 0, buf.Length, 0,
-                    new AsyncCallback(ReceiveCallback), state);
+                connection = listener.EndAccept(ar);
+                byte[] buffer = new byte[4096];
+                var state = new ReceiveState(connection, buffer);
+                connection.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, ReceiveCallback, state);
+                connection = null; // ownership transferred to ReceiveCallback
             }
-            catch (ObjectDisposedException)
-            {
-                // Expected when the listener socket is closed during shutdown.
-            }
-            catch (SocketException e) when (IsExpectedSocketShutdown(e))
-            {
-                // .NET 7+ reports cancellation of a pending BeginAccept as OperationAborted.
-            }
+            catch (ObjectDisposedException) { }
+            catch (SocketException e) when (IsExpectedSocketShutdown(e)) { }
             catch (Exception e)
             {
                 logger.LogUsefulException(e);
             }
             finally
             {
-                // Do not re-arm a callback belonging to a listener that has been stopped
-                // or replaced during a controller restart.
+                connection?.Dispose();
                 if (ReferenceEquals(listener, _tcpSocket))
                 {
-                    try
-                    {
-                        listener.BeginAccept(
-                            new AsyncCallback(AcceptCallback),
-                            listener);
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        // Expected during shutdown.
-                    }
-                    catch (SocketException e) when (IsExpectedSocketShutdown(e))
-                    {
-                        // Expected during shutdown on .NET 7+.
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogUsefulException(e);
-                    }
+                    try { listener.BeginAccept(AcceptCallback, listener); }
+                    catch (ObjectDisposedException) { }
+                    catch (SocketException e) when (IsExpectedSocketShutdown(e)) { }
+                    catch (Exception e) { logger.LogUsefulException(e); }
                 }
             }
         }
 
-        private static bool IsExpectedSocketShutdown(SocketException exception)
-        {
-            return exception.SocketErrorCode == SocketError.OperationAborted
-                || exception.SocketErrorCode == SocketError.Interrupted;
-        }
+        private static bool IsExpectedSocketShutdown(SocketException exception) =>
+            exception.SocketErrorCode is SocketError.OperationAborted or SocketError.Interrupted;
 
         private void ReceiveCallback(IAsyncResult ar)
         {
-            object[] state = (object[])ar.AsyncState;
+            if (ar.AsyncState is not ReceiveState state)
+            {
+                return;
+            }
 
-            Socket conn = (Socket)state[0];
-            byte[] buf = (byte[])state[1];
+            Socket connection = state.Socket;
             try
             {
-                int bytesRead = conn.EndReceive(ar);
-                if (bytesRead <= 0) goto Shutdown;
-                foreach (IService service in _services)
+                int bytesRead = connection.EndReceive(ar);
+                if (bytesRead > 0)
                 {
-                    if (service.Handle(buf, bytesRead, conn, null))
+                    foreach (IService service in _services)
                     {
-                        return;
+                        if (service.Handle(state.Buffer, bytesRead, connection, null))
+                        {
+                            return;
+                        }
                     }
                 }
-            Shutdown:
-                // no service found for this
-                if (conn.ProtocolType == ProtocolType.Tcp)
-                {
-                    conn.Close();
-                }
+
+                connection.Dispose();
             }
             catch (Exception e)
             {
                 logger.LogUsefulException(e);
-                conn.Close();
+                connection.Dispose();
             }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            Stop();
+            _disposed = true;
+            GC.SuppressFinalize(this);
         }
     }
 }

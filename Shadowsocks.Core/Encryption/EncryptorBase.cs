@@ -2,13 +2,13 @@
 {
     public class EncryptorInfo
     {
-        public int KeySize;
-        public int IvSize;
-        public int SaltSize;
-        public int TagSize;
-        public int NonceSize;
-        public int Type;
-        public string InnerLibName;
+        public int KeySize { get; set; }
+        public int IvSize { get; set; }
+        public int SaltSize { get; set; }
+        public int TagSize { get; set; }
+        public int NonceSize { get; set; }
+        public int Type { get; set; }
+        public string InnerLibName { get; set; }
 
         // For those who make use of internal crypto method name
         // e.g. mbed TLS
@@ -61,17 +61,17 @@
     public abstract class EncryptorBase
         : IEncryptor
     {
-        public const int MAX_INPUT_SIZE = 32768;
+        public const int MaxInputSize = 32768;
 
-        public const int MAX_DOMAIN_LEN = 255;
-        public const int ADDR_PORT_LEN = 2;
-        public const int ADDR_ATYP_LEN = 1;
+        public const int MaxDomainLength = 255;
+        public const int AddressPortLength = 2;
+        public const int AddressTypeLength = 1;
 
-        public const int ATYP_IPv4 = 0x01;
-        public const int ATYP_DOMAIN = 0x03;
-        public const int ATYP_IPv6 = 0x04;
+        public const int AddressTypeIPv4 = 0x01;
+        public const int AddressTypeDomain = 0x03;
+        public const int AddressTypeIPv6 = 0x04;
 
-        public const int MD5_LEN = 16;
+        public const int Md5Length = 16;
 
         protected EncryptorBase(string method, string password)
         {
@@ -79,8 +79,8 @@
             Password = password;
         }
 
-        protected string Method;
-        protected string Password;
+        protected string Method { get; }
+        protected string Password { get; }
 
         public abstract void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength);
 

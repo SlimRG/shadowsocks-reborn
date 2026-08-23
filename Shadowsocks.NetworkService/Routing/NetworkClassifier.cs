@@ -12,12 +12,9 @@ internal static class NetworkClassifier
             return true;
         }
 
-        // DNS interception has an explicit policy contract in the main application,
-        // but is intentionally not implemented in this revision.
-        if (flow.RemotePort == 53)
-        {
-            return true;
-        }
+        // Port 53 is handled before this classifier by the explicit DNS policy.
+        // Keeping it out of the generic infrastructure rules prevents an enabled
+        // DNSCrypt policy from being accidentally bypassed.
 
         // DHCP, mDNS and LLMNR are local discovery/bootstrap traffic and must never
         // be sent to a remote Shadowsocks server.

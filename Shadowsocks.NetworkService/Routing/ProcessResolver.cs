@@ -16,19 +16,18 @@ internal static partial class ProcessResolver
     private const int AfInet = 2;
     private const int AfInet6 = 23;
     private const uint ErrorInsufficientBuffer = 122;
+    private const int DnsOwnerLookupAttempts = 4;
 
     public static ProcessIdentity Resolve(FlowKey flow)
     {
-        int pid = flow.Protocol switch
+        int pid;
+        if (!ProcessAttributionCache.TryGetProcessId(flow.Protocol, flow.LocalPort, DateTime.UtcNow, out pid))
         {
-            6 => flow.LocalAddress.AddressFamily == AddressFamily.InterNetwork
-                ? FindTcp4(flow)
-                : FindTcp6(flow),
-            17 => flow.LocalAddress.AddressFamily == AddressFamily.InterNetwork
-                ? FindUdp4(flow)
-                : FindUdp6(flow),
-            _ => 0,
-        };
+            pid = ResolvePidWithRetry(
+                () => FindOwnerPid(flow),
+                flow.RemotePort == 53,
+                static delayMilliseconds => Thread.Sleep(delayMilliseconds));
+        }
 
         if (pid <= 0)
         {
@@ -62,6 +61,49 @@ internal static partial class ProcessResolver
         {
             return new ProcessIdentity(pid, null, null);
         }
+    }
+
+    private static int FindOwnerPid(FlowKey flow)
+    {
+        return flow.Protocol switch
+        {
+            6 => flow.LocalAddress.AddressFamily == AddressFamily.InterNetwork
+                ? FindTcp4(flow)
+                : FindTcp6(flow),
+            17 => flow.LocalAddress.AddressFamily == AddressFamily.InterNetwork
+                ? FindUdp4(flow)
+                : FindUdp6(flow),
+            _ => 0,
+        };
+    }
+
+    internal static int ResolvePidWithRetry(
+        Func<int> resolvePid,
+        bool dnsFlow,
+        Action<int>? delay = null)
+    {
+        ArgumentNullException.ThrowIfNull(resolvePid);
+        delay ??= static milliseconds => Thread.Sleep(milliseconds);
+
+        int attempts = dnsFlow ? DnsOwnerLookupAttempts : 1;
+        for (int attempt = 0; attempt < attempts; attempt++)
+        {
+            int processId = resolvePid();
+            if (processId > 0)
+            {
+                return processId;
+            }
+
+            if (attempt + 1 < attempts)
+            {
+                // DNSCrypt's short-lived -check process and a newly restarted runtime can emit
+                // bootstrap DNS immediately after creating their socket. Give the Windows owner
+                // tables a few milliseconds to expose the PID before applying port-53 policy.
+                delay(attempt switch { 0 => 1, 1 => 4, _ => 10 });
+            }
+        }
+
+        return 0;
     }
 
     private static int FindTcp4(FlowKey flow)

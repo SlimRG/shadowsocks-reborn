@@ -7,91 +7,87 @@ namespace Shadowsocks.Controller
 {
     public static class ProtocolHandler
     {
-        const string ssURLRegKey = @"SOFTWARE\Classes\ss";
-
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private const string SsUrlRegKey = @"SOFTWARE\Classes\ss";
+        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         public static bool Set(bool enabled)
         {
-            RegistryKey ssURLAssociation = null;
-
             try
             {
-                ssURLAssociation = Registry.CurrentUser.CreateSubKey(ssURLRegKey, RegistryKeyPermissionCheck.ReadWriteSubTree);
-                if (ssURLAssociation == null)
+                if (!enabled)
                 {
-                    logger.Error(@"Failed to create HKCU\SOFTWARE\Classes\ss to register ss:// association.");
+                    Registry.CurrentUser.DeleteSubKeyTree(SsUrlRegKey, throwOnMissingSubKey: false);
+                    Logger.Info(@"Successfully removed ss:// association.");
+                    return true;
+                }
+
+                using RegistryKey ssUrlAssociation = Registry.CurrentUser.CreateSubKey(
+                    SsUrlRegKey,
+                    RegistryKeyPermissionCheck.ReadWriteSubTree);
+
+                if (ssUrlAssociation is null)
+                {
+                    Logger.Error(@"Failed to create HKCU\SOFTWARE\Classes\ss to register ss:// association.");
                     return false;
                 }
-                if (enabled)
+
+                ssUrlAssociation.SetValue("", "URL:shadowsocks-reborn");
+                ssUrlAssociation.SetValue("URL Protocol", "");
+
+                using RegistryKey shell = ssUrlAssociation.CreateSubKey("shell");
+                using RegistryKey open = shell?.CreateSubKey("open");
+                using RegistryKey command = open?.CreateSubKey("command");
+                if (command is null)
                 {
-                    ssURLAssociation.SetValue("", "URL:shadowsocks-reborn");
-                    ssURLAssociation.SetValue("URL Protocol", "");
-                    var shellOpen = ssURLAssociation.CreateSubKey("shell").CreateSubKey("open").CreateSubKey("command");
-                    shellOpen.SetValue("", $"{RuntimeEnvironment.ExecutablePath} --open-url %1");
-                    logger.Info(@"Successfully added ss:// association.");
+                    Logger.Error(@"Failed to create the ss:// shell open command registry key.");
+                    return false;
                 }
-                else
-                {
-                    Registry.CurrentUser.DeleteSubKeyTree(ssURLRegKey);
-                    logger.Info(@"Successfully removed ss:// association.");
-                }
+
+                command.SetValue("", BuildShellOpenCommand(RuntimeEnvironment.ExecutablePath));
+                Logger.Info(@"Successfully added ss:// association.");
                 return true;
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                logger.LogUsefulException(e);
+                Logger.LogUsefulException(exception);
                 return false;
-            }
-            finally
-            {
-                if (ssURLAssociation != null)
-                {
-                    try
-                    {
-                        ssURLAssociation.Close();
-                        ssURLAssociation.Dispose();
-                    }
-                    catch (Exception e)
-                    { logger.LogUsefulException(e); }
-                }
             }
         }
 
         public static bool Check()
         {
-            RegistryKey ssURLAssociation = null;
             try
             {
-                ssURLAssociation = Registry.CurrentUser.OpenSubKey(ssURLRegKey, true);
-                if (ssURLAssociation == null)
-                {
-                    //logger.Info(@"ss:// links not associated.");
-                    return false;
-                }
+                using RegistryKey ssUrlAssociation = Registry.CurrentUser.OpenSubKey(SsUrlRegKey, writable: false);
+                using RegistryKey command = ssUrlAssociation?
+                    .OpenSubKey("shell", writable: false)?
+                    .OpenSubKey("open", writable: false)?
+                    .OpenSubKey("command", writable: false);
 
-                var shellOpen = ssURLAssociation.OpenSubKey("shell").OpenSubKey("open").OpenSubKey("command");
-                return (string)shellOpen.GetValue("") == $"{RuntimeEnvironment.ExecutablePath} --open-url %1";
+                return command?.GetValue("") is string registeredCommand
+                    && string.Equals(
+                        registeredCommand,
+                        BuildShellOpenCommand(RuntimeEnvironment.ExecutablePath),
+                        StringComparison.Ordinal);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                logger.LogUsefulException(e);
+                Logger.LogUsefulException(exception);
                 return false;
-            }
-            finally
-            {
-                if (ssURLAssociation != null)
-                {
-                    try
-                    {
-                        ssURLAssociation.Close();
-                        ssURLAssociation.Dispose();
-                    }
-                    catch (Exception e)
-                    { logger.LogUsefulException(e); }
-                }
             }
         }
 
+        internal static string BuildShellOpenCommand(string executablePath)
+        {
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                throw new ArgumentException("Executable path is required.", nameof(executablePath));
+            }
+
+            // Windows protocol handlers are parsed as command lines. Quote both the
+            // executable path and the URL placeholder so paths/URLs containing spaces
+            // cannot change argument boundaries.
+            return $"\"{executablePath}\" --open-url \"%1\"";
+        }
     }
 }

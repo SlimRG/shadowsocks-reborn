@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Package version label, for example v5.0.0
+        description: Package version label, for example v5.2.31
         required: true
-        default: v5.0.0
+        default: v5.2.31
 
 permissions:
   contents: write
@@ -34,7 +34,8 @@ jobs:
         run: |
           if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             "label=${{ inputs.version }}" >> $env:GITHUB_OUTPUT
-          } else {
+          }
+          else {
             "label=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
           }
 

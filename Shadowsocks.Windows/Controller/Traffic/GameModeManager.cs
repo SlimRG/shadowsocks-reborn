@@ -24,13 +24,15 @@ namespace Shadowsocks.Controller.Traffic
 
         private Configuration _configuration;
         private int[] _excludedProcessIds = [];
+        private DnsCaptureRuntimeState _dnsRuntime = DnsCaptureRuntimeState.Unavailable;
         private string[] _runningGameApplications = [];
         private bool _automaticGameMode;
         private bool _disposed;
 
         public GameModeManager(AdminCaptureManager adminCapture)
         {
-            _adminCapture = adminCapture ?? throw new ArgumentNullException(nameof(adminCapture));
+            ArgumentNullException.ThrowIfNull(adminCapture);
+            _adminCapture = adminCapture;
             _adminCapture.StatusChanged += AdminCapture_StatusChanged;
             _timer = new Timer(static state => ((GameModeManager)state).QueuePoll(), this, Timeout.Infinite, Timeout.Infinite);
         }
@@ -66,6 +68,7 @@ namespace Shadowsocks.Controller.Traffic
         public async Task ApplyConfigurationAsync(
             Configuration configuration,
             IEnumerable<int> excludedProcessIds,
+            DnsCaptureRuntimeState dnsRuntime,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(configuration);
@@ -76,6 +79,7 @@ namespace Shadowsocks.Controller.Traffic
                 ThrowIfDisposed();
                 _configuration = configuration;
                 _excludedProcessIds = (excludedProcessIds ?? []).Where(pid => pid > 0).Distinct().ToArray();
+                _dnsRuntime = dnsRuntime;
 
                 _runningGameApplications = configuration.trafficCaptureMode == TrafficCaptureMode.Admin
                     ? FindRunningConfiguredGames(configuration.gameModeApplications)
@@ -91,6 +95,22 @@ namespace Shadowsocks.Controller.Traffic
                 {
                     _timer.Change(Timeout.Infinite, Timeout.Infinite);
                 }
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        public async Task UpdateDnsRuntimeAsync(
+            DnsCaptureRuntimeState dnsRuntime,
+            CancellationToken cancellationToken = default)
+        {
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                ThrowIfDisposed();
+                _dnsRuntime = dnsRuntime;
             }
             finally
             {
@@ -186,28 +206,49 @@ namespace Shadowsocks.Controller.Traffic
 
             if (_automaticGameMode)
             {
-                await _adminCapture.EnterGameModeAsync(cancellationToken).ConfigureAwait(false);
+                // Keep the elevated broker's pending configuration current while the
+                // capture child is paused. Do not create a broker/UAC prompt merely
+                // because DNSCrypt restarted while a game was already running.
+                if (_adminCapture.IsGameMode && _adminCapture.IsBrokerRunning)
+                {
+                    await _adminCapture.StartOrUpdateAsync(
+                        _configuration,
+                        _excludedProcessIds,
+                        _dnsRuntime,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _adminCapture.EnterGameModeAsync(cancellationToken).ConfigureAwait(false);
+                }
                 StatusChanged?.Invoke(this, EventArgs.Empty);
                 return;
             }
 
             if (_adminCapture.IsGameMode)
             {
-                // If the broker survived Game Mode, exiting it resumes capture without UAC.
-                // When no broker exists (e.g. app started while a game was already open),
-                // StartOrUpdate below performs the first elevation now that the game ended.
+                // Update the broker's stored request before resuming capture so a DNSCrypt
+                // restart that happened during Game Mode cannot restore a stale PID/port.
+                await _adminCapture.StartOrUpdateAsync(
+                    _configuration,
+                    _excludedProcessIds,
+                    _dnsRuntime,
+                    cancellationToken).ConfigureAwait(false);
                 await _adminCapture.ExitGameModeAsync(cancellationToken).ConfigureAwait(false);
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+                return;
             }
 
             await _adminCapture.StartOrUpdateAsync(
                 _configuration,
                 _excludedProcessIds,
+                _dnsRuntime,
                 cancellationToken).ConfigureAwait(false);
 
             StatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        private static string[] FindRunningConfiguredGames(IReadOnlyCollection<string> patterns)
+        private static string[] FindRunningConfiguredGames(List<string> patterns)
         {
             if (patterns is null || patterns.Count == 0)
             {
