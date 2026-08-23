@@ -45,7 +45,11 @@ function Get-ProjectProperty {
     )
 
     $node = $Project.SelectSingleNode("/Project/PropertyGroup/$Name")
-    return if ($null -eq $node) { $null } else { [string]$node.InnerText }
+    if ($null -eq $node) {
+        return $null
+    }
+
+    return [string]$node.InnerText
 }
 
 function Get-PackageVersion {
@@ -56,7 +60,11 @@ function Get-PackageVersion {
     )
 
     $node = $Project.SelectSingleNode("/Project/ItemGroup/PackageReference[@Include='$PackageName']")
-    return if ($null -eq $node) { $null } else { [string]$node.Version }
+    if ($null -eq $node) {
+        return $null
+    }
+
+    return [string]$node.Version
 }
 
 function Get-RepositoryFiles {
@@ -112,6 +120,20 @@ function Test-PowerShellStrictModeCollectionFormatting {
     foreach ($script in $scripts) {
         $text = Get-Content -LiteralPath $script.FullName -Raw
         Test-Condition ($text -notmatch $unsafeMemberEnumeration) "PowerShell StrictMode-unsafe collection member formatting found in $($script.FullName). Project collection properties through ForEach-Object before joining them."
+    }
+}
+
+function Test-PowerShellReturnStatementUsage {
+    [CmdletBinding()]
+    param()
+
+    $packagingRoot = Join-Path $repoRoot 'packaging'
+    $scripts = @(Get-ChildItem -LiteralPath $packagingRoot -File -Filter '*.ps1')
+    $invalidReturnStatement = '(?im)^\s*return\s+(?:if|foreach|for|while|switch|try)\b'
+
+    foreach ($script in $scripts) {
+        $text = Get-Content -LiteralPath $script.FullName -Raw
+        Test-Condition ($text -notmatch $invalidReturnStatement) "PowerShell statement keyword cannot be used as a direct return operand in $($script.FullName). Use a statement block with explicit return values instead."
     }
 }
 
@@ -174,6 +196,7 @@ $allFiles = Get-RepositoryFiles
 Test-PowerShellSyntax @($allFiles | Where-Object Extension -EQ '.ps1')
 Test-TextEncodingAndLineEndings $allFiles
 Test-PowerShellStrictModeCollectionFormatting
+Test-PowerShellReturnStatementUsage
 Test-WinUiIsEnabledAssignments
 
 $unexpectedBuildTrees = @(Get-ChildItem -LiteralPath $repoRoot -Recurse -Directory | Where-Object { $_.Name -in @('bin', 'obj', 'artifacts') -and $_.FullName -notmatch '[\\/](?:\.git|\.github)[\\/]' })
